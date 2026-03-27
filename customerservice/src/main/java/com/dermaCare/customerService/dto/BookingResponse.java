@@ -1,6 +1,7 @@
 package com.dermaCare.customerService.dto;
 
 import java.util.List;
+import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
@@ -72,5 +73,8 @@ public class BookingResponse {
     private String bodyPartId;
 	private String bodyPartName;
 	private String partImage;
-	private List<QuestionsDTO> questions;
+	private Map<String,List<TheraphyAnswersDTO>> theraphyAnswers;	
+	private List<String> parts;
+	private double partAmount;
+	private double dueAmount;
 }

@@ -15,8 +15,7 @@ import com.clinicadmin.dto.Branch;
 import com.clinicadmin.dto.Response;
 import com.clinicadmin.dto.ResponseStructure;
 import com.clinicadmin.dto.TherapistDTO;
-import com.clinicadmin.dto.TherapistLoginDTO;
-import com.clinicadmin.dto.TherapistLoginResponseDTO;
+
 import com.clinicadmin.entity.DoctorLoginCredentials;
 import com.clinicadmin.entity.Documents;
 import com.clinicadmin.entity.Therapist;
