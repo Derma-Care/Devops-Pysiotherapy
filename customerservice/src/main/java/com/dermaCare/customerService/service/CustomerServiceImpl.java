@@ -39,6 +39,7 @@ import com.dermaCare.customerService.dto.DoctorsDTO;
 import com.dermaCare.customerService.dto.FavouriteDoctorsDTO;
 import com.dermaCare.customerService.dto.LoginDTO;
 import com.dermaCare.customerService.dto.NotificationToCustomer;
+import com.dermaCare.customerService.dto.QuestionsDTO;
 import com.dermaCare.customerService.dto.ReportsAndDoctorSaveDetailsDto;
 import com.dermaCare.customerService.dto.ReportsDtoList;
 import com.dermaCare.customerService.dto.ServicesDto;
@@ -49,6 +50,7 @@ import com.dermaCare.customerService.entity.ConsultationEntity;
 import com.dermaCare.customerService.entity.Customer;
 import com.dermaCare.customerService.entity.CustomerRating;
 import com.dermaCare.customerService.entity.FavouriteDoctorsEntity;
+import com.dermaCare.customerService.entity.QuestionsEntity;
 import com.dermaCare.customerService.feignClient.AdminFeign;
 import com.dermaCare.customerService.feignClient.BookingFeign;
 import com.dermaCare.customerService.feignClient.CategoryServicesFeign;
@@ -59,6 +61,7 @@ import com.dermaCare.customerService.repository.ConsultationRep;
 import com.dermaCare.customerService.repository.CustomerFavouriteDoctors;
 import com.dermaCare.customerService.repository.CustomerRatingRepository;
 import com.dermaCare.customerService.repository.CustomerRepository;
+import com.dermaCare.customerService.repository.PhysiotherapyRepo;
 import com.dermaCare.customerService.util.ExtractFeignMessage;
 import com.dermaCare.customerService.util.HelperForConversion;
 import com.dermaCare.customerService.util.ResBody;
@@ -86,6 +89,9 @@ public class CustomerServiceImpl implements CustomerService {
     
     @Autowired
     private BookingFeign bookingFeign;
+    
+    @Autowired
+    private PhysiotherapyRepo physiotherapyRepo;
     
     @Autowired
     private ClinicAdminFeign clinicAdminFeign;
@@ -869,12 +875,20 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 	            req.getMobileNumber(), req.getSubServiceId(), req.getDoctorId());
 
 	    Response response = new Response();
-
+	    BookingResponse bookingResponse = null;
+	    ResponseEntity<ResponseStructure<BookingResponse>> res = null;
 	    try {
 	        log.debug("BOOK_SERVICE :: CALLING_BOOKING_SERVICE");
-
-	        ResponseEntity<ResponseStructure<BookingResponse>> res = bookingFeign.bookService(req);
-	        BookingResponse bookingResponse = res.getBody().getData();
+//	        if(req.getBodyPartId() != null) {
+//	        for(QuestionsDTO dto:req.getQuestions()) {
+//	        //Optional<QuestionsEntity> entity = physiotherapyRepo.findByQuestionId(dto.getQuestionId());
+//	        if(entity.isPresent()) {
+//	        dto.setQuestion(entity.get().getQuestion());}}
+	        res = bookingFeign.bookService(req);
+	        bookingResponse = res.getBody().getData();
+//	        }else {
+//	        res = bookingFeign.bookService(req);
+//	        bookingResponse = res.getBody().getData();}
 
 	        if (bookingResponse != null) {
 

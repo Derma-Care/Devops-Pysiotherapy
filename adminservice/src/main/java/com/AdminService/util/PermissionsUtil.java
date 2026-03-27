@@ -16,7 +16,7 @@ public final class PermissionsUtil {
         adminPermissions.put("Appointments", List.of("create", "read", "update", "delete"));
         adminPermissions.put("Employee management", List.of("create", "read", "update", "delete"));
         adminPermissions.put("Doctors", List.of("create", "read", "update", "delete"));
-        adminPermissions.put("Nurses", List.of("create", "read", "update", "delete"));
+        adminPermissions.put("Therapist", List.of("create", "read", "update", "delete"));
         adminPermissions.put("Pharmacist", List.of("create", "read", "update", "delete"));
         adminPermissions.put("Lab Technician", List.of("create", "read", "update", "delete"));
         adminPermissions.put("Administrator", List.of("create", "read", "update", "delete"));
@@ -26,12 +26,14 @@ public final class PermissionsUtil {
         adminPermissions.put("Disease-Management", List.of("create", "read", "update", "delete"));
         adminPermissions.put("Tests", List.of("create", "read", "update", "delete"));
         adminPermissions.put("Treatments", List.of("create", "read", "update", "delete"));
-        adminPermissions.put("Procedure Management", List.of("create", "read", "update", "delete"));
+        adminPermissions.put("Therapy Management", List.of("create", "read", "update", "delete"));
         adminPermissions.put("Reports", List.of("create", "read", "update", "delete"));
         adminPermissions.put("Payouts", List.of("create", "read", "update", "delete"));
         adminPermissions.put("Help", List.of("create", "read", "update", "delete"));
         adminPermissions.put("Customer Management", List.of("create", "read", "update", "delete"));
         adminPermissions.put("ConsentForms", List.of("create", "read", "update", "delete"));
+        adminPermissions.put("Exercise", List.of("create", "read", "update", "delete"));
+        adminPermissions.put("Package Management", List.of("create", "read", "update", "delete"));
        
         adminPermissions.put("Vendor Management", List.of("create", "read", "update", "delete"));
         adminPermissions.put("Pharmacy Management", List.of("create", "read", "update", "delete"));

@@ -55,4 +55,9 @@ public class BookingRequset {
 	private String bookedAt;
 	private String followupStatus;
 	private String foc;
+	private String bodyPartId;
+	private String bodyPartName;
+	private String partImage;
+	private List<QuestionsDTO> questions;
+	
 }
