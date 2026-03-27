@@ -1,0 +1,64 @@
+package physiotherapydoctor.controller;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import lombok.RequiredArgsConstructor;
+import physiotherapydoctor.dto.PhysiotherapyRecordDTO;
+import physiotherapydoctor.dto.Response;
+import physiotherapydoctor.service.PhysiotherapyService;
+
+@RestController
+@RequestMapping("/physiotherapy")
+@RequiredArgsConstructor
+public class PhysiotherapyController {
+
+	private final PhysiotherapyService service;
+
+	// ✅ CREATE
+	@PostMapping("/create")
+	public ResponseEntity<Response> create(@RequestBody PhysiotherapyRecordDTO dto) {
+
+		Response response = service.create(dto);
+		return ResponseEntity.status(response.getStatus()).body(response);
+	}
+
+	// ✅ GET BY ID
+	@GetMapping("getById/{id}")
+	public ResponseEntity<Response> getById(@PathVariable String id) {
+
+		Response response = service.getById(id);
+		return ResponseEntity.status(response.getStatus()).body(response);
+	}
+
+	// ✅ GET ALL
+	@GetMapping("/getAll")
+	public ResponseEntity<Response> getAll() {
+
+		Response response = service.getAll();
+		return ResponseEntity.status(response.getStatus()).body(response);
+	}
+
+	// ✅ UPDATE
+	@PutMapping("updateById/{id}")
+	public ResponseEntity<Response> update(@PathVariable String id, @RequestBody PhysiotherapyRecordDTO dto) {
+
+		Response response = service.update(id, dto);
+		return ResponseEntity.status(response.getStatus()).body(response);
+	}
+
+	// ✅ DELETE
+	@DeleteMapping("deleteById/{id}")
+	public ResponseEntity<Response> delete(@PathVariable String id) {
+
+		Response response = service.delete(id);
+		return ResponseEntity.status(response.getStatus()).body(response);
+	}
+}
