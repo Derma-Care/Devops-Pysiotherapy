@@ -4,7 +4,6 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -45,10 +44,13 @@ import com.dermaCare.customerService.dto.ServicesDto;
 import com.dermaCare.customerService.dto.SubServicesDetailsDto;
 import com.dermaCare.customerService.dto.SubServicesDto;
 import com.dermaCare.customerService.dto.TempBlockingSlot;
+import com.dermaCare.customerService.dto.TheraphyAnswersDTO;
 import com.dermaCare.customerService.entity.ConsultationEntity;
 import com.dermaCare.customerService.entity.Customer;
 import com.dermaCare.customerService.entity.CustomerRating;
 import com.dermaCare.customerService.entity.FavouriteDoctorsEntity;
+import com.dermaCare.customerService.entity.QuestionsByPartEntity;
+import com.dermaCare.customerService.entity.QuestionsEntity;
 import com.dermaCare.customerService.feignClient.AdminFeign;
 import com.dermaCare.customerService.feignClient.BookingFeign;
 import com.dermaCare.customerService.feignClient.CategoryServicesFeign;
@@ -59,7 +61,9 @@ import com.dermaCare.customerService.repository.ConsultationRep;
 import com.dermaCare.customerService.repository.CustomerFavouriteDoctors;
 import com.dermaCare.customerService.repository.CustomerRatingRepository;
 import com.dermaCare.customerService.repository.CustomerRepository;
+import com.dermaCare.customerService.repository.PhysiotherapyRepo;
 import com.dermaCare.customerService.util.ExtractFeignMessage;
+import com.dermaCare.customerService.util.GetByKey;
 import com.dermaCare.customerService.util.HelperForConversion;
 import com.dermaCare.customerService.util.ResBody;
 import com.dermaCare.customerService.util.Response;
@@ -86,6 +90,9 @@ public class CustomerServiceImpl implements CustomerService {
     
     @Autowired
     private BookingFeign bookingFeign;
+    
+    @Autowired
+    private GetByKey getByKey;
     
     @Autowired
     private ClinicAdminFeign clinicAdminFeign;
@@ -869,13 +876,56 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 	            req.getMobileNumber(), req.getSubServiceId(), req.getDoctorId());
 
 	    Response response = new Response();
-
+	    BookingResponse bookingResponse = null;
+	    ResponseEntity<ResponseStructure<BookingResponse>> res = null;
 	    try {
 	        log.debug("BOOK_SERVICE :: CALLING_BOOKING_SERVICE");
+	        if(req.getTheraphyAnswers()!= null) {
+	        
+	        	if (req.getTheraphyAnswers() != null && !req.getTheraphyAnswers().isEmpty()) {
 
-	        ResponseEntity<ResponseStructure<BookingResponse>> res = bookingFeign.bookService(req);
-	        BookingResponse bookingResponse = res.getBody().getData();
+	        	    Map<String, List<TheraphyAnswersDTO>> map = req.getTheraphyAnswers();
 
+	        	    for (Map.Entry<String, List<TheraphyAnswersDTO>> entry : map.entrySet()) {
+
+	        	        String key = entry.getKey(); // e.g., "back"
+	        	        List<TheraphyAnswersDTO> answersList = entry.getValue();
+
+	        	        // 🔍 Fetch DB data based on key
+	        	        QuestionsByPartEntity entity = getByKey.getByKey(key);
+
+	        	        if (entity == null || entity.getQuestionsByPart() == null) {
+	        	            continue;
+	        	        }
+
+	        	        List<QuestionsEntity> questionsList = entity.getQuestionsByPart().get(key);
+
+	        	        if (questionsList == null) {
+	        	            continue;
+	        	        }
+
+	        	        // 🔁 Match questionId and set question
+	        	        for (TheraphyAnswersDTO dto : answersList) {
+
+	        	            for (QuestionsEntity q : questionsList) {
+
+	        	                if (q.getQuestionId() == dto.getQuestionId()) {
+	        	                    dto.setQuestion(q.getQuestion());
+	        	                    break; // stop once matched
+	        	                }
+	        	            }
+	        	        }
+	        	    }
+	        	}
+	        double due = req.getTotalFee() - req.getPartAmount();
+	        req.setDueAmount(due);
+	        res = bookingFeign.bookService(req);
+	        bookingResponse = res.getBody().getData();
+	        }else {
+	        res = bookingFeign.bookService(req);
+	        bookingResponse = res.getBody().getData();}
+
+	        
 	        if (bookingResponse != null) {
 
 	            log.info("BOOK_SERVICE :: BOOKING_SUCCESS :: bookingId={}",

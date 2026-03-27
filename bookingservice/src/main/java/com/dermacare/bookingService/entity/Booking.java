@@ -1,6 +1,7 @@
 package com.dermacare.bookingService.entity;
 
 import java.util.List;
+import java.util.Map;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import com.dermacare.bookingService.dto.TreatmentResponseDTO;
@@ -72,6 +73,13 @@ public class Booking  {
     private String foc;
     // ------------------- NEW: Treatments and dates -------------------
     private TreatmentResponseDTO treatments; // treatmentName -> treatment details
+    private String bodyPartId;
+   	private String bodyPartName;
+   	private byte[] partImage;
+   	private Map<String,List<TheraphyAnswersEntity>> theraphyAnswers;
+   	private List<String> parts;
+   	private double partAmount;
+   	private double dueAmount;
 
     public Booking(Booking booking) {
         this.bookingId = booking.getBookingId();

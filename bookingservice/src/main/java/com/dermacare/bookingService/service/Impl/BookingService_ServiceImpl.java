@@ -199,6 +199,10 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 
 	             // 🔔 Publish to Kafka
 	             try {
+	            	 updatedBooking.setAttachments(null); 
+	            	 updatedBooking.setPartImage(null);
+	            	 updatedBooking.setConsentFormPdf(null);
+	            	 updatedBooking.setPrescriptionPdf(null);
 	                 kafkaProducer.publishBooking(updatedBooking);
 	             } catch (Exception e) {
 	                 System.err.println("⚠️ Kafka publish failed: " + e.getMessage());
@@ -251,6 +255,10 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	         nullifyLargeFields(savedBooking);
 
 	         try {
+	        	 savedBooking.setConsentFormPdf(null);
+	        	 savedBooking.setConsentFormPdf(null);
+	        	 savedBooking.setPrescriptionPdf(null); 
+	        	 savedBooking.setPartImage(null);
 	             kafkaProducer.publishBooking(savedBooking);
 	         } catch (Exception e) {
 	             System.err.println("⚠️ Kafka publish failed: " + e.getMessage());

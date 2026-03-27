@@ -17,8 +17,9 @@ public class Therapist {
     private String therapistId;
 
     private String clinicId;
+    private String clinicName;
     private String branchId;
-
+    private String branchName;
     private String fullName;
     private String contactNumber;
     private String gender;

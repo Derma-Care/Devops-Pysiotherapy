@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.clinicadmin.dto.Response;
 import com.clinicadmin.dto.ResponseStructure;
 import com.clinicadmin.dto.TherapistDTO;
 import com.clinicadmin.dto.TherapistLoginDTO;
@@ -26,27 +27,27 @@ public class TherapistController {
     @Autowired
     private TherapistService service;
 
-    // ================= CREATE =================
+ // ================= CREATE =================
     @PostMapping("/addTherapist")
-    public ResponseEntity<ResponseStructure<TherapistDTO>> createTherapist(
+    public ResponseEntity<Response> createTherapist(
             @RequestBody TherapistDTO dto) {
 
-        ResponseStructure<TherapistDTO> response = service.createTherapist(dto);
+        Response response = service.therapistOnboarding(dto);
 
-        return ResponseEntity.status(response.getHttpStatus())
+        return ResponseEntity.status(response.getStatus())
                 .body(response);
     }
 
-    // ================= LOGIN =================
-    @PostMapping("/login")
-    public ResponseEntity<ResponseStructure<TherapistLoginResponseDTO>> login(
-            @RequestBody TherapistLoginDTO dto) {
-
-        ResponseStructure<TherapistLoginResponseDTO> response = service.login(dto);
-
-        return ResponseEntity.status(response.getHttpStatus())
-                .body(response);
-    }
+//    // ================= LOGIN =================
+//    @PostMapping("/login")
+//    public ResponseEntity<ResponseStructure<TherapistLoginResponseDTO>> login(
+//            @RequestBody TherapistLoginDTO dto) {
+//
+//        ResponseStructure<TherapistLoginResponseDTO> response = service.login(dto);
+//
+//        return ResponseEntity.status(response.getHttpStatus())
+//                .body(response);
+//    }
 
     // ================= GET BY therapistId =================
     @GetMapping("/getByTherapistId/{therapistId}")

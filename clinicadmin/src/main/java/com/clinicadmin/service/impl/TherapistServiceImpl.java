@@ -1,24 +1,34 @@
 package com.clinicadmin.service.impl;
 
+
 import java.security.SecureRandom;
 import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.clinicadmin.dto.Branch;
+import com.clinicadmin.dto.Response;
 import com.clinicadmin.dto.ResponseStructure;
 import com.clinicadmin.dto.TherapistDTO;
-import com.clinicadmin.dto.TherapistLoginDTO;
-import com.clinicadmin.dto.TherapistLoginResponseDTO;
+
+import com.clinicadmin.entity.DoctorLoginCredentials;
 import com.clinicadmin.entity.Documents;
 import com.clinicadmin.entity.Therapist;
+import com.clinicadmin.feignclient.AdminServiceClient;
+import com.clinicadmin.repository.DoctorLoginCredentialsRepository;
 import com.clinicadmin.repository.TherapistRepository;
 import com.clinicadmin.service.TherapistService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Service
+@Slf4j
 public class TherapistServiceImpl implements TherapistService {
 
     @Autowired
@@ -26,108 +36,148 @@ public class TherapistServiceImpl implements TherapistService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
-
+    
+    @Autowired
+    DoctorLoginCredentialsRepository credentialsRepository;
+    
+    @Autowired
+    AdminServiceClient adminServiceClient;
+    
+    @Autowired
+    ObjectMapper objectMapper;
     @Override
-    public ResponseStructure<TherapistDTO> createTherapist(TherapistDTO dto) {
+    public Response therapistOnboarding(TherapistDTO dto) {
 
-        //  1. Validate contact number
+        log.info("Therapist onboarding started for contact number: {}", dto.getContactNumber());
+
+        Response response = new Response();
+
+        
+        // ✅ 2. Validate contact number
         if (dto.getContactNumber() == null || dto.getContactNumber().trim().isEmpty()) {
-            return ResponseStructure.buildResponse(
-                    null,
-                    "Contact number is required",
-                    HttpStatus.BAD_REQUEST,
-                    400);
+            response.setSuccess(false);
+            response.setMessage("Contact number is required");
+            response.setStatus(HttpStatus.BAD_REQUEST.value());
+            return response;
         }
 
         String contact = dto.getContactNumber().trim();
-        dto.setContactNumber(contact);
 
-        System.out.println("Incoming Contact: " + contact);
-
-        //  2. SAFE duplicate check (NO existsBy)
-        List<Therapist> allTherapists = repository.findAll();
-
-        boolean exists = allTherapists.stream()
-                .anyMatch(t -> contact.equals(t.getContactNumber()));
-
-        System.out.println("Exists manually: " + exists);
-
-        if (exists) {
-            return ResponseStructure.buildResponse(
-                    null,
-                    "Therapist already exists",
-                    HttpStatus.CONFLICT,
-                    409);
+        // ✅ 3. Duplicate check (same as nurse existsBy)
+        if (repository.existsByContactNumber(contact)) {
+            log.warn("Therapist already exists with contact number: {}", contact);
+            response.setSuccess(false);
+            response.setMessage("Therapist already exists with this mobile number");
+            response.setStatus(HttpStatus.BAD_REQUEST.value());
+            return response;
         }
 
-        //  3. Map DTO → Entity
-        Therapist entity = mapToEntity(dto);
+        // ✅ 4. Check credentials already exist
+        if (credentialsRepository.existsByUsername(contact)) {
+            log.warn("Credentials already exist for username: {}", contact);
+            response.setSuccess(false);
+            response.setMessage("Login credentials already exist for this mobile number");
+            response.setStatus(HttpStatus.BAD_REQUEST.value());
+            return response;
+        }
 
-        //  4. Generate therapistId & username
+        // ✅ 5. Get Branch Details (same as nurse)
+        log.debug("Fetching branch details for branchId: {}", dto.getBranchId());
+
+        ResponseEntity<Response> res = adminServiceClient.getBranchById(dto.getBranchId());
+        Branch br = objectMapper.convertValue(res.getBody().getData(), Branch.class);
+
+        // ✅ 6. Map DTO → Entity
+        Therapist therapist = mapToEntity(dto);
+        therapist.setBranchName(br.getBranchName());
+
+        // ✅ 7. Generate Therapist ID
         String therapistId = generateTherapistId();
-        entity.setTherapistId(therapistId);
-        entity.setUserName(therapistId);
+        therapist.setTherapistId(therapistId);
 
-        //  5. Generate password (plain as per your requirement)
+        // ✅ 8. Username & Password
+        String username = therapistId;
         String rawPassword = generatePassword();
-        entity.setPassword(rawPassword);
+        String encodedPassword = passwordEncoder.encode(rawPassword);
 
-        // ✅ 6. Save to DB
-        Therapist saved = repository.save(entity);
+        // ✅ 9. Save Therapist
+        Therapist savedTherapist = repository.save(therapist);
 
-        // ✅ 7. Map Entity → DTO
-        TherapistDTO response = mapToDTO(saved);
-        response.setUserName(therapistId);
-        response.setPassword(rawPassword);
+        log.info("Therapist saved successfully with therapistId: {}", savedTherapist.getTherapistId());
 
-        //  8. Return response
-        return ResponseStructure.buildResponse(
-                response,
-                "Therapist created successfully",
-                HttpStatus.CREATED,
-                201);
-    }
-    // ================= LOGIN =================
-    @Override
-    public ResponseStructure<TherapistLoginResponseDTO> login(TherapistLoginDTO dto) {
+        // ✅ 10. Save Credentials (IMPORTANT - same as nurse)
+        DoctorLoginCredentials credentials = DoctorLoginCredentials.builder()
+                .staffId(savedTherapist.getTherapistId())
+                .staffName(savedTherapist.getFullName())
+                .hospitalId(savedTherapist.getClinicId())
+                .hospitalName(savedTherapist.getClinicName())
+                .branchId(savedTherapist.getBranchId())
+                .branchName(savedTherapist.getBranchName())
+                .username(username)
+                .password(encodedPassword)
+                .role(dto.getRole())
+//                .permissions(savedTherapist.())
+                .build();
 
-        Therapist user = repository.findByUserName(dto.getUserName())
-                .orElseThrow(() -> new RuntimeException("Invalid username"));
+        credentialsRepository.save(credentials);
 
-        //  password check
-        if (!dto.getPassword().equals(user.getPassword())) {
-            return ResponseStructure.buildResponse(
-                    null,
-                    "Invalid password",
-                    HttpStatus.UNAUTHORIZED,
-                    401);
-        }
+        log.info("Login credentials created for therapistId: {}", savedTherapist.getTherapistId());
 
-        //  physioType check
-        if (dto.getGetPhysioType() != null && 
-            !dto.getGetPhysioType().equalsIgnoreCase(user.getPhysioType())) {
+        // ✅ 11. Map to DTO response
+        TherapistDTO savedDTO = mapToDTO(savedTherapist);
+        savedDTO.setUserName(username);
+        savedDTO.setPassword(rawPassword);
 
-            return ResponseStructure.buildResponse(
-                    null,
-                    "Invalid physio type",
-                    HttpStatus.UNAUTHORIZED,
-                    401);
-        }
+        // ✅ 12. Final response
+        response.setSuccess(true);
+        response.setData(savedDTO);
+        response.setMessage("Therapist added successfully");
+        response.setStatus(HttpStatus.CREATED.value());
 
-        //  build response DTO
-        TherapistLoginResponseDTO responseDTO = new TherapistLoginResponseDTO();
-        responseDTO.setTherapistId(user.getTherapistId());
-        responseDTO.setClinicId(user.getClinicId());
-        responseDTO.setBranchId(user.getBranchId());
-        responseDTO.setTherapistName(user.getFullName());
-        responseDTO.setPhysioType(user.getPhysioType());
+        log.info("Therapist onboarding completed successfully for therapistId: {}", savedTherapist.getTherapistId());
 
-        return ResponseStructure.buildResponse(
-                responseDTO,
-                "Login Success",
-                HttpStatus.OK,
-                200);
-    }
+        return response;
+    }    // ================= LOGIN =================
+//    @Override
+//    public ResponseStructure<TherapistLoginResponseDTO> login(TherapistLoginDTO dto) {
+//
+//        Therapist user = repository.findByUserName(dto.getUserName())
+//                .orElseThrow(() -> new RuntimeException("Invalid username"));
+//
+//        //  password check
+//        if (!dto.getPassword().equals(user.getPassword())) {
+//            return ResponseStructure.buildResponse(
+//                    null,
+//                    "Invalid password",
+//                    HttpStatus.UNAUTHORIZED,
+//                    401);
+//        }
+//
+//        //  physioType check
+//        if (dto.getGetPhysioType() != null && 
+//            !dto.getGetPhysioType().equalsIgnoreCase(user.getPhysioType())) {
+//
+//            return ResponseStructure.buildResponse(
+//                    null,
+//                    "Invalid physio type",
+//                    HttpStatus.UNAUTHORIZED,
+//                    401);
+//        }
+//
+//        //  build response DTO
+//        TherapistLoginResponseDTO responseDTO = new TherapistLoginResponseDTO();
+//        responseDTO.setTherapistId(user.getTherapistId());
+//        responseDTO.setClinicId(user.getClinicId());
+//        responseDTO.setBranchId(user.getBranchId());
+//        responseDTO.setTherapistName(user.getFullName());
+//        responseDTO.setPhysioType(user.getPhysioType());
+//
+//        return ResponseStructure.buildResponse(
+//                responseDTO,
+//                "Login Success",
+//                HttpStatus.OK,
+//                200);
+//    }
     // ================= GET BY THERAPIST ID =================
     @Override
     public ResponseStructure<TherapistDTO> getBytherapistId(String therapistId) {
