@@ -32,7 +32,7 @@ public class TherapistRecordDTO {
 
     private String therapistNotes;
     private String patientResponse;
-
+    private String sessionId;
     private String result;
     private String status;
     private String mode;

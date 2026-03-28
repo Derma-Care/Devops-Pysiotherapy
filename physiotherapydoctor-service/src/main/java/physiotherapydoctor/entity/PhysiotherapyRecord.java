@@ -43,6 +43,8 @@ public class PhysiotherapyRecord {
     private FollowUp followUp;
     private ProgressAnalytics progressAnalytics;
     private List<TreatmentTemplate> treatmentTemplates;
+    private String overallStatus;
     private String createdAt;
     private String updatedAt;
+    
 }

@@ -61,10 +61,13 @@ public class PhysiotherapyController {
 		Response response = service.delete(id);
 		return ResponseEntity.status(response.getStatus()).body(response);
 	}
-	@GetMapping("physiotherapy-record/therapist/{therapistId}")
-	public ResponseEntity<Response> getDashboard(@PathVariable String therapistId) {
-		Response response = service.getTherapistDashboard(therapistId);
-		return ResponseEntity.status(response.getStatus()).body(response);
+	@GetMapping("physiotherapy-record/dashboard/{clinicId}/{branchId}/{therapistId}")
+	public ResponseEntity<Response> getDashboard(
+	        @PathVariable String clinicId,
+	        @PathVariable String branchId,
+	        @PathVariable String therapistId) {
 
+	    Response response = service.getTherapistDashboard(clinicId, branchId, therapistId);
+	    return ResponseEntity.status(response.getStatus()).body(response);
 	}
 }

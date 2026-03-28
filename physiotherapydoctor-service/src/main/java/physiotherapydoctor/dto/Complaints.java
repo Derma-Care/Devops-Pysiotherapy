@@ -1,6 +1,7 @@
 package physiotherapydoctor.dto;
 
 import java.util.List;
+import java.util.Map;
 
 import lombok.Data;
 
@@ -10,6 +11,7 @@ public class Complaints {
 	private String painAssessmentImage;
 	private List<String> reportImages;
 	private String selectedTherapy;
-	private List<String> theraphyAnswers;
+	private String selectedTherapyID;
+	private Map<String, List<TherapyAnswer>> theraphyAnswers;
 	private String duration;
 }
