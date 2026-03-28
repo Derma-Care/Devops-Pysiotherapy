@@ -293,7 +293,7 @@ public class DoctorServiceImpl implements DoctorService {
 			DoctorLoginCredentials credentials = DoctorLoginCredentials.builder().staffId(savedDoctor.getDoctorId())
 					.staffName(savedDoctor.getDoctorName()).hospitalId(savedDoctor.getHospitalId())
 					.hospitalName(savedDoctor.getHospitalName()).branchId(savedDoctor.getBranchId()).username(username)
-					.password(encodedPassword).role(dto.getRole()).permissions(savedDoctor.getPermissions()).build();
+					.password(encodedPassword).role(dto.getRole()).emailId(savedDoctor.getDoctorEmail()).permissions(savedDoctor.getPermissions()).build();
 
 			credentialsRepository.save(credentials);
 			log.info("Logib credentials created successfully for doctorId={}", savedDoctor.getDoctorId());
