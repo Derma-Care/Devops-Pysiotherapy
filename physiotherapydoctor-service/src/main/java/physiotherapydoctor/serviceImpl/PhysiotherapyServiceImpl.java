@@ -215,7 +215,8 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 	private PhysiotherapyRecord mapToEntity(PhysiotherapyRecordDTO dto) {
 
 		PhysiotherapyRecord entity = new PhysiotherapyRecord();
-
+		entity.setPatientInfo(dto.getPatientInfo());
+		entity.setComplaints(dto.getComplaints());
 		entity.setAssessment(dto.getAssessment());
 		entity.setDiagnosis(dto.getDiagnosis());
 		entity.setTreatmentPlan(dto.getTreatmentPlan());

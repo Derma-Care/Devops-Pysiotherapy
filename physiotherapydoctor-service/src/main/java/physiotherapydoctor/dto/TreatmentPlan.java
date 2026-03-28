@@ -7,6 +7,12 @@ import lombok.Data;
 @Data
 public class TreatmentPlan {
 
+    private String doctorId;
+    private String doctorName;
+
+    private String theraphyId;
+    private String theraphyName;
+
     private List<String> modalities;
     private String manualTherapy;
     private String sessionDuration;

@@ -66,4 +66,7 @@ public class Doctors {
     
     private String updatedDate;
 
-}
+	private String  Status;
+		
+	}
+

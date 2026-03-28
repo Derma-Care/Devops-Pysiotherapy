@@ -9,9 +9,11 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import physiotherapydoctor.dto.Assessment;
+import physiotherapydoctor.dto.Complaints;
 import physiotherapydoctor.dto.Diagnosis;
 import physiotherapydoctor.dto.ExercisePlan;
 import physiotherapydoctor.dto.FollowUp;
+import physiotherapydoctor.dto.PatientInfo;
 import physiotherapydoctor.dto.ProgressAnalytics;
 import physiotherapydoctor.dto.ProgressNotes;
 import physiotherapydoctor.dto.TherapySession;
@@ -26,7 +28,8 @@ public class PhysiotherapyRecord {
 
     @Id
     private String id;
-
+    private PatientInfo patientInfo;  
+    private Complaints complaints;     
     private Assessment assessment;
     private Diagnosis diagnosis;
     private TreatmentPlan treatmentPlan;
