@@ -23,4 +23,5 @@ public class PhysiotherapyRecordDTO {
 	    private List<TreatmentTemplate> treatmentTemplates;
 	    private String createdAt;
 	    private String updatedAt;
+	    private String overallStatus;
 }

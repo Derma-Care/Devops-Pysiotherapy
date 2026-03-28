@@ -41,7 +41,7 @@ public class TherapistRecord {
     private String status;
     private String mode;
     private String nextPlan;
-
+    private String sessionId;
     private String beforeImage;
     private String afterImage;
     private String beforeVideo;

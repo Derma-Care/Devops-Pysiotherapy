@@ -4,7 +4,7 @@ import lombok.Data;
 
 @Data
 public class Exercise {
-
+    private String id;
     private String name;
     private String sets;
     private String reps;

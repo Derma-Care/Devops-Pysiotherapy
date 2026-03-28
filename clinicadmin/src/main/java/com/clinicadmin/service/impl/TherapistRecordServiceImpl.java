@@ -85,7 +85,7 @@ public class TherapistRecordServiceImpl implements TherapistRecordService {
     private TherapistRecord mapToEntity(TherapistRecordDTO dto) {
 
         TherapistRecord record = new TherapistRecord();
-
+//       record.s
         record.setClinicId(dto.getClinicId());
         record.setBranchId(dto.getBranchId());
         record.setPatientId(dto.getPatientId());
@@ -107,6 +107,7 @@ public class TherapistRecordServiceImpl implements TherapistRecordService {
 
         record.setTherapistNotes(dto.getTherapistNotes());
         record.setPatientResponse(dto.getPatientResponse());
+        record.setSessionId(dto.getSessionId());
 
         record.setResult(dto.getResult());
 //        record.setStatus(dto.getStatus());
@@ -144,6 +145,7 @@ public class TherapistRecordServiceImpl implements TherapistRecordService {
 
         dto.setTherapistNotes(record.getTherapistNotes());
         dto.setPatientResponse(record.getPatientResponse());
+        dto.setSessionId(record.getSessionId());
 
         dto.setResult(record.getResult());
         dto.setStatus(record.getStatus());

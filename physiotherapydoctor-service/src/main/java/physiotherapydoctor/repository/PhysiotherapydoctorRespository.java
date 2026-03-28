@@ -9,5 +9,12 @@ import physiotherapydoctor.entity.PhysiotherapyRecord;
 
 @Repository
 public interface PhysiotherapydoctorRespository extends MongoRepository<PhysiotherapyRecord, String> {
-	List<PhysiotherapyRecord> findByTreatmentPlanTheraphyId(String theraphyId);
+//	List<PhysiotherapyRecord> findByTreatmentPlanTheraphyId(String theraphyId);
+//	List<PhysiotherapyRecord> findByClinicIdAndBranchIdAndTreatmentPlanTheraphyId(
+//	        String clinicId,
+//	        String branchId,
+//	        String therapistId
+//	);
+	List<PhysiotherapyRecord> findByClinicIdAndBranchIdAndTreatmentPlanTherapistId(String clinicId, String branchId,
+			String therapistId);
 }

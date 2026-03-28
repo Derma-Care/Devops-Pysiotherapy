@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import physiotherapydoctor.dto.PhysiotherapyRecordDTO;
 import physiotherapydoctor.dto.Response;
 import physiotherapydoctor.dto.TherapistDashboardResponse;
+import physiotherapydoctor.dto.TherapySession;
 import physiotherapydoctor.entity.PhysiotherapyRecord;
 import physiotherapydoctor.repository.PhysiotherapydoctorRespository;
 import physiotherapydoctor.service.PhysiotherapyService;
@@ -35,6 +36,7 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 			return response;
 		}
 		PhysiotherapyRecord dtoData = mapToEntity(dto);
+		generateSessionIds(dtoData.getTherapySessions());
 		dtoData.setCreatedAt(dto.getCreatedAt());
 		PhysiotherapyRecord saved = repository.save(dtoData);
 
@@ -172,6 +174,9 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 		if (dto.getTreatmentTemplates() != null) {
 			existing.setTreatmentTemplates(dto.getTreatmentTemplates());
 		}
+		if (dto.getOverallStatus() != null) {
+			existing.setOverallStatus(dto.getOverallStatus());
+		}
 		existing.setUpdatedAt(dto.getUpdatedAt());
 		PhysiotherapyRecord updated = repository.save(existing);
 
@@ -233,17 +238,19 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 		entity.setBookingId(dto.getBookingId());
 		entity.setClinicId(dto.getClinicId());
 		entity.setBranchId(dto.getBranchId());
+		entity.setOverallStatus(dto.getOverallStatus());
 
 		return entity;
 	}
 	
 	@Override
-	public Response getTherapistDashboard(String therapistId) {
+	public Response getTherapistDashboard(String clinicId, String branchId, String therapistId) {
 
 	    Response response = new Response();
 
 	    List<PhysiotherapyRecord> records =
-	            repository.findByTreatmentPlanTheraphyId(therapistId);
+	            repository.findByClinicIdAndBranchIdAndTreatmentPlanTherapistId(
+	                    clinicId, branchId, therapistId);
 
 	    if (records.isEmpty()) {
 	        response.setSuccess(false);
@@ -258,13 +265,8 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 
 	    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
-	    int todayCount = 0;
-	    int weekCount = 0;
-	    int monthCount = 0;
-
-	    long todayMinutes = 0;
-	    long weekMinutes = 0;
-	    long monthMinutes = 0;
+	    int todayCount = 0, weekCount = 0, monthCount = 0;
+	    long todayMinutes = 0, weekMinutes = 0, monthMinutes = 0;
 
 	    for (PhysiotherapyRecord record : records) {
 
@@ -275,7 +277,7 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 	        try {
 	            recordDate = parseDate(record.getCreatedAt(), formatter);
 	        } catch (Exception e) {
-	            continue; // skip invalid dates
+	            continue;
 	        }
 
 	        long duration = extractMinutes(record);
@@ -286,13 +288,13 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 	            todayMinutes += duration;
 	        }
 
-	        // ✅ WEEK (last 7 days)
+	        // ✅ WEEK
 	        if (!recordDate.isBefore(weekStart)) {
 	            weekCount++;
 	            weekMinutes += duration;
 	        }
 
-	        // ✅ MONTH (last 30 days)
+	        // ✅ MONTH
 	        if (!recordDate.isBefore(monthStart)) {
 	            monthCount++;
 	            monthMinutes += duration;
@@ -372,6 +374,28 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 
 	    } catch (Exception e) {
 	        return 0;
+	    }
+	}
+	private void generateSessionIds(List<TherapySession> sessions) {
+
+	    if (sessions == null || sessions.isEmpty()) return;
+
+	    for (TherapySession session : sessions) {
+
+	        // ✅ Generate UNIQUE sessionId
+	        session.setSessionId("SES-" + System.currentTimeMillis());
+
+	        // small delay to avoid same millis
+	        try {
+	            Thread.sleep(1);
+	        } catch (InterruptedException e) {
+	            Thread.currentThread().interrupt();
+	        }
+
+	        // ✅ Auto set status if null
+	        if (session.getStatus() == null || session.getStatus().isEmpty()) {
+	            session.setStatus("Pending");
+	        }
 	    }
 	}
 }
