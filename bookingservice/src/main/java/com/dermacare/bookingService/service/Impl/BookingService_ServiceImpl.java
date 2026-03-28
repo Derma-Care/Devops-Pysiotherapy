@@ -23,14 +23,12 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-
 import com.dermacare.bookingService.dto.BookingInfoByInput;
 import com.dermacare.bookingService.dto.BookingRequset;
 import com.dermacare.bookingService.dto.BookingResponse;
@@ -63,7 +61,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	@Autowired
 	private KafkaProducer kafkaProducer;
 	
-	// @Autowired
+//	// @Autowired
 	//private NotificationFeign notificationFeign;
 	
 	@Autowired
@@ -300,6 +298,8 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	     Booking entity = new ObjectMapper().convertValue(request, Booking.class);
 	     ZonedDateTime istTime = ZonedDateTime.now(ZoneId.of("Asia/Kolkata"));
 	     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy hh:mm a");
+	     double due = request.getTotalFee() - request.getPartAmount();
+	     entity.setDueAmount(due);
 	     entity.setBookedAt(istTime.format(formatter));
 	     entity.setFreeFollowUpsLeft(request.getFreeFollowUps());
 

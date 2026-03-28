@@ -31,8 +31,9 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 			response.setStatus(400);
 			return response;
 		}
-
-		PhysiotherapyRecord saved = repository.save(mapToEntity(dto));
+		PhysiotherapyRecord dtoData = mapToEntity(dto);
+		dtoData.setCreatedAt(dto.getCreatedAt());
+		PhysiotherapyRecord saved = repository.save(dtoData);
 
 		response.setSuccess(true);
 		response.setData(saved);
@@ -168,7 +169,7 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 		if (dto.getTreatmentTemplates() != null) {
 			existing.setTreatmentTemplates(dto.getTreatmentTemplates());
 		}
-
+		existing.setUpdatedAt(dto.getUpdatedAt());
 		PhysiotherapyRecord updated = repository.save(existing);
 
 		response.setSuccess(true);
@@ -226,6 +227,9 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 		entity.setFollowUp(dto.getFollowUp());
 		entity.setProgressAnalytics(dto.getProgressAnalytics());
 		entity.setTreatmentTemplates(dto.getTreatmentTemplates());
+		entity.setBookingId(dto.getBookingId());
+		entity.setClinicId(dto.getClinicId());
+		entity.setBranchId(dto.getBranchId());
 
 		return entity;
 	}
