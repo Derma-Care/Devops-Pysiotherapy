@@ -28,7 +28,7 @@ import physiotherapydoctor.dto.TreatmentTemplate;
 public class PhysiotherapyRecord {
 
     @Id
-    private String id;
+    private String therapistRecordId;
     private String bookingId;
     private String clinicId;
     private String branchId;

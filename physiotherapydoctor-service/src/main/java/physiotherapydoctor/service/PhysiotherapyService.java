@@ -19,4 +19,6 @@ public interface PhysiotherapyService {
 
     // DELETE
     Response delete(String id);
+
+	Response getTherapistDashboard(String therapistId);
 }
