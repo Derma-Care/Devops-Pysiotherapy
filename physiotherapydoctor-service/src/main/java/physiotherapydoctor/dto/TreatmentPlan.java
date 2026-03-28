@@ -10,8 +10,8 @@ public class TreatmentPlan {
     private String doctorId;
     private String doctorName;
 
-    private String theraphyId;
-    private String theraphyName;
+    private String theraphyId;  // therapist id
+    private String theraphyName; // therapistName
 
     private List<String> modalities;
     private String manualTherapy;

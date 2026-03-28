@@ -1,5 +1,7 @@
 package physiotherapydoctor.serviceImpl;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -8,6 +10,7 @@ import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 import physiotherapydoctor.dto.PhysiotherapyRecordDTO;
 import physiotherapydoctor.dto.Response;
+import physiotherapydoctor.dto.TherapistDashboardResponse;
 import physiotherapydoctor.entity.PhysiotherapyRecord;
 import physiotherapydoctor.repository.PhysiotherapydoctorRespository;
 import physiotherapydoctor.service.PhysiotherapyService;
@@ -232,5 +235,143 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 		entity.setBranchId(dto.getBranchId());
 
 		return entity;
+	}
+	
+	@Override
+	public Response getTherapistDashboard(String therapistId) {
+
+	    Response response = new Response();
+
+	    List<PhysiotherapyRecord> records =
+	            repository.findByTreatmentPlanTheraphyId(therapistId);
+
+	    if (records.isEmpty()) {
+	        response.setSuccess(false);
+	        response.setMessage("No records found");
+	        response.setStatus(404);
+	        return response;
+	    }
+
+	    LocalDate today = LocalDate.now();
+	    LocalDate weekStart = today.minusDays(7);
+	    LocalDate monthStart = today.minusDays(30);
+
+	    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+
+	    int todayCount = 0;
+	    int weekCount = 0;
+	    int monthCount = 0;
+
+	    long todayMinutes = 0;
+	    long weekMinutes = 0;
+	    long monthMinutes = 0;
+
+	    for (PhysiotherapyRecord record : records) {
+
+	        if (record.getCreatedAt() == null) continue;
+
+	        LocalDate recordDate;
+
+	        try {
+	            recordDate = parseDate(record.getCreatedAt(), formatter);
+	        } catch (Exception e) {
+	            continue; // skip invalid dates
+	        }
+
+	        long duration = extractMinutes(record);
+
+	        // ✅ TODAY
+	        if (recordDate.equals(today)) {
+	            todayCount++;
+	            todayMinutes += duration;
+	        }
+
+	        // ✅ WEEK (last 7 days)
+	        if (!recordDate.isBefore(weekStart)) {
+	            weekCount++;
+	            weekMinutes += duration;
+	        }
+
+	        // ✅ MONTH (last 30 days)
+	        if (!recordDate.isBefore(monthStart)) {
+	            monthCount++;
+	            monthMinutes += duration;
+	        }
+	    }
+
+	    TherapistDashboardResponse dashboard = new TherapistDashboardResponse();
+	    dashboard.setTodayPatientCount(todayCount);
+	    dashboard.setTodayWorkingMinutes(todayMinutes);
+
+	    dashboard.setWeeklyPatientCount(weekCount);
+	    dashboard.setWeeklyWorkingMinutes(weekMinutes);
+
+	    dashboard.setMonthlyPatientCount(monthCount);
+	    dashboard.setMonthlyWorkingMinutes(monthMinutes);
+
+	    dashboard.setRecords(records);
+
+	    response.setSuccess(true);
+	    response.setData(dashboard);
+	    response.setMessage("Dashboard fetched successfully");
+	    response.setStatus(200);
+
+	    return response;
+	}
+	private LocalDate parseDate(String date, DateTimeFormatter formatter) {
+
+	    if (date == null || date.isEmpty()) {
+	        throw new RuntimeException("Invalid date");
+	    }
+
+	    String cleanDate = date.length() >= 10 ? date.substring(0, 10) : date;
+
+	    return LocalDate.parse(cleanDate, formatter);
+	}
+	private long extractMinutes(PhysiotherapyRecord record) {
+
+	    long totalMinutes = 0;
+
+	    // ✅ From TherapySessions
+	    if (record.getTherapySessions() != null) {
+
+	        totalMinutes = record.getTherapySessions().stream()
+	                .filter(session -> session.getDuration() != null)
+	                .mapToLong(session -> parseDuration(session.getDuration()))
+	                .sum();
+
+	        if (totalMinutes > 0) {
+	            return totalMinutes;
+	        }
+	    }
+
+	    // ✅ Fallback: TreatmentPlan
+	    if (record.getTreatmentPlan() != null &&
+	        record.getTreatmentPlan().getSessionDuration() != null) {
+
+	        return parseDuration(record.getTreatmentPlan().getSessionDuration());
+	    }
+
+	    return 0;
+	}
+	private long parseDuration(String duration) {
+
+	    if (duration == null || duration.isEmpty()) return 0;
+
+	    duration = duration.toLowerCase().trim();
+
+	    try {
+	        long value = Long.parseLong(duration.replaceAll("[^0-9]", ""));
+
+	        // handle hours
+	        if (duration.contains("hour")) {
+	            return value * 60;
+	        }
+
+	        return value;
+
+	    } catch (Exception e) {
+	        return 0;
+	    }
 	}
 }
