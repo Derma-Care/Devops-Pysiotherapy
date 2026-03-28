@@ -917,8 +917,6 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 	        	        }
 	        	    }
 	        	}
-	        double due = req.getTotalFee() - req.getPartAmount();
-	        req.setDueAmount(due);
 	        res = bookingFeign.bookService(req);
 	        bookingResponse = res.getBody().getData();
 	        }else {

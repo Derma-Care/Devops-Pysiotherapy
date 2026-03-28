@@ -1,5 +1,6 @@
 package physiotherapydoctor.entity;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.annotation.Id;
@@ -28,6 +29,9 @@ public class PhysiotherapyRecord {
 
     @Id
     private String id;
+    private String bookingId;
+    private String clinicId;
+    private String branchId;
     private PatientInfo patientInfo;  
     private Complaints complaints;     
     private Assessment assessment;
@@ -39,4 +43,6 @@ public class PhysiotherapyRecord {
     private FollowUp followUp;
     private ProgressAnalytics progressAnalytics;
     private List<TreatmentTemplate> treatmentTemplates;
+    private String createdAt;
+    private String updatedAt;
 }
