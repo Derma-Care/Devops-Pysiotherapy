@@ -16,14 +16,14 @@ import physiotherapydoctor.dto.Response;
 import physiotherapydoctor.service.PhysiotherapyService;
 
 @RestController
-@RequestMapping("/physiotherapy")
+@RequestMapping("/physiotherapy-doctor")
 @RequiredArgsConstructor
 public class PhysiotherapyController {
 
 	private final PhysiotherapyService service;
 
 	// ✅ CREATE
-	@PostMapping("/create")
+	@PostMapping("/physiotherapy-record/create")
 	public ResponseEntity<Response> create(@RequestBody PhysiotherapyRecordDTO dto) {
 
 		Response response = service.create(dto);
@@ -31,7 +31,7 @@ public class PhysiotherapyController {
 	}
 
 	// ✅ GET BY ID
-	@GetMapping("getById/{id}")
+	@GetMapping("/physiotherapy-recordgetById/{id}")
 	public ResponseEntity<Response> getById(@PathVariable String id) {
 
 		Response response = service.getById(id);
@@ -39,7 +39,7 @@ public class PhysiotherapyController {
 	}
 
 	// ✅ GET ALL
-	@GetMapping("/getAll")
+	@GetMapping("/physiotherapy-record/getAll")
 	public ResponseEntity<Response> getAll() {
 
 		Response response = service.getAll();
@@ -47,7 +47,7 @@ public class PhysiotherapyController {
 	}
 
 	// ✅ UPDATE
-	@PutMapping("updateById/{id}")
+	@PutMapping("/physiotherapy-record/updateById/{id}")
 	public ResponseEntity<Response> update(@PathVariable String id, @RequestBody PhysiotherapyRecordDTO dto) {
 
 		Response response = service.update(id, dto);
@@ -55,7 +55,7 @@ public class PhysiotherapyController {
 	}
 
 	// ✅ DELETE
-	@DeleteMapping("deleteById/{id}")
+	@DeleteMapping("/physiotherapy-record/deleteById/{id}")
 	public ResponseEntity<Response> delete(@PathVariable String id) {
 
 		Response response = service.delete(id);
