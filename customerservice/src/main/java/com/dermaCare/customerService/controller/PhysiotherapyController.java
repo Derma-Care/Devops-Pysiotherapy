@@ -47,7 +47,7 @@ public class PhysiotherapyController {
         return service.deleteQuestionByKeyAndId(key, qId );
     }
 
-    @GetMapping("/getByKey")
+    @PostMapping("/getByKey")
     public ResponseEntity<Response> getByKey(@RequestBody MutiplePartsDto keys) {
         return service.getByKeys(keys);
     }
