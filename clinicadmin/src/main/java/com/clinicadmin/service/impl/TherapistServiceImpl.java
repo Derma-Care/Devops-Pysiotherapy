@@ -115,6 +115,7 @@ public class TherapistServiceImpl implements TherapistService {
                     .hospitalName(savedTherapist.getClinicName())
                     .branchId(savedTherapist.getBranchId())
                     .branchName(savedTherapist.getBranchName())
+                    .emailId(savedTherapist.getEmailId())
                     .username(username)
                     .password(encodedPassword)
                     .role(dto.getRole())
