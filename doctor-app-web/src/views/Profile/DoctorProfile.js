@@ -423,14 +423,14 @@ const DoctorProfile = () => {
                     {/* In-Clinic Fee */}
                     <div className="flex-fill p-3 bg-light rounded shadow-sm">
                       <p className="mb-0 text-muted">
-                        <strong>In-Clinic Consultation Fee: ₹{doctorDetails?.doctorFees?.inClinicFee || "N/A"}</strong>
+                        <strong>In-Clinic Consultation Fee: ₹{doctorDetails?.doctorFees?.inClinicFee || 0}</strong>
                       </p>
 
                     </div>
 
                     {/* Video Consultation Fee */}
                     <div className="flex-fill p-3 bg-light rounded shadow-sm">
-                      <p className="mb-0 text-muted"><strong>Video Consultation Fee: ₹{doctorDetails?.doctorFees?.vedioConsultationFee || "N/A"}</strong></p>
+                      <p className="mb-0 text-muted"><strong>Video Consultation Fee: ₹{doctorDetails?.doctorFees?.vedioConsultationFee || 0}</strong></p>
                     </div>
                   </div>
                 </CCol>
