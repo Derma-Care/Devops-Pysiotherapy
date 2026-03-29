@@ -8,5 +8,5 @@ public interface TherapistRecordService {
     ResponseStructure<TherapistRecordDTO> saveRecord(TherapistRecordDTO dto);
 
     ResponseStructure<TherapistRecordDTO> getByIds(
-            String clinicId, String branchId, String therapistRecordId);
+            String clinicId, String branchId, String therapistRecordId,String sessionId);
 }

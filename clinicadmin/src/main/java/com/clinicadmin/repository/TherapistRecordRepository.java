@@ -10,4 +10,12 @@ public interface TherapistRecordRepository extends MongoRepository<TherapistReco
 
     Optional<TherapistRecord> findByClinicIdAndBranchIdAndTherapistRecordId(
             String clinicId, String branchId, String therapistRecordId);
+    Optional<TherapistRecord> findByClinicIdAndBranchIdAndTherapistRecordIdAndSessionId(
+            String clinicId,
+            String branchId,
+            String therapistRecordId,
+            String sessionId
+    );
+
+	
 }

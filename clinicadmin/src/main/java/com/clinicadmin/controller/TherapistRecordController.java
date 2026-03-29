@@ -31,14 +31,15 @@ public class TherapistRecordController {
     }
 
     //  GET API 
-    @GetMapping("/getRecordByClinicIdBranchIdAndtherapistRecordId/{clinicId}/{branchId}/{therapistRecordId}")
-    public ResponseEntity<ResponseStructure<TherapistRecordDTO>> getRecordByClinicIdBranchIdAndtherapistRecordId(
+    @GetMapping("/getRecordByClinicIdBranchIdtherapistRecordIdAndSessionId/{clinicId}/{branchId}/{therapistRecordId}/{sessionId}")
+    public ResponseEntity<ResponseStructure<TherapistRecordDTO>> getRecordByClinicIdBranchIdtherapistRecordIdAndSessionId(
             @PathVariable String clinicId,
             @PathVariable String branchId,
-            @PathVariable String therapistRecordId) {
+            @PathVariable String therapistRecordId,
+            @PathVariable String sessionId) {
 
         ResponseStructure<TherapistRecordDTO> response =
-                service.getByIds(clinicId, branchId, therapistRecordId);
+                service.getByIds(clinicId, branchId, therapistRecordId,sessionId);
 
         return ResponseEntity
                 .status(response.getStatusCode())
