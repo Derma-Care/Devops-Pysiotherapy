@@ -70,4 +70,12 @@ public class PhysiotherapyController {
 	    Response response = service.getTherapistDashboard(clinicId, branchId, therapistId);
 	    return ResponseEntity.status(response.getStatus()).body(response);
 	}
+	
+	@PutMapping("/updateSessionFromTherapist/{therapistRecordId}/{sessionId}")
+	public void updateSessionFromTherapist(
+	        @PathVariable String therapistRecordId,
+	        @PathVariable String sessionId) {
+
+	    service.updateSessionStatusFromTherapist(therapistRecordId, sessionId);
+	}
 }

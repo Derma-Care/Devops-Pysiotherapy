@@ -22,32 +22,48 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 
 	private final PhysiotherapydoctorRespository repository;
 
-	// ✅ CREATE
 	@Override
 	public Response create(PhysiotherapyRecordDTO dto) {
 
-		Response response = new Response();
+	    Response response = new Response();
 
-		if (dto == null) {
-			response.setSuccess(false);
-			response.setData(null);
-			response.setMessage("Request body is null");
-			response.setStatus(400);
-			return response;
-		}
-		PhysiotherapyRecord dtoData = mapToEntity(dto);
-		generateSessionIds(dtoData.getTherapySessions());
-		dtoData.setCreatedAt(dto.getCreatedAt());
-		PhysiotherapyRecord saved = repository.save(dtoData);
+	    if (dto == null) {
+	        response.setSuccess(false);
+	        response.setData(null);
+	        response.setMessage("Request body is null");
+	        response.setStatus(400);
+	        return response;
+	    }
 
-		response.setSuccess(true);
-		response.setData(saved);
-		response.setMessage("Record created successfully");
-		response.setStatus(201);
+	    PhysiotherapyRecord dtoData = mapToEntity(dto);
 
-		return response;
+	    // ✅ VERY IMPORTANT (FIX)
+	    dtoData.setTherapistRecordId(dto.getTherapistRecordId());
+
+	    // ✅ Generate session IDs
+	    generateSessionIds(dtoData.getTherapySessions());
+
+	    // ✅ Set initial session status
+	    if (dtoData.getTherapySessions() != null) {
+	        for (TherapySession s : dtoData.getTherapySessions()) {
+	            s.setStatus("Pending");
+	        }
+	    }
+
+	    // ✅ Set overall status
+	    dtoData.setOverallStatus("Pending");
+
+	    dtoData.setCreatedAt(dto.getCreatedAt());
+
+	    PhysiotherapyRecord saved = repository.save(dtoData);
+
+	    response.setSuccess(true);
+	    response.setData(saved);
+	    response.setMessage("Record created successfully");
+	    response.setStatus(201);
+
+	    return response;
 	}
-
 	// ✅ GET BY ID
 	@Override
 	public Response getById(String id) {
@@ -398,4 +414,63 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 	        }
 	    }
 	}
+	public void updateSessionStatusFromTherapist(String therapistRecordId, String sessionId) {
+
+	    PhysiotherapyRecord record = repository
+	            .findByTherapistRecordId(therapistRecordId)
+	            .orElseThrow(() -> new RuntimeException("Record not found"));
+
+	    List<TherapySession> sessions = record.getTherapySessions();
+
+	    if (sessions == null || sessions.isEmpty()) {
+	        throw new RuntimeException("No sessions found");
+	    }
+
+	    boolean sessionFound = false;
+
+	    for (TherapySession session : sessions) {
+
+	        // ✅ MATCH sessionId safely
+	        if (sessionId.equals(session.getSessionId())) {
+
+	            // ✅ Update status
+	            session.setStatus("Completed");
+	            sessionFound = true;
+	            break;
+	        }
+	    }
+
+	    if (!sessionFound) {
+	        throw new RuntimeException("Session not found with ID: " + sessionId);
+	    }
+
+	    // ✅ UPDATE OVERALL STATUS
+	    record.setOverallStatus(calculateOverallStatus(sessions));
+
+	    repository.save(record);
+	}
+	private String calculateOverallStatus(List<TherapySession> sessions) {
+
+	    if (sessions == null || sessions.isEmpty()) {
+	        return "Pending";
+	    }
+
+	    boolean allCompleted = true;
+	    boolean anyCompleted = false;
+
+	    for (TherapySession s : sessions) {
+
+	        if ("Completed".equalsIgnoreCase(s.getStatus())) {
+	            anyCompleted = true;
+	        } else {
+	            allCompleted = false;
+	        }
+	    }
+
+	    if (allCompleted) return "Completed";
+	    if (anyCompleted) return "Active";
+
+	    return "PENDING";
+	}
+	
 }
