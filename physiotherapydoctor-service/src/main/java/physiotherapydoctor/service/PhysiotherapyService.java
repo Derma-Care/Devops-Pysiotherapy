@@ -25,4 +25,6 @@ public interface PhysiotherapyService {
 
   
 	Response getTherapistDashboard(String clinicId, String branchId, String therapistId);
+
+	void updateSessionStatusFromTherapist(String therapistRecordId, String sessionId);
 }

@@ -6,8 +6,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-import com.clinicadmin.dto.*;
+import com.clinicadmin.dto.ResponseStructure;
+import com.clinicadmin.dto.TherapistRecordDTO;
 import com.clinicadmin.entity.TherapistRecord;
+import com.clinicadmin.feignclient.PhysiotherapyFeignClient;
 import com.clinicadmin.repository.TherapistRecordRepository;
 import com.clinicadmin.service.TherapistRecordService;
 
@@ -16,14 +18,27 @@ public class TherapistRecordServiceImpl implements TherapistRecordService {
 
     @Autowired
     private TherapistRecordRepository repository;
+    
+    @Autowired
+    private PhysiotherapyFeignClient physiotherapyFeignClient;
 
     @Override
     public ResponseStructure<TherapistRecordDTO> saveRecord(TherapistRecordDTO dto) {
 
+        // ✅ Basic validation
+        if (dto == null) {
+            return ResponseStructure.buildResponse(
+                    null,
+                    "Request body is null",
+                    HttpStatus.BAD_REQUEST,
+                    400
+            );
+        }
+
         TherapistRecord record = mapToEntity(dto);
 
-        // ✅ ALWAYS set completed
-        record.setStatus("completed");
+        // ✅ TherapistRecord status (separate from session)
+        record.setStatus("COMPLETED");
 
         // ================= ENCODE =================
 
@@ -51,9 +66,29 @@ public class TherapistRecordServiceImpl implements TherapistRecordService {
             );
         }
 
+        // ✅ IMPORTANT: ensure IDs are set
         record.setTherapistRecordId(dto.getTherapistRecordId());
+        record.setSessionId(dto.getSessionId());
 
+        // ✅ SAVE RECORD
         TherapistRecord saved = repository.save(record);
+
+        // 🔥 CALL PHYSIOTHERAPY SERVICE
+        try {
+            if (dto.getTherapistRecordId() != null && dto.getSessionId() != null) {
+
+                System.out.println("Calling Physio API: "
+                        + dto.getTherapistRecordId() + " | " + dto.getSessionId());
+
+                physiotherapyFeignClient.updateSessionStatus(
+                        dto.getTherapistRecordId(),
+                        dto.getSessionId()
+                );
+            }
+        } catch (Exception e) {
+            // ✅ LOG ERROR (important for debugging)
+            System.out.println("Physio update failed: " + e.getMessage());
+        }
 
         return ResponseStructure.buildResponse(
                 mapToDTO(saved),
@@ -62,7 +97,6 @@ public class TherapistRecordServiceImpl implements TherapistRecordService {
                 201
         );
     }
-
     // ================= GET =================
     @Override
     public ResponseStructure<TherapistRecordDTO> getByIds(

@@ -1,6 +1,7 @@
 package physiotherapydoctor.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
@@ -17,4 +18,6 @@ public interface PhysiotherapydoctorRespository extends MongoRepository<Physioth
 //	);
 	List<PhysiotherapyRecord> findByClinicIdAndBranchIdAndTreatmentPlanTherapistId(String clinicId, String branchId,
 			String therapistId);
+
+	Optional<PhysiotherapyRecord> findByTherapistRecordId(String therapistRecordId);
 }

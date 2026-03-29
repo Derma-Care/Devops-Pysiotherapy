@@ -24,4 +24,6 @@ public class PhysiotherapyRecordDTO {
 	    private String createdAt;
 	    private String updatedAt;
 	    private String overallStatus;
+		private String TherapistRecordId;
+		
 }
