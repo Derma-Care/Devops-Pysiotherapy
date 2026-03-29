@@ -8,14 +8,6 @@ const AppBreadcrumb = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const [dateTime, setDateTime] = useState('')
-  const [prevPath, setPrevPath] = useState('/dashboard')
-
-  // Update previous path
-  useEffect(() => {
-    const lastPath = sessionStorage.getItem('prevPath')
-    if (lastPath) setPrevPath(lastPath)
-    sessionStorage.setItem('prevPath', location.pathname)
-  }, [location.pathname])
 
   // Update date & time every minute
   useEffect(() => {
@@ -26,10 +18,10 @@ const AppBreadcrumb = () => {
         day % 10 === 1 && day !== 11
           ? 'st'
           : day % 10 === 2 && day !== 12
-            ? 'nd'
-            : day % 10 === 3 && day !== 13
-              ? 'rd'
-              : 'th'
+          ? 'nd'
+          : day % 10 === 3 && day !== 13
+          ? 'rd'
+          : 'th'
 
       const month = now.toLocaleString('en-US', { month: 'short' })
       const year = now.getFullYear().toString().slice(-2)
@@ -81,12 +73,17 @@ const AppBreadcrumb = () => {
 
   const breadcrumbs = generateBreadcrumbs(location.pathname)
 
-  // Show back button only for detail pages
+  // Show Back button on detail pages
   const showBackButton =
     location.pathname.includes('/tab-content/') ||
     location.pathname.includes('/tab-inProgress/') ||
     location.pathname.includes('/tab-completed-content/') ||
     location.pathname.includes('/appointments/')
+
+  // Always go to Dashboard
+  const handleBack = () => {
+    navigate('/dashboard')
+  }
 
   return (
     <div className="d-flex justify-content-between align-items-center w-100 px-3 py-2">
@@ -121,7 +118,7 @@ const AppBreadcrumb = () => {
         {showBackButton && (
           <button
             className="btn btn-sm btn-outline-primary d-flex align-items-center px-3"
-            onClick={() => (window.history.length > 1 ? navigate(-1) : navigate(prevPath))}
+            onClick={handleBack}
             style={{
               fontWeight: 600,
               borderRadius: '20px',
