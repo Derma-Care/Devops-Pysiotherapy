@@ -341,7 +341,7 @@ const FollowUp = ({ seed = {}, onNext }) => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', color: '#1a3a5c' }}>
                   <thead>
                     <tr style={{ background: 'linear-gradient(135deg,#1a5fa8,#3a8fd4)', color: '#fff' }}>
-                      {['#', 'Session Date', 'Status', 'Modalities Used', 'Exercises Done', 'Patient Response', 'Therapist Notes', 'Actions'].map(h => (
+                      {['#', 'Session Date', 'Status', 'Modalities Used', 'Exercises Done', 'Patient Response', 'Actions'].map(h => (
                         <th key={h} style={{ padding: '10px 14px', textAlign: 'left', whiteSpace: 'nowrap', fontWeight: 600 }}>{h}</th>
                       ))}
                     </tr>
@@ -367,11 +367,11 @@ const FollowUp = ({ seed = {}, onNext }) => {
                           </div>
                         </td>
                         <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>{s.patientResponse || '—'}</td>
-                        <td style={{ padding: '10px 14px', maxWidth: 180 }}>
+                        {/* <td style={{ padding: '10px 14px', maxWidth: 180 }}>
                           <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.therapistNotes}>
                             {s.therapistNotes || '—'}
                           </div>
-                        </td>
+                        </td> */}
                         <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
                           <button onClick={() => handleEdit(idx)} style={{
                             marginRight: 6, padding: '4px 12px', borderRadius: 6,
@@ -396,15 +396,26 @@ const FollowUp = ({ seed = {}, onNext }) => {
       </CContainer>
 
       {/* ── Sticky bottom bar ── */}
-      <div className="position-fixed bottom-0" style={{
-        left: 0, right: 0,
-        background: 'linear-gradient(90deg,#1a3a5c,#1a5fa8)',
-        display: 'flex', justifyContent: 'flex-end',
-        padding: '10px 24px',
-        boxShadow: '0 -2px 16px rgba(26,90,168,0.18)',
-        zIndex: 999,
-      }}>
-        <Button customColor={COLORS.bgcolor} color={COLORS.black} onClick={handleNext}>
+      <div className="position-fixed bottom-0"
+        style={{
+          left: 0,
+          right: 0,
+          background: '#a5c4d4ff', // ✅ light background
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 16,
+          padding: '10px 24px',
+          boxShadow: '0 -2px 10px rgba(0,0,0,0.08)', // ✅ soft shadow
+        }}>
+        <Button   customColor="#ffffff" // ✅ white button bg
+          color="#7e3a93"       // ✅ purple text
+          onClick={handleNext}
+          style={{
+            borderRadius: '20px',
+            fontWeight: 600,
+            padding: '6px 18px',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+          }}>
           Next
         </Button>
       </div>
