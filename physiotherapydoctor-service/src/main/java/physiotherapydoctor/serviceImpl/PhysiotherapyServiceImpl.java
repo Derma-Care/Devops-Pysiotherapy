@@ -5,14 +5,18 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
+import physiotherapydoctor.dto.BookingResponse;
 import physiotherapydoctor.dto.PhysiotherapyRecordDTO;
 import physiotherapydoctor.dto.Response;
+import physiotherapydoctor.dto.ResponseStructure;
 import physiotherapydoctor.dto.TherapistDashboardResponse;
 import physiotherapydoctor.dto.TherapySession;
 import physiotherapydoctor.entity.PhysiotherapyRecord;
+import physiotherapydoctor.feign.BookingFeign;
 import physiotherapydoctor.repository.PhysiotherapydoctorRespository;
 import physiotherapydoctor.service.PhysiotherapyService;
 
@@ -21,49 +25,108 @@ import physiotherapydoctor.service.PhysiotherapyService;
 public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 
 	private final PhysiotherapydoctorRespository repository;
+	
+	@Autowired
+	private  BookingFeign bookingFeign; 
 
-	@Override
-	public Response create(PhysiotherapyRecordDTO dto) {
 
-	    Response response = new Response();
-
-	    if (dto == null) {
-	        response.setSuccess(false);
-	        response.setData(null);
-	        response.setMessage("Request body is null");
-	        response.setStatus(400);
-	        return response;
-	    }
-
-	    PhysiotherapyRecord dtoData = mapToEntity(dto);
-
-	    // ✅ VERY IMPORTANT (FIX)
-	    dtoData.setTherapistRecordId(dto.getTherapistRecordId());
-
-	    // ✅ Generate session IDs
-	    generateSessionIds(dtoData.getTherapySessions());
-
-	    // ✅ Set initial session status
-	    if (dtoData.getTherapySessions() != null) {
-	        for (TherapySession s : dtoData.getTherapySessions()) {
-	            s.setStatus("Pending");
-	        }
-	    }
-
-	    // ✅ Set overall status
-	    dtoData.setOverallStatus("Pending");
-
-	    dtoData.setCreatedAt(dto.getCreatedAt());
-
-	    PhysiotherapyRecord saved = repository.save(dtoData);
-
-	    response.setSuccess(true);
-	    response.setData(saved);
-	    response.setMessage("Record created successfully");
-	    response.setStatus(201);
-
-	    return response;
-	}
+		@Override
+		public Response create(PhysiotherapyRecordDTO dto) {
+	
+		    Response response = new Response();
+	
+		    if (dto == null) {
+		        response.setSuccess(false);
+		        response.setData(null);
+		        response.setMessage("Request body is null");
+		        response.setStatus(400);
+		        return response;
+		    }
+	
+		    PhysiotherapyRecord dtoData = mapToEntity(dto);
+	
+		    // ✅ VERY IMPORTANT (FIX)
+		    dtoData.setTherapistRecordId(dto.getTherapistRecordId());
+	
+		    // ✅ Generate session IDs
+		    generateSessionIds(dtoData.getTherapySessions());
+	
+		    // ✅ Set initial session status
+		    if (dtoData.getTherapySessions() != null) {
+		        for (TherapySession s : dtoData.getTherapySessions()) {
+		            s.setStatus("Pending");
+		        }
+		    }
+	
+		    // ✅ Set overall status
+		    dtoData.setOverallStatus("Pending");
+	
+		    dtoData.setCreatedAt(dto.getCreatedAt());
+	
+		    PhysiotherapyRecord saved = repository.save(dtoData);
+		    
+		    
+		    if (dto.getBookingId() != null && !dto.getBookingId().isEmpty()) {
+	
+		        try {
+		            ResponseStructure<BookingResponse> res =
+		                    bookingFeign.getBookingById(dto.getBookingId());
+	
+		            if (res != null && res.getData() != null) {
+	
+		                BookingResponse oldBooking = res.getData();
+	
+		                // ✅ Create new object (IMPORTANT)
+		                BookingResponse updateRequest = new BookingResponse();
+	
+		                // ✅ Set required fields
+		                updateRequest.setBookingId(oldBooking.getBookingId());
+		                updateRequest.setStatus("Active");
+	
+		                // (optional but safe: copy few important fields)
+		                updateRequest.setName(oldBooking.getName());
+		                updateRequest.setMobileNumber(oldBooking.getMobileNumber());
+	
+		                bookingFeign.updateAppointment(updateRequest);
+		            }
+		        } catch (Exception e) {
+		        }
+		    }if (dto.getBookingId() != null && !dto.getBookingId().isEmpty()) {
+	
+		        try {
+		            ResponseStructure<BookingResponse> res =
+		                    bookingFeign.getBookingById(dto.getBookingId());
+	
+		            if (res != null && res.getData() != null) {
+	
+		                BookingResponse oldBooking = res.getData();
+	
+		                // ✅ Create new object (IMPORTANT)
+		                BookingResponse updateRequest = new BookingResponse();
+	
+		                // ✅ Set required fields
+		                updateRequest.setBookingId(oldBooking.getBookingId());
+		                updateRequest.setStatus("Active");
+	
+		                // (optional but safe: copy few important fields)
+		                updateRequest.setName(oldBooking.getName());
+		                updateRequest.setMobileNumber(oldBooking.getMobileNumber());
+	
+		                bookingFeign.updateAppointment(updateRequest);
+		            }
+		        } catch (Exception e) {
+		        
+		        }
+		    }
+		  
+	
+		    response.setSuccess(true);
+		    response.setData(saved);
+		    response.setMessage("Record created successfully");
+		    response.setStatus(201);
+	
+		    return response;
+		}
 	// ✅ GET BY ID
 	@Override
 	public Response getById(String id) {
@@ -448,6 +511,32 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 	    record.setOverallStatus(calculateOverallStatus(sessions));
 
 	    repository.save(record);
+	    // ======================================================
+	    // 🔥 ADD THIS BLOCK (BOOKING UPDATE)
+	    // ======================================================
+	    if (record.getBookingId() != null && !record.getBookingId().isEmpty()) {
+
+	        try {
+	            ResponseStructure<BookingResponse> res =
+	                    bookingFeign.getBookingById(record.getBookingId());
+
+	            if (res != null && res.getData() != null) {
+
+	                BookingResponse updateRequest = new BookingResponse();
+	                updateRequest.setBookingId(record.getBookingId());
+
+	                // ✅ CORE LOGIC
+	                if ("Completed".equalsIgnoreCase(record.getOverallStatus())) {
+	                    updateRequest.setStatus("Completed");   // 🔥 Active → Completed
+	                } else {
+	                    updateRequest.setStatus("Active");
+	                }
+
+	                bookingFeign.updateAppointment(updateRequest);
+	            }
+	        } catch (Exception e) {
+	        }
+	    }
 	}
 	private String calculateOverallStatus(List<TherapySession> sessions) {
 
