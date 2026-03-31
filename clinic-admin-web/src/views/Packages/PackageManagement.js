@@ -13,6 +13,7 @@ import {
   CModalBody,
   CRow,
   CCol,
+  CModalTitle,
 } from '@coreui/react'
 
 import { Eye, Edit2, Trash2 } from 'lucide-react'
@@ -135,10 +136,12 @@ useEffect(() => {
       <CTable bordered className="pink-table">
         <CTableHead>
           <CTableRow>
+            <CTableHeaderCell>S.No</CTableHeaderCell>
             <CTableHeaderCell>Name</CTableHeaderCell>
-            <CTableHeaderCell>Sessions</CTableHeaderCell>
-            <CTableHeaderCell>Price</CTableHeaderCell>
-            <CTableHeaderCell>Validity</CTableHeaderCell>
+            <CTableHeaderCell>Program Price</CTableHeaderCell>
+            <CTableHeaderCell>Discount %</CTableHeaderCell>
+            <CTableHeaderCell>Discounted Price</CTableHeaderCell>
+            <CTableHeaderCell>Final Price <br/> <small>(including Tax)</small></CTableHeaderCell>
             <CTableHeaderCell className="text-center">
               Actions
             </CTableHeaderCell>
@@ -146,12 +149,19 @@ useEffect(() => {
         </CTableHead>
 
         <CTableBody>
-          {packages.map((pkg) => (
+          {packages.map((pkg,index) => (
             <CTableRow key={pkg.id}>
+              <CTableDataCell>{index+1}</CTableDataCell>
               <CTableDataCell>{pkg.packageName}</CTableDataCell>
-              <CTableDataCell>{pkg.therapies[0]?.sessions || 'N/A'}</CTableDataCell>
-              <CTableDataCell>₹{pkg.packagePrice}</CTableDataCell>
-              <CTableDataCell>{pkg.validity} days</CTableDataCell>
+              <CTableDataCell>₹ {pkg.packagePrice}</CTableDataCell>
+              <CTableDataCell>₹ {pkg.discount || 'N/A'}</CTableDataCell>
+             <CTableDataCell>
+  ₹ {Number(pkg.afterDiscountPrice || 0).toFixed(2)}
+</CTableDataCell>
+
+<CTableDataCell>
+  ₹ {Number(pkg.finalPrice || 0).toFixed(2)}
+</CTableDataCell>
 
               <CTableDataCell className="text-center">
                 <div className="d-flex justify-content-center gap-2">
@@ -199,96 +209,132 @@ useEffect(() => {
       </CTable>
 
       {/* MODAL */}
-      <CModal visible={modalVisible} onClose={() => setModalVisible(false)} size="lg" backdrop="static">
-        <CModalHeader>
-          {viewMode
-            ? 'Program Details'
-            : selectedPackage
-            ? 'Edit Program'
-            : 'Add Program'}
-        </CModalHeader>
+      <CModal visible={modalVisible} onClose={() => setModalVisible(false)} size="lg" backdrop="static" className='custom-modal'>
+        {/* <CModalTitle>{viewMode ? 'Personal Information' : 'Add / Edit Receptionist'}</CModalTitle> */}
+       
+       <CModalHeader>
+  <CModalTitle
+    style={{
+      fontSize: "22px",
+      fontWeight: "700", // bold
+      color: "var(--color-black)",
+   
+    }}
+  >
+    {viewMode
+      ? "Program Details"
+      : selectedPackage
+      ? "Edit Program"
+      : "Add Program"}
+  </CModalTitle>
+</CModalHeader>
 
         <CModalBody>
           {viewMode ? (
-            // ✅ VIEW MODE (NO INPUTS)
-          <div>
+    <div className="p-3">
 
   {/* ================= BASIC ================= */}
-  <h6>Basic Information</h6>
-  <CRow>
-    <CCol md={6}>
-      <Field label="Package Name" value={selectedPackage?.packageName} />
-    </CCol>
-  </CRow>
+  <div className="mb-4">
+    <h6 className="fw-bold mb-3" >
+      Basic Information
+    </h6>
 
-  <Field label="Description" value={selectedPackage?.description} />
+    <CRow className="mb-2">
+      <CCol md={6}>
+        <Field label="Program Name" value={selectedPackage?.packageName} />
+      </CCol>
+    </CRow>
+
+    <Field label="Description" value={selectedPackage?.description} />
+  </div>
 
   {/* ================= PRICING ================= */}
-  <h6 className="mt-3">Pricing</h6>
-  <CRow>
-    <CCol md={3}>
-      <Field label="Price" value={`₹${selectedPackage?.packagePrice}`} />
-    </CCol>
+  <div className="mb-4">
+    <h6 className="fw-bold mb-3" >
+      Pricing Details
+    </h6>
 
-    <CCol md={3}>
-      <Field label="Discount" value={`${selectedPackage?.discount}%`} />
-    </CCol>
+    <CRow className="g-3">
+      <CCol md={3}>
+        <Field label="Price" value={`₹ ${selectedPackage?.packagePrice}`} />
+      </CCol>
 
-    <CCol md={3}>
-      <Field label="GST" value={`${selectedPackage?.gst}%`} />
-    </CCol>
+      <CCol md={3}>
+        <Field label="Discount" value={`${selectedPackage?.discount}%`} />
+      </CCol>
 
-    <CCol md={3}>
-      <Field label="Other Taxes" value={`${selectedPackage?.otherTaxes}%`} />
-    </CCol>
-  </CRow>
+      <CCol md={3}>
+        <Field label="GST" value={`${selectedPackage?.gst}%`} />
+      </CCol>
+
+      <CCol md={3}>
+        <Field label="Other Taxes" value={`${selectedPackage?.otherTaxes}%`} />
+      </CCol>
+    </CRow>
+  </div>
 
   {/* ================= PAYMENT ================= */}
-  <h6 className="mt-3">Payment</h6>
-  <Field label="Payment Type" value={selectedPackage?.paymentType} />
+  <div className="mb-4">
+    <h6 className="fw-bold mb-3" >
+      Payment Details
+    </h6>
+
+    <Field label="Payment Type" value={selectedPackage?.paymentType} />
+  </div>
 
   {/* ================= OFFER ================= */}
-  <h6 className="mt-3">Offer</h6>
-  <CRow>
-    <CCol md={6}>
-      <Field label="Start Date" value={selectedPackage?.offerStartDate || 'N/A'} />
-    </CCol>
+  <div className="mb-4">
+    <h6 className="fw-bold mb-3" >
+      Offer Period
+    </h6>
 
-    <CCol md={6}>
-      <Field label="End Date" value={selectedPackage?.offerEndDate || 'N/A'} />
-    </CCol>
-  </CRow>
+    <CRow className="g-3">
+      <CCol md={6}>
+        <Field label="Start Date" value={selectedPackage?.offerStartDate || 'N/A'} />
+      </CCol>
+
+      <CCol md={6}>
+        <Field label="End Date" value={selectedPackage?.offerEndDate || 'N/A'} />
+      </CCol>
+    </CRow>
+  </div>
 
   {/* ================= THERAPIES ================= */}
-  <h6 className="mt-3">Therapies</h6>
+  <div className="mb-3">
+    <h6 className="fw-bold mb-3">
+      Therapies Included
+    </h6>
 
-  {selectedPackage?.therapies?.length ? (
-    selectedPackage.therapies.map((t, i) => (
-      <div key={i} className="border p-2 mb-2 rounded">
+    {selectedPackage?.therapies?.length ? (
+      selectedPackage.therapies.map((t, i) => (
+        <div
+          key={i}
+          className="border rounded p-3 mb-3"
+          style={{ backgroundColor: "#f9fafb" }}
+        >
+          <CRow className="g-3">
+            <CCol md={3}>
+              <Field label="Therapy" value={t.name} />
+            </CCol>
 
-        <CRow>
-          <CCol md={3}>
-            <Field label="Therapy Name" value={t.name} />
-          </CCol>
+            <CCol md={3}>
+              <Field label="Sessions" value={t.sessions} />
+            </CCol>
 
-          <CCol md={3}>
-            <Field label="Sessions" value={t.sessions} />
-          </CCol>
+            <CCol md={3}>
+              <Field label="Duration" value={`${t.sessionDuration} mins`} />
+            </CCol>
 
-          <CCol md={3}>
-            <Field label="Duration" value={`${t.sessionDuration} mins`} />
-          </CCol>
-
-          <CCol md={3}>
-            <Field label="Validity" value={`${t.validity} days`} />
-          </CCol>
-        </CRow>
-
-      </div>
-    ))
-  ) : (
-    <p>No therapies added</p>
-  )}
+            <CCol md={3}>
+              <Field label="Validity" value={`${t.validity} days`} />
+            </CCol>
+          </CRow>
+        </div>
+      ))
+    ) : (
+      <p className="text-muted">No therapies added</p>
+    )}
+  </div>
 
 </div>
           ) : (
@@ -298,6 +344,7 @@ useEffect(() => {
               onSave={handleSave}
               viewMode={false}
               therapyOptions={therapyOptions} 
+              onCancel={false}
             />
           )}
         </CModalBody>

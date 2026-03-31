@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect } from 'react'
+import React, { Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { CSpinner, useColorModes } from '@coreui/react'
@@ -18,6 +18,9 @@ import SupplierApp from './components/PharmacyManagement/Reorder/SupplierApp'
 // import { listenNotification } from './firebase'
 import { LogoLoader } from './Utils/LogoLoder'
 
+ 
+ 
+
 const App = () => {
   const { isColorModeSet, setColorMode } = useColorModes('coreui-free-react-admin-template-theme')
   const storedTheme = useSelector((state) => state.theme)
@@ -33,7 +36,8 @@ const App = () => {
   // useEffect(() => {
   //   listenNotification()
   // }, [])
-
+ 
+ 
   return (
     <Suspense fallback={<LogoLoader />}>
     {/* <Suspense> */}
