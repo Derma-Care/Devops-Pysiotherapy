@@ -218,27 +218,27 @@ public class BookingServiceController {
 	}
 	
 	
-	@GetMapping("/getTodayDoctorAppointmentsByDoctorId/{clinicId}/{branchId}/{doctorId}")
-	public ResponseEntity<?> getTodayDoctorAppointmentsByDoctorId(@PathVariable String clinicId,@PathVariable String bId,@PathVariable String doctorId){
-		return service.getTodayDoctorAppointmentsByDoctorId(clinicId,bId, doctorId);
+	@GetMapping("/getTodayDoctorAppointmentsByDoctorId/{clinicId}/{doctorId}")
+	public ResponseEntity<?> getTodayDoctorAppointmentsByDoctorId(@PathVariable String clinicId,@PathVariable String doctorId){
+		return service.getTodayDoctorAppointmentsByDoctorId(clinicId, doctorId);
 	
 	}
 	
-	@GetMapping("/filterDoctorAppointmentsByDoctorId/{clinicId}/{branchId}/{doctorId}/{number}")
-	public ResponseEntity<?> filterDoctorAppointmentsByDoctorId(@PathVariable String clinicId,@PathVariable String bId,@PathVariable String doctorId,@PathVariable String number){
-		return service.filterDoctorAppointmentsByDoctorId(clinicId, bId,doctorId, number);
+	@GetMapping("/filterDoctorAppointmentsByDoctorId/{clinicId}/{doctorId}/{number}")
+	public ResponseEntity<?> filterDoctorAppointmentsByDoctorId(@PathVariable String clinicId,@PathVariable String doctorId,@PathVariable String number){
+		return service.filterDoctorAppointmentsByDoctorId(clinicId, doctorId, number);
 	
 	}
 	
-	@GetMapping("/getCompletedApntsByDoctorId/{clinicId}/{branchId}/{doctorId}")
-	public ResponseEntity<?> filterDoctorAppointmentsByDoctorId(@PathVariable String clinicId,@PathVariable String bId,@PathVariable String doctorId){
-		return service.getCompletedApntsByDoctorId(clinicId,bId, doctorId);
+	@GetMapping("/getCompletedApntsByDoctorId/{clinicId}/{doctorId}")
+	public ResponseEntity<?> filterDoctorAppointmentsByDoctorId(@PathVariable String clinicId,@PathVariable String doctorId){
+		return service.getCompletedApntsByDoctorId(clinicId, doctorId);
 	
 	}
 	
-	@GetMapping("/getSizeOfConsultationTypesByDoctorId/{clinicId}/{branchId}/{doctorId}")
-	public ResponseEntity<?> getSizeOfConsultationTypesByDoctorId(@PathVariable String clinicId,@PathVariable String bId,@PathVariable String doctorId){
-		return service.getSizeOfConsultationTypesByDoctorId(clinicId,bId, doctorId);
+	@GetMapping("/getSizeOfConsultationTypesByDoctorId/{clinicId}/{doctorId}")
+	public ResponseEntity<?> getSizeOfConsultationTypesByDoctorId(@PathVariable String clinicId,@PathVariable String doctorId){
+		return service.getSizeOfConsultationTypesByDoctorId(clinicId, doctorId);
 	
 	}
 	
