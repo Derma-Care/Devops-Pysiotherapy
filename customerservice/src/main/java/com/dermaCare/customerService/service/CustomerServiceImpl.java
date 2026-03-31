@@ -900,7 +900,7 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 
 	        	        List<QuestionsEntity> questionsList = entity.getQuestionsByPart().get(key);
 
-	        	        if (questionsList == null) {
+	        	        if (questionsList == null || questionsList.isEmpty()  ) {
 	        	            continue;
 	        	        }
 

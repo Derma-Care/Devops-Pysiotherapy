@@ -342,41 +342,39 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 	    LocalDate weekStart = today.minusDays(7);
 	    LocalDate monthStart = today.minusDays(30);
 
-	    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-
+	    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 	    int todayCount = 0, weekCount = 0, monthCount = 0;
 	    long todayMinutes = 0, weekMinutes = 0, monthMinutes = 0;
 
 	    for (PhysiotherapyRecord record : records) {
 
-	        if (record.getCreatedAt() == null) continue;
+	        if (record.getTherapySessions() == null) continue;
 
-	        LocalDate recordDate;
+	        for (TherapySession session : record.getTherapySessions()) {
 
-	        try {
-	            recordDate = parseDate(record.getCreatedAt(), formatter);
-	        } catch (Exception e) {
-	            continue;
-	        }
+	            if (session.getSessionDate() == null) continue;
 
-	        long duration = extractMinutes(record);
+	            LocalDate sessionDate = LocalDate.parse(session.getSessionDate());
 
-	        // ✅ TODAY
-	        if (recordDate.equals(today)) {
-	            todayCount++;
-	            todayMinutes += duration;
-	        }
+	            long duration = parseDuration(session.getDuration());
 
-	        // ✅ WEEK
-	        if (!recordDate.isBefore(weekStart)) {
-	            weekCount++;
-	            weekMinutes += duration;
-	        }
+	            // ✅ TODAY
+	            if (sessionDate.equals(today)) {
+	                todayCount++;
+	                todayMinutes += duration;
+	            }
 
-	        // ✅ MONTH
-	        if (!recordDate.isBefore(monthStart)) {
-	            monthCount++;
-	            monthMinutes += duration;
+	            // ✅ WEEK
+	            if (!sessionDate.isBefore(weekStart)) {
+	                weekCount++;
+	                weekMinutes += duration;
+	            }
+
+	            // ✅ MONTH
+	            if (!sessionDate.isBefore(monthStart)) {
+	                monthCount++;
+	                monthMinutes += duration;
+	            }
 	        }
 	    }
 

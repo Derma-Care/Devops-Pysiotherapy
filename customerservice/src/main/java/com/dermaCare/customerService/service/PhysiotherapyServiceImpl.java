@@ -107,10 +107,12 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 	        	Map<String, List<QuestionsEntity>> filteredMap = new HashMap<>();
 	            for (String key : keys.getKeys()) {
 	            QuestionsByPartEntity entity = getByKey.getByKey(key);
-		        Map<String, List<QuestionsEntity>> existingMap = entity.getQuestionsByPart();		           
+	            if(entity != null) {
+		        Map<String, List<QuestionsEntity>> existingMap = entity.getQuestionsByPart();
+		        if(existingMap != null || !existingMap.isEmpty()) {
 	                if (existingMap.containsKey(key)) {
 	                    filteredMap.put(key, existingMap.get(key));
-	                }}
+	                }}}}
 	            if (filteredMap.isEmpty()) {
 	                return new ResponseEntity<>(
 	                        new Response("No matching keys found", 404, false, null),
