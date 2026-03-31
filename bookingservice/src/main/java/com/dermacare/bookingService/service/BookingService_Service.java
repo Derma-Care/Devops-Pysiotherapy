@@ -23,10 +23,10 @@ public interface BookingService_Service {
 	public List<BookingResponse> bookingByBranchId(String branchId);
 	public ResponseEntity<?> getAppointsByPatientId(String patientId);
 	public ResponseEntity<?> getAppointsByInput(String input);
-	public ResponseEntity<?> getTodayDoctorAppointmentsByDoctorId(String hospitalId,String branchId,String doctorId);
-	public ResponseEntity<?> filterDoctorAppointmentsByDoctorId(String hospitalId,String branchId,String doctorId,String number);
-	public ResponseEntity<?> getCompletedApntsByDoctorId(String hospitalId,String branchId,String doctorId);
-	public ResponseEntity<?> getSizeOfConsultationTypesByDoctorId(String hospitalId,String branchId,String doctorId);
+	public ResponseEntity<?> getTodayDoctorAppointmentsByDoctorId(String hospitalId,String doctorId);
+	public ResponseEntity<?> filterDoctorAppointmentsByDoctorId(String hospitalId,String doctorId,String number);
+	public ResponseEntity<?> getCompletedApntsByDoctorId(String hospitalId,String doctorId);
+	public ResponseEntity<?> getSizeOfConsultationTypesByDoctorId(String hospitalId,String doctorId);
 	public Response getPatientDetailsForConsetForm(String bookingId, String patientId, String mobileNumber);
 	public ResponseEntity<?> getInProgressAppointments(String number);
 	public ResponseEntity<?> retrieveOneWeekAppointments(String cinicId,String branchId);								

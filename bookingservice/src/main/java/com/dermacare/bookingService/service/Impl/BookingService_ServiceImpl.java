@@ -42,7 +42,7 @@ import com.dermacare.bookingService.entity.Booking;
 import com.dermacare.bookingService.entity.ReportsList;
 import com.dermacare.bookingService.feign.ClinicAdminFeign;
 import com.dermacare.bookingService.feign.DoctorFeign;
-//import com.dermacare.bookingService.producer.KafkaProducer;
+import com.dermacare.bookingService.producer.KafkaProducer;
 import com.dermacare.bookingService.repository.BookingServiceRepository;
 import com.dermacare.bookingService.service.BookingService_Service;
 import com.dermacare.bookingService.util.Response;
@@ -57,10 +57,10 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 
 	@Autowired
 	private BookingServiceRepository repository;
-//	
-//	@Autowired
-//	private KafkaProducer kafkaProducer;
-//	
+	
+	@Autowired
+	private KafkaProducer kafkaProducer;
+	
 //	// @Autowired
 	//private NotificationFeign notificationFeign;
 	
@@ -195,16 +195,16 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	             Booking updatedBooking = repository.save(b);
 	             nullifyLargeFields(updatedBooking);
 
-//	             // 🔔 Publish to Kafka
-//	             try {
-//	            	 updatedBooking.setAttachments(null); 
-//	            	 updatedBooking.setPartImage(null);
-//	            	 updatedBooking.setConsentFormPdf(null);
-//	            	 updatedBooking.setPrescriptionPdf(null);
-//	                 kafkaProducer.publishBooking(updatedBooking);
-//	             } catch (Exception e) {
-//	                 System.err.println("⚠️ Kafka publish failed: " + e.getMessage());
-//	             }
+	             // 🔔 Publish to Kafka
+	             try {
+	            	 updatedBooking.setAttachments(null); 
+	            	 updatedBooking.setPartImage(null);
+	            	 updatedBooking.setConsentFormPdf(null);
+	            	 updatedBooking.setPrescriptionPdf(null);
+	                 kafkaProducer.publishBooking(updatedBooking);
+	             } catch (Exception e) {
+	                 System.err.println("⚠️ Kafka publish failed: " + e.getMessage());
+	             }
 
 	             BookingResponse res = toResponse(updatedBooking);
 
@@ -252,15 +252,15 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	         Booking savedBooking = repository.save(entity);
 	         nullifyLargeFields(savedBooking);
 
-//	         try {
-//	        	 savedBooking.setConsentFormPdf(null);
-//	        	 savedBooking.setConsentFormPdf(null);
-//	        	 savedBooking.setPrescriptionPdf(null); 
-//	        	 savedBooking.setPartImage(null);
-//	             kafkaProducer.publishBooking(savedBooking);
-//	         } catch (Exception e) {
-//	             System.err.println("⚠️ Kafka publish failed: " + e.getMessage());
-//	         }
+	         try {
+	        	 savedBooking.setConsentFormPdf(null);
+	        	 savedBooking.setConsentFormPdf(null);
+	        	 savedBooking.setPrescriptionPdf(null); 
+	        	 savedBooking.setPartImage(null);
+	             kafkaProducer.publishBooking(savedBooking);
+	         } catch (Exception e) {
+	             System.err.println("⚠️ Kafka publish failed: " + e.getMessage());
+	         }
 
 	         BookingResponse bRes = toResponse(savedBooking);
 	         response = ResponseStructure.buildResponse(
@@ -450,12 +450,12 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	
 	
 
-	public ResponseEntity<?> getTodayDoctorAppointmentsByDoctorId(String hospitalId, String branchId, String doctorId) {
+	public ResponseEntity<?> getTodayDoctorAppointmentsByDoctorId(String hospitalId, String doctorId) {
 	    ResponseStructure<List<BookingResponse>> res = new ResponseStructure<>();
 	    List<BookingResponse> responseList = new ArrayList<>();
 
 	    try {
-	        List<Booking> existingBookings = repository.findByClinicIdAndBranchIdAndDoctorId(hospitalId, branchId, doctorId);
+	        List<Booking> existingBookings = repository.findByClinicIdAndDoctorId(hospitalId, doctorId);
 	        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 	        LocalDate currentDate = LocalDate.now(ZoneId.of("Asia/Kolkata"));
 
@@ -549,7 +549,6 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 
 	public ResponseEntity<?> filterDoctorAppointmentsByDoctorId(
 	        String hospitalId,
-	        String branchId,
 	        String doctorId,
 	        String number) {
 
@@ -558,7 +557,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 
 	    try {
 	        List<Booking> bookings =
-	                repository.findByClinicIdAndBranchIdAndDoctorId(hospitalId, branchId, doctorId);
+	                repository.findByClinicIdAndDoctorId(hospitalId, doctorId);
 
 	        LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
 
@@ -730,10 +729,10 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 
 
 		
-	public ResponseEntity<?> getCompletedApntsByDoctorId(String hospitalId, String branchId,String doctorId) {
+	public ResponseEntity<?> getCompletedApntsByDoctorId(String hospitalId,String doctorId) {
 		    Map<String,Object> m = new LinkedHashMap<>();
 		try {
-			List<Booking> existingBooking = repository.findByClinicIdAndBranchIdAndDoctorId(hospitalId, branchId, doctorId);			
+			List<Booking> existingBooking = repository.findByClinicIdAndDoctorId(hospitalId, doctorId);
 			List<BookingResponse> res = new ArrayList<>();
 			if(existingBooking != null) {
 			for(Booking b : existingBooking) {
@@ -754,10 +753,10 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	}
 	
 	
-	public ResponseEntity<?> getSizeOfConsultationTypesByDoctorId(String hospitalId, String branchId,String doctorId) {
+	public ResponseEntity<?> getSizeOfConsultationTypesByDoctorId(String hospitalId,String doctorId) {
 	    Map<String,Object> m = new LinkedHashMap<>();
 	try {
-		List<Booking> existingBooking = repository.findByClinicIdAndBranchIdAndDoctorId(hospitalId, branchId, doctorId);		
+		List<Booking> existingBooking = repository.findByClinicIdAndDoctorId(hospitalId, doctorId);
 		List<BookingResponse> servicesAndConsul = new ArrayList<>();
 		List<BookingResponse> inClinic = new ArrayList<>();
 		List<BookingResponse> online = new ArrayList<>();
