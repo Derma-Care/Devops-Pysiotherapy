@@ -25,108 +25,83 @@ import physiotherapydoctor.service.PhysiotherapyService;
 public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 
 	private final PhysiotherapydoctorRespository repository;
-	
+
 	@Autowired
-	private  BookingFeign bookingFeign; 
+	private BookingFeign bookingFeign;
 
+	@Override
+	public Response create(PhysiotherapyRecordDTO dto) {
 
-		@Override
-		public Response create(PhysiotherapyRecordDTO dto) {
-	
-		    Response response = new Response();
-	
-		    if (dto == null) {
-		        response.setSuccess(false);
-		        response.setData(null);
-		        response.setMessage("Request body is null");
-		        response.setStatus(400);
-		        return response;
-		    }
-	
-		    PhysiotherapyRecord dtoData = mapToEntity(dto);
-	
-		    // ✅ VERY IMPORTANT (FIX)
-		    dtoData.setTherapistRecordId(dto.getTherapistRecordId());
-	
-		    // ✅ Generate session IDs
-		    generateSessionIds(dtoData.getTherapySessions());
-	
-		    // ✅ Set initial session status
-		    if (dtoData.getTherapySessions() != null) {
-		        for (TherapySession s : dtoData.getTherapySessions()) {
-		            s.setStatus("Pending");
-		        }
-		    }
-	
-		    // ✅ Set overall status
-		    dtoData.setOverallStatus("Pending");
-	
-		    dtoData.setCreatedAt(dto.getCreatedAt());
-	
-		    PhysiotherapyRecord saved = repository.save(dtoData);
-		    
-		    
-		    if (dto.getBookingId() != null && !dto.getBookingId().isEmpty()) {
-	
-		        try {
-		            ResponseStructure<BookingResponse> res =
-		                    bookingFeign.getBookingById(dto.getBookingId());
-	
-		            if (res != null && res.getData() != null) {
-	
-		                BookingResponse oldBooking = res.getData();
-	
-		                // ✅ Create new object (IMPORTANT)
-		                BookingResponse updateRequest = new BookingResponse();
-	
-		                // ✅ Set required fields
-		                updateRequest.setBookingId(oldBooking.getBookingId());
-		                updateRequest.setStatus("Active");
-	
-		                // (optional but safe: copy few important fields)
-		                updateRequest.setName(oldBooking.getName());
-		                updateRequest.setMobileNumber(oldBooking.getMobileNumber());
-	
-		                bookingFeign.updateAppointment(updateRequest);
-		            }
-		        } catch (Exception e) {
-		        }
-		    }if (dto.getBookingId() != null && !dto.getBookingId().isEmpty()) {
-	
-		        try {
-		            ResponseStructure<BookingResponse> res =
-		                    bookingFeign.getBookingById(dto.getBookingId());
-	
-		            if (res != null && res.getData() != null) {
-	
-		                BookingResponse oldBooking = res.getData();
-	
-		                // ✅ Create new object (IMPORTANT)
-		                BookingResponse updateRequest = new BookingResponse();
-	
-		                // ✅ Set required fields
-		                updateRequest.setBookingId(oldBooking.getBookingId());
-		                updateRequest.setStatus("Active");
-	
-		                // (optional but safe: copy few important fields)
-		                updateRequest.setName(oldBooking.getName());
-		                updateRequest.setMobileNumber(oldBooking.getMobileNumber());
-	
-		                bookingFeign.updateAppointment(updateRequest);
-		            }
-		        } catch (Exception e) {
-		        
-		        }
-		    }
-		  
-	
-		    response.setSuccess(true);
-		    response.setData(saved);
-		    response.setMessage("Record created successfully");
-		    response.setStatus(201);
-	
-		    return response;
+		Response response = new Response();
+
+		if (dto == null) {
+			response.setSuccess(false);
+			response.setData(null);
+			response.setMessage("Request body is null");
+			response.setStatus(400);
+			return response;
 		}
+
+		PhysiotherapyRecord dtoData = mapToEntity(dto);
+
+		// ✅ Set ID
+		dtoData.setTherapistRecordId(dto.getTherapistRecordId());
+
+		// ✅ Generate session IDs
+		generateSessionIds(dtoData.getTherapySessions());
+
+		// ✅ Set session status
+		if (dtoData.getTherapySessions() != null) {
+			for (TherapySession s : dtoData.getTherapySessions()) {
+				if (s.getStatus() == null || s.getStatus().isEmpty()) {
+					s.setStatus("Pending");
+				}
+			}
+		}
+
+		// ✅ Set overall status
+		dtoData.setOverallStatus("Pending");
+
+		dtoData.setCreatedAt(dto.getCreatedAt());
+
+		// ✅ Save record
+		PhysiotherapyRecord saved = repository.save(dtoData);
+
+		// ✅ 🔥 SINGLE booking update block (FIXED)
+		if (dto.getBookingId() != null && !dto.getBookingId().isEmpty()) {
+
+			try {
+				ResponseStructure<BookingResponse> res = bookingFeign.getBookingById(dto.getBookingId());
+
+				if (res != null && res.getData() != null) {
+
+					BookingResponse oldBooking = res.getData();
+
+					BookingResponse updateRequest = new BookingResponse();
+					updateRequest.setBookingId(oldBooking.getBookingId());
+					updateRequest.setStatus("Active");
+
+					// optional fields
+					updateRequest.setName(oldBooking.getName());
+					updateRequest.setMobileNumber(oldBooking.getMobileNumber());
+
+					bookingFeign.updateAppointment(updateRequest);
+				}
+
+			} catch (Exception e) {
+				// 🔥 log instead of silent fail (recommended)
+				System.out.println("Booking update failed: " + e.getMessage());
+			}
+		}
+
+		response.setSuccess(true);
+		response.setData(saved);
+		response.setMessage("Record created successfully");
+		response.setStatus(201);
+
+		return response;
+	}
+
 	// ✅ GET BY ID
 	@Override
 	public Response getById(String id) {
@@ -321,243 +296,243 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 
 		return entity;
 	}
-	
+
 	@Override
 	public Response getTherapistDashboard(String clinicId, String branchId, String therapistId) {
 
-	    Response response = new Response();
+		Response response = new Response();
 
-	    List<PhysiotherapyRecord> records =
-	            repository.findByClinicIdAndBranchIdAndTreatmentPlanTherapistId(
-	                    clinicId, branchId, therapistId);
+		List<PhysiotherapyRecord> records = repository.findByClinicIdAndBranchIdAndTreatmentPlanTherapistId(clinicId,
+				branchId, therapistId);
 
-	    if (records.isEmpty()) {
-	        response.setSuccess(false);
-	        response.setMessage("No records found");
-	        response.setStatus(404);
-	        return response;
-	    }
+		if (records.isEmpty()) {
+			response.setSuccess(false);
+			response.setMessage("No records found");
+			response.setStatus(404);
+			return response;
+		}
 
-	    LocalDate today = LocalDate.now();
-	    LocalDate weekStart = today.minusDays(7);
-	    LocalDate monthStart = today.minusDays(30);
+		LocalDate today = LocalDate.now();
+		LocalDate weekStart = today.minusDays(7);
+		LocalDate monthStart = today.minusDays(30);
 
-	    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-	    int todayCount = 0, weekCount = 0, monthCount = 0;
-	    long todayMinutes = 0, weekMinutes = 0, monthMinutes = 0;
+		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-	    for (PhysiotherapyRecord record : records) {
+		int todayCount = 0, weekCount = 0, monthCount = 0;
+		long todayMinutes = 0, weekMinutes = 0, monthMinutes = 0;
 
-	        if (record.getTherapySessions() == null) continue;
+		for (PhysiotherapyRecord record : records) {
 
-	        for (TherapySession session : record.getTherapySessions()) {
+			if (record.getTherapySessions() == null)
+				continue;
 
-	            if (session.getSessionDate() == null) continue;
+			boolean countedToday = false;
+			boolean countedWeek = false;
+			boolean countedMonth = false;
 
-	            LocalDate sessionDate = LocalDate.parse(session.getSessionDate());
+			for (TherapySession session : record.getTherapySessions()) {
 
-	            long duration = parseDuration(session.getDuration());
+				if (session.getSessionDate() == null)
+					continue;
 
-	            // ✅ TODAY
-	            if (sessionDate.equals(today)) {
-	                todayCount++;
-	                todayMinutes += duration;
-	            }
+				LocalDate sessionDate = parseDate(session.getSessionDate(), formatter);
 
-	            // ✅ WEEK
-	            if (!sessionDate.isBefore(weekStart)) {
-	                weekCount++;
-	                weekMinutes += duration;
-	            }
+				if (sessionDate == null) continue; // ✅ ADD THIS
+				long duration = parseDuration(session.getDuration());
 
-	            // ✅ MONTH
-	            if (!sessionDate.isBefore(monthStart)) {
-	                monthCount++;
-	                monthMinutes += duration;
-	            }
-	        }
-	    }
+				// ✅ TODAY
+				if (sessionDate.equals(today)) {
+					if (!countedToday) {
+						todayCount++; // count patient once
+						countedToday = true;
+					}
+					todayMinutes += duration;
+				}
 
-	    TherapistDashboardResponse dashboard = new TherapistDashboardResponse();
-	    dashboard.setTodayPatientCount(todayCount);
-	    dashboard.setTodayWorkingMinutes(todayMinutes);
+				// ✅ WEEK
+				if (!sessionDate.isBefore(weekStart)) {
+					if (!countedWeek) {
+						weekCount++;
+						countedWeek = true;
+					}
+					weekMinutes += duration;
+				}
 
-	    dashboard.setWeeklyPatientCount(weekCount);
-	    dashboard.setWeeklyWorkingMinutes(weekMinutes);
+				// ✅ MONTH
+				if (!sessionDate.isBefore(monthStart)) {
+					if (!countedMonth) {
+						monthCount++;
+						countedMonth = true;
+					}
+					monthMinutes += duration;
+				}
+			}
+		}
 
-	    dashboard.setMonthlyPatientCount(monthCount);
-	    dashboard.setMonthlyWorkingMinutes(monthMinutes);
+		TherapistDashboardResponse dashboard = new TherapistDashboardResponse();
+		dashboard.setTodayPatientCount(todayCount);
+		dashboard.setTodayWorkingMinutes(todayMinutes);
 
-	    dashboard.setRecords(records);
+		dashboard.setWeeklyPatientCount(weekCount);
+		dashboard.setWeeklyWorkingMinutes(weekMinutes);
 
-	    response.setSuccess(true);
-	    response.setData(dashboard);
-	    response.setMessage("Dashboard fetched successfully");
-	    response.setStatus(200);
+		dashboard.setMonthlyPatientCount(monthCount);
+		dashboard.setMonthlyWorkingMinutes(monthMinutes);
 
-	    return response;
+		dashboard.setRecords(records);
+
+		response.setSuccess(true);
+		response.setData(dashboard);
+		response.setMessage("Dashboard fetched successfully");
+		response.setStatus(200);
+
+		return response;
 	}
+
 	private LocalDate parseDate(String date, DateTimeFormatter formatter) {
+		try {
+			if (date == null || date.isEmpty())
+				return null;
 
-	    if (date == null || date.isEmpty()) {
-	        throw new RuntimeException("Invalid date");
-	    }
+			String cleanDate = date.length() >= 10 ? date.substring(0, 10) : date;
+			return LocalDate.parse(cleanDate, formatter);
 
-	    String cleanDate = date.length() >= 10 ? date.substring(0, 10) : date;
-
-	    return LocalDate.parse(cleanDate, formatter);
+		} catch (Exception e) {
+			return null; // 🔥 SAFE
+		}
 	}
-	private long extractMinutes(PhysiotherapyRecord record) {
 
-	    long totalMinutes = 0;
 
-	    // ✅ From TherapySessions
-	    if (record.getTherapySessions() != null) {
-
-	        totalMinutes = record.getTherapySessions().stream()
-	                .filter(session -> session.getDuration() != null)
-	                .mapToLong(session -> parseDuration(session.getDuration()))
-	                .sum();
-
-	        if (totalMinutes > 0) {
-	            return totalMinutes;
-	        }
-	    }
-
-	    // ✅ Fallback: TreatmentPlan
-	    if (record.getTreatmentPlan() != null &&
-	        record.getTreatmentPlan().getSessionDuration() != null) {
-
-	        return parseDuration(record.getTreatmentPlan().getSessionDuration());
-	    }
-
-	    return 0;
-	}
 	private long parseDuration(String duration) {
 
-	    if (duration == null || duration.isEmpty()) return 0;
+		if (duration == null || duration.isEmpty())
+			return 0;
 
-	    duration = duration.toLowerCase().trim();
+		duration = duration.toLowerCase().trim();
 
-	    try {
-	        long value = Long.parseLong(duration.replaceAll("[^0-9]", ""));
+		try {
+			long value = Long.parseLong(duration.replaceAll("[^0-9]", ""));
 
-	        // handle hours
-	        if (duration.contains("hour")) {
-	            return value * 60;
-	        }
+			// support: "1 hour", "2 hrs"
+			if (duration.contains("hour") || duration.contains("hr")) {
+				return value * 60;
+			}
 
-	        return value;
+			return value; // minutes
 
-	    } catch (Exception e) {
-	        return 0;
-	    }
+		} catch (Exception e) {
+			return 0;
+		}
 	}
+
 	private void generateSessionIds(List<TherapySession> sessions) {
 
-	    if (sessions == null || sessions.isEmpty()) return;
+		if (sessions == null || sessions.isEmpty())
+			return;
 
-	    for (TherapySession session : sessions) {
+		for (TherapySession session : sessions) {
 
-	        // ✅ Generate UNIQUE sessionId
-	        session.setSessionId("SES-" + System.currentTimeMillis());
+			// ✅ Generate UNIQUE sessionId
+			session.setSessionId("SES-" + System.currentTimeMillis());
 
-	        // small delay to avoid same millis
-	        try {
-	            Thread.sleep(1);
-	        } catch (InterruptedException e) {
-	            Thread.currentThread().interrupt();
-	        }
+			// small delay to avoid same millis
+			try {
+				Thread.sleep(1);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
 
-	        // ✅ Auto set status if null
-	        if (session.getStatus() == null || session.getStatus().isEmpty()) {
-	            session.setStatus("Pending");
-	        }
-	    }
+			// ✅ Auto set status if null
+			if (session.getStatus() == null || session.getStatus().isEmpty()) {
+				session.setStatus("Pending");
+			}
+		}
 	}
+
 	public void updateSessionStatusFromTherapist(String therapistRecordId, String sessionId) {
 
-	    PhysiotherapyRecord record = repository
-	            .findByTherapistRecordId(therapistRecordId)
-	            .orElseThrow(() -> new RuntimeException("Record not found"));
+		PhysiotherapyRecord record = repository.findByTherapistRecordId(therapistRecordId)
+				.orElseThrow(() -> new RuntimeException("Record not found"));
 
-	    List<TherapySession> sessions = record.getTherapySessions();
+		List<TherapySession> sessions = record.getTherapySessions();
 
-	    if (sessions == null || sessions.isEmpty()) {
-	        throw new RuntimeException("No sessions found");
-	    }
+		if (sessions == null || sessions.isEmpty()) {
+			throw new RuntimeException("No sessions found");
+		}
 
-	    boolean sessionFound = false;
+		boolean sessionFound = false;
 
-	    for (TherapySession session : sessions) {
+		for (TherapySession session : sessions) {
 
-	        // ✅ MATCH sessionId safely
-	        if (sessionId.equals(session.getSessionId())) {
+			// ✅ MATCH sessionId safely
+			if (sessionId.equals(session.getSessionId())) {
 
-	            // ✅ Update status
-	            session.setStatus("Completed");
-	            sessionFound = true;
-	            break;
-	        }
-	    }
+				// ✅ Update status
+				session.setStatus("Completed");
+				sessionFound = true;
+				break;
+			}
+		}
 
-	    if (!sessionFound) {
-	        throw new RuntimeException("Session not found with ID: " + sessionId);
-	    }
+		if (!sessionFound) {
+			throw new RuntimeException("Session not found with ID: " + sessionId);
+		}
 
-	    // ✅ UPDATE OVERALL STATUS
-	    record.setOverallStatus(calculateOverallStatus(sessions));
+		// ✅ UPDATE OVERALL STATUS
+		record.setOverallStatus(calculateOverallStatus(sessions));
 
-	    repository.save(record);
-	    // ======================================================
-	    // 🔥 ADD THIS BLOCK (BOOKING UPDATE)
-	    // ======================================================
-	    if (record.getBookingId() != null && !record.getBookingId().isEmpty()) {
+		repository.save(record);
+		// ======================================================
+		// 🔥 ADD THIS BLOCK (BOOKING UPDATE)
+		// ======================================================
+		if (record.getBookingId() != null && !record.getBookingId().isEmpty()) {
 
-	        try {
-	            ResponseStructure<BookingResponse> res =
-	                    bookingFeign.getBookingById(record.getBookingId());
+			try {
+				ResponseStructure<BookingResponse> res = bookingFeign.getBookingById(record.getBookingId());
 
-	            if (res != null && res.getData() != null) {
+				if (res != null && res.getData() != null) {
 
-	                BookingResponse updateRequest = new BookingResponse();
-	                updateRequest.setBookingId(record.getBookingId());
+					BookingResponse updateRequest = new BookingResponse();
+					updateRequest.setBookingId(record.getBookingId());
 
-	                // ✅ CORE LOGIC
-	                if ("Completed".equalsIgnoreCase(record.getOverallStatus())) {
-	                    updateRequest.setStatus("Completed");   // 🔥 Active → Completed
-	                } else {
-	                    updateRequest.setStatus("Active");
-	                }
+					// ✅ CORE LOGIC
+					if ("Completed".equalsIgnoreCase(record.getOverallStatus())) {
+						updateRequest.setStatus("Completed"); // 🔥 Active → Completed
+					} else {
+						updateRequest.setStatus("Active");
+					}
 
-	                bookingFeign.updateAppointment(updateRequest);
-	            }
-	        } catch (Exception e) {
-	        }
-	    }
+					bookingFeign.updateAppointment(updateRequest);
+				}
+			} catch (Exception e) {
+			}
+		}
 	}
+
 	private String calculateOverallStatus(List<TherapySession> sessions) {
 
-	    if (sessions == null || sessions.isEmpty()) {
-	        return "Pending";
-	    }
+		if (sessions == null || sessions.isEmpty()) {
+			return "Pending";
+		}
 
-	    boolean allCompleted = true;
-	    boolean anyCompleted = false;
+		boolean allCompleted = true;
+		boolean anyCompleted = false;
 
-	    for (TherapySession s : sessions) {
+		for (TherapySession s : sessions) {
 
-	        if ("Completed".equalsIgnoreCase(s.getStatus())) {
-	            anyCompleted = true;
-	        } else {
-	            allCompleted = false;
-	        }
-	    }
+			if ("Completed".equalsIgnoreCase(s.getStatus())) {
+				anyCompleted = true;
+			} else {
+				allCompleted = false;
+			}
+		}
 
-	    if (allCompleted) return "Completed";
-	    if (anyCompleted) return "Active";
+		if (allCompleted)
+			return "Completed";
+		if (anyCompleted)
+			return "Active";
 
-	    return "PENDING";
+		return "Pending";
 	}
-	
+
 }
