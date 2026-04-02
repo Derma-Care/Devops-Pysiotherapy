@@ -32,6 +32,7 @@ public class PhysiotherapyRecord {
     private String bookingId;
     private String clinicId;
     private String branchId;
+    private String overallStatus;
     private PatientInfo patientInfo;  
     private Complaints complaints;     
     private Assessment assessment;
@@ -43,7 +44,6 @@ public class PhysiotherapyRecord {
     private FollowUp followUp;
     private ProgressAnalytics progressAnalytics;
     private List<TreatmentTemplate> treatmentTemplates;
-    private String overallStatus;
     private String createdAt;
     private String updatedAt;
     
