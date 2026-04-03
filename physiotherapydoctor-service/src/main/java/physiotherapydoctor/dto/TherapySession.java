@@ -12,6 +12,7 @@ public class TherapySession {
 	private List<String> modalitiesUsed;
 	private List<String> exercisesDone;
 	private String patientResponse;
+	private String frequency;
 	private String duration;
 //	private String therapistNotes;
 //	private String overallStatus; // ✅ NEW
