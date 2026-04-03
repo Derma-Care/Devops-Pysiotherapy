@@ -24,4 +24,11 @@ public interface TherapyExercisesRepository extends MongoRepository<TherapyExerc
 
 	Optional<TherapyExercises> findByClinicIdAndBranchIdAndTherapyExercisesId(String clinicId, String branchId,
 			String therapyExercisesId);
+
+	List<TherapyExercises> findByTherapyExercisesIdInAndClinicIdAndBranchId(
+	        List<String> therapyExerciseIds,
+	        String clinicId,
+	        String branchId
+	);
+
 }
