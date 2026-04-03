@@ -14,4 +14,6 @@ public interface TherapyServiceService {
     Response updateTherapyById(String id, TherapyServiceDTO dto);
 
     Response deleteTherapyById(String id);
+
+	Response getTherapyWithExercises(String id, String clinicId, String branchId);
 }

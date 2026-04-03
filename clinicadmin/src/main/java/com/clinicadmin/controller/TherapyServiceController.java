@@ -6,6 +6,7 @@ import com.clinicadmin.service.TherapyServiceService;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,8 +14,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/clinic-admin")
 @RequiredArgsConstructor
 public class TherapyServiceController {
-
-    private final TherapyServiceService service;
+	
+    @Autowired
+    private  TherapyServiceService service;
 
     // ✅ CREATE
     @PostMapping("/createTherapistService")
@@ -62,4 +64,14 @@ public class TherapyServiceController {
         Response res = service.deleteTherapyById(id);
         return ResponseEntity.status(res.getStatus()).body(res);
     }
+ //  NEW API → GET Therapy + Exercises 🔥
+    @GetMapping("/getTherapistServiceWithExercises/{id}/{clinicId}/{branchId}")
+    public ResponseEntity<Response> getTherapistServiceWithExercises(
+            @PathVariable String id,
+            @PathVariable String clinicId,
+            @PathVariable String branchId) {
+
+        Response res = service.getTherapyWithExercises(id, clinicId, branchId);
+        return ResponseEntity.status(res.getStatus()).body(res);
+}
 }
