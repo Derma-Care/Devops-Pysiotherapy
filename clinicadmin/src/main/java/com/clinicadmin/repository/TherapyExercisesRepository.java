@@ -18,6 +18,8 @@ public interface TherapyExercisesRepository extends MongoRepository<TherapyExerc
 
     Optional<TherapyExercises> findByTherapyExercisesId(String therapyExercisesId);
 
+    List<TherapyExercises> findByTherapyExercisesId(List<String> therapyExerciseIds);
+
     boolean existsByTherapyExercisesId(String therapyExercisesId);
 
     void deleteByTherapyExercisesId(String therapyExercisesId);

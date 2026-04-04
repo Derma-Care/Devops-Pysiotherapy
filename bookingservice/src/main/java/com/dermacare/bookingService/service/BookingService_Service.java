@@ -1,9 +1,7 @@
 package com.dermacare.bookingService.service;
 
 import java.util.List;
-
 import org.springframework.http.ResponseEntity;
-
 import com.dermacare.bookingService.dto.BookingInfoByInput;
 import com.dermacare.bookingService.dto.BookingRequset;
 import com.dermacare.bookingService.dto.BookingResponse;
@@ -46,5 +44,6 @@ public interface BookingService_Service {
 	        String branchId,
 	        Integer number,
 	        String startDate,
-	        String endDate);	
+	        String endDate);
+	
 }

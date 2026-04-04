@@ -1,6 +1,7 @@
 package com.clinicadmin.service.impl;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.http.ResponseEntity;
@@ -8,6 +9,8 @@ import org.springframework.stereotype.Service;
 
 import com.clinicadmin.dto.ProgramWithTherophy;
 import com.clinicadmin.dto.Response;
+import com.clinicadmin.dto.TheraphyNamesDTO;
+import com.clinicadmin.dto.TheraphyProgramWithTheraphyNamesDto;
 import com.clinicadmin.dto.TherapyServiceDTO;
 import com.clinicadmin.dto.TherophyProgramsDTO;
 import com.clinicadmin.entity.TherophyProgramEntity;
@@ -111,7 +114,7 @@ public class TherophyProgramServiceImpl implements TherophyProgramService {
               List<TherapyServiceDTO> lst = new ArrayList<>();
               if(entity != null) {
             	   for(String s:entity.getTherophyIds()) {
-            		   TherapyServiceDTO thry = therapyServiceServiceImpl.getById(s);
+            		   TherapyServiceDTO thry = therapyServiceServiceImpl.getTherapyWithExercisesWithId(s);
             		   lst.add(thry);
             	   }}
            ProgramWithTherophy programWithTherophy = new ProgramWithTherophy();
@@ -130,6 +133,67 @@ public class TherophyProgramServiceImpl implements TherophyProgramService {
                             .status(200)
                             .build()
             );
+
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body(
+                    Response.builder()
+                            .success(false)
+                            .message(e.getMessage())
+                            .status(404)
+                            .build()
+            );
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(
+                    Response.builder()
+                            .success(false)
+                            .message("Error fetching program: " + e.getMessage())
+                            .status(500)
+                            .build()
+            );
+        }
+    }
+
+    @Override
+    public ResponseEntity<Response> getByclinicAndBranchId(String cid,String bid) {
+        try {
+            List<TherophyProgramEntity> entity = repository.findByClinicIdAndBranchId(cid, bid);
+              List<TheraphyNamesDTO> lst = new LinkedList<>();
+              List<TheraphyProgramWithTheraphyNamesDto> theraphyProgramWithTheraphyNamesDto = new LinkedList<>();
+              TheraphyProgramWithTheraphyNamesDto theraphyDto = new TheraphyProgramWithTheraphyNamesDto();
+              if(entity != null) {
+            	  for(TherophyProgramEntity e : entity) {
+            	   for(String s:e.getTherophyIds()) {
+            		   TherapyServiceDTO thry = therapyServiceServiceImpl.getById(s);
+            		   if(thry != null) {
+            		   TheraphyNamesDTO dto = new TheraphyNamesDTO();
+            		   dto.setTheraphyId(s);
+            		   dto.setTheraphyName(thry.getTherapyName());
+            		   lst.add(dto);}
+            	   }theraphyDto.setBranchId(e.getBranchId());
+            	   theraphyDto.setClinicId(e.getClinicId());
+            	   theraphyDto.setId(e.getId());
+            	   theraphyDto.setProgramName(e.getProgramName());
+            	   theraphyDto.setTherophy(lst);
+            	   theraphyProgramWithTheraphyNamesDto.add(theraphyDto);
+            	   }}
+            if(theraphyProgramWithTheraphyNamesDto != null || !theraphyProgramWithTheraphyNamesDto.isEmpty()) {
+            	 return ResponseEntity.ok(
+                         Response.builder()
+                                 .success(true)
+                                 .data(theraphyProgramWithTheraphyNamesDto)
+                                 .message("Program fetched successfully")
+                                 .status(200)
+                                 .build()
+                 );
+            }
+            return ResponseEntity.ok(
+                    Response.builder()
+                    .success(false)
+                    .data(null)
+                    .message("Programs not found")
+                    .status(404)
+                    .build());
 
         } catch (RuntimeException e) {
             return ResponseEntity.status(404).body(
