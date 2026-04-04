@@ -22,13 +22,11 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-
 import com.dermacare.bookingService.dto.BookingInfoByInput;
 import com.dermacare.bookingService.dto.BookingRequset;
 import com.dermacare.bookingService.dto.BookingResponse;
@@ -44,7 +42,7 @@ import com.dermacare.bookingService.entity.Booking;
 import com.dermacare.bookingService.entity.ReportsList;
 import com.dermacare.bookingService.feign.ClinicAdminFeign;
 import com.dermacare.bookingService.feign.DoctorFeign;
-//import com.dermacare.bookingService.producer.KafkaProducer;
+import com.dermacare.bookingService.producer.KafkaProducer;
 import com.dermacare.bookingService.repository.BookingServiceRepository;
 import com.dermacare.bookingService.service.BookingService_Service;
 import com.dermacare.bookingService.util.Response;
@@ -60,9 +58,9 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	@Autowired
 	private BookingServiceRepository repository;
 	
-//	@Autowired
-//	private KafkaProducer kafkaProducer;
-//	
+	@Autowired
+	private KafkaProducer kafkaProducer;
+	
 //	// @Autowired
 	//private NotificationFeign notificationFeign;
 	
@@ -198,15 +196,15 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	             nullifyLargeFields(updatedBooking);
 
 	             // 🔔 Publish to Kafka
-//	             try {
-//	            	 updatedBooking.setAttachments(null); 
-//	            	 updatedBooking.setPartImage(null);
-//	            	 updatedBooking.setConsentFormPdf(null);
-//	            	 updatedBooking.setPrescriptionPdf(null);
-//	                 kafkaProducer.publishBooking(updatedBooking);
-//	             } catch (Exception e) {
-//	                 System.err.println("⚠️ Kafka publish failed: " + e.getMessage());
-//	             }
+	             try {
+	            	 updatedBooking.setAttachments(null); 
+	            	 updatedBooking.setPartImage(null);
+	            	 updatedBooking.setConsentFormPdf(null);
+	            	 updatedBooking.setPrescriptionPdf(null);
+	                 kafkaProducer.publishBooking(updatedBooking);
+	             } catch (Exception e) {
+	                 System.err.println("⚠️ Kafka publish failed: " + e.getMessage());
+	             }
 
 	             BookingResponse res = toResponse(updatedBooking);
 
@@ -254,15 +252,15 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	         Booking savedBooking = repository.save(entity);
 	         nullifyLargeFields(savedBooking);
 
-//	         try {
-//	        	 savedBooking.setConsentFormPdf(null);
-//	        	 savedBooking.setConsentFormPdf(null);
-//	        	 savedBooking.setPrescriptionPdf(null); 
-//	        	 savedBooking.setPartImage(null);
-//	             kafkaProducer.publishBooking(savedBooking);
-//	         } catch (Exception e) {
-//	             System.err.println("⚠️ Kafka publish failed: " + e.getMessage());
-//	         }
+	         try {
+	        	 savedBooking.setConsentFormPdf(null);
+	        	 savedBooking.setConsentFormPdf(null);
+	        	 savedBooking.setPrescriptionPdf(null); 
+	        	 savedBooking.setPartImage(null);
+	             kafkaProducer.publishBooking(savedBooking);
+	         } catch (Exception e) {
+	             System.err.println("⚠️ Kafka publish failed: " + e.getMessage());
+	         }
 
 	         BookingResponse bRes = toResponse(savedBooking);
 	         response = ResponseStructure.buildResponse(

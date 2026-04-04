@@ -1,9 +1,11 @@
 package com.clinicadmin.service.impl;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -45,19 +47,56 @@ public class TherapyServiceServiceImpl implements TherapyServiceService {
         return response;
     }
 
-    //  GET BY clinicId + branchId
     @Override
     public Response getByClinicAndBranch(String clinicId, String branchId) {
 
         List<TherapyService> list = repository.findByClinicIdAndBranchId(clinicId, branchId);
 
-        List<TherapyServiceDTO> dtos = list.stream()
-                .map(this::mapToDTO)
-                .collect(Collectors.toList());
+        List<Map<String, Object>> finalList = new ArrayList<>();
+
+        for (TherapyService therapy : list) {
+
+            List<String> exerciseIds = therapy.getExerciseIds();
+
+            List<TherapyExercises> exercises = new ArrayList<>();
+
+            if (exerciseIds != null && !exerciseIds.isEmpty()) {
+                exercises = exercisesRepository
+                        .findByTherapyExercisesIdInAndClinicIdAndBranchId(
+                                exerciseIds,
+                                clinicId,
+                                branchId
+                        );
+            }
+
+            // 🔥 Convert to required format
+            List<Map<String, Object>> exerciseList = new ArrayList<>();
+
+            for (TherapyExercises ex : exercises) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("exerciseName", ex.getName());
+                map.put("exerciseId", ex.getTherapyExercisesId());
+                exerciseList.add(map);
+            }
+
+            Map<String, Object> data = new LinkedHashMap<>();
+
+       
+         data.put("id", therapy.getId());
+         data.put("consentType", therapy.getConsentType());
+         data.put("therapyName", therapy.getTherapyName());
+         data.put("clinicId", therapy.getClinicId());
+         data.put("branchId", therapy.getBranchId());
+         data.put("noExerciseIdCount",
+                 therapy.getExerciseIds() != null ? therapy.getExerciseIds().size() : 0);
+         data.put("exercises", exerciseList);
+
+            finalList.add(data);
+        }
 
         Response response = new Response();
         response.setSuccess(true);
-        response.setData(dtos);
+        response.setData(finalList);
         response.setMessage("Fetched successfully");
         response.setStatus(HttpStatus.OK.value());
 
@@ -211,7 +250,6 @@ public class TherapyServiceServiceImpl implements TherapyServiceService {
 
         Response response = new Response();
 
-        // ✅ 1. Check therapy exists
         if (optional.isEmpty()) {
             response.setSuccess(false);
             response.setMessage("Therapy not found");
@@ -221,14 +259,11 @@ public class TherapyServiceServiceImpl implements TherapyServiceService {
 
         TherapyService therapy = optional.get();
 
-        // ✅ 2. Get exerciseIds safely
         List<String> exerciseIds = therapy.getExerciseIds();
 
         List<TherapyExercises> exercises = new ArrayList<>();
 
-        // ✅ 3. Only call DB if list is not empty
         if (exerciseIds != null && !exerciseIds.isEmpty()) {
-
             exercises = exercisesRepository
                     .findByTherapyExercisesIdInAndClinicIdAndBranchId(
                             exerciseIds,
@@ -237,18 +272,42 @@ public class TherapyServiceServiceImpl implements TherapyServiceService {
                     );
         }
 
-        // ✅ 4. Map therapy → DTO
         TherapyServiceDTO dto = mapToDTO(therapy);
 
-        // ✅ 5. Attach exercises (even if empty list)
+        // ✅ IMPORTANT: set full data
         dto.setExercises(exercises);
 
-        // ✅ 6. Build response
+        // ✅ RETURN DTO directly (DO NOT override)
         response.setSuccess(true);
         response.setData(dto);
         response.setMessage("Fetched successfully with exercises");
         response.setStatus(HttpStatus.OK.value());
 
         return response;
+    }
+    
+ 
+    public TherapyServiceDTO getTherapyWithExercisesWithId(String id) {
+
+        Optional<TherapyService> optional =
+                repository.findById(id);     
+        // ✅ 1. Check therapy exists
+        if (optional.isEmpty()) {          
+            return null;
+        }
+        TherapyService therapy = optional.get();
+        // ✅ 2. Get exerciseIds safely
+        List<String> exerciseIds = therapy.getExerciseIds();
+        List<TherapyExercises> exercises = new ArrayList<>();
+        // ✅ 3. Only call DB if list is not empty
+        if (exerciseIds != null && !exerciseIds.isEmpty()) {
+            exercises = exercisesRepository
+                    .findByTherapyExercisesId(
+                            exerciseIds);}
+        // ✅ 4. Map therapy → DTO
+        TherapyServiceDTO dto = mapToDTO(therapy);
+        // ✅ 5. Attach exercises (even if empty list)
+        dto.setExercises(exercises);
+        return dto;
     }
 }

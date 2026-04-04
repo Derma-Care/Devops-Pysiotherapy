@@ -26,6 +26,12 @@ public class TherophyProgramController {
         return service.getById(id);
     }
     
+    
+    @GetMapping("/getBycIdAndbId/{cId}/{bId}")
+    public ResponseEntity<Response> getBycIdAndbId(@PathVariable String cId,@PathVariable String bId) {
+        return service.getByclinicAndBranchId(cId, bId);
+    }
+    
     @PostMapping("/getBycIdAndbIdAndId/{cId}/{bId}/{id}")
     public ResponseEntity<Response> getBycIdAndbIdAndId(@PathVariable String cId,@PathVariable String bId,@PathVariable String id) {
         return service.getByclinicAndBranchIdAndId(cId, bId, id);
