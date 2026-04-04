@@ -19,15 +19,15 @@ public class TherapyServiceController {
     private  TherapyServiceService service;
 
     // ✅ CREATE
-    @PostMapping("/createTherapistService")
-    public ResponseEntity<Response> createTherapistService(@RequestBody TherapyServiceDTO dto) {
+    @PostMapping("/createTherapyService")
+    public ResponseEntity<Response> createTherapyService(@RequestBody TherapyServiceDTO dto) {
         Response res = service.createTherapy(dto);
         return ResponseEntity.status(res.getStatus()).body(res);
     }
 
     // ✅ GET by clinicId + branchId
-    @GetMapping("/getByTherapistServiceClinicIdAndBranchId/{clinicId}/{branchId}")
-    public ResponseEntity<Response> getByClinicIdBranchId(
+    @GetMapping("/getByTherapyServiceClinicIdAndBranchId/{clinicId}/{branchId}")
+    public ResponseEntity<Response> getByTherapyServiceClinicIdAndBranchId(
             @PathVariable String clinicId,
             @PathVariable String branchId) {
 
@@ -36,8 +36,8 @@ public class TherapyServiceController {
     }
 
     // ✅ GET by id + clinicId + branchId
-    @GetMapping("/getByTherapistServiceIdClinicIdAndBranchId/{id}/{clinicId}/{branchId}")
-    public ResponseEntity<Response> getByClinicIdAndBranchId(
+    @GetMapping("/getByTherapyServiceIdClinicIdAndBranchId/{id}/{clinicId}/{branchId}")
+    public ResponseEntity<Response> getByTherapyServiceIdClinicIdAndBranchId(
             @PathVariable String id,
             @PathVariable String clinicId,
             @PathVariable String branchId) {
@@ -47,8 +47,8 @@ public class TherapyServiceController {
     }
 
     // ✅ UPDATE 
-    @PutMapping("/updateByTherapistServieId/{id}")
-    public ResponseEntity<Response> updateByTherapistServieId(
+    @PutMapping("/updateByTherapyServieId/{id}")
+    public ResponseEntity<Response> updateByTherapyServieId(
             @PathVariable String id,
             @RequestBody TherapyServiceDTO dto) {
 
@@ -57,16 +57,16 @@ public class TherapyServiceController {
     }
 
     // ✅ DELETE 
-    @DeleteMapping("/deleteByTherapistServiceId/{id}")
-    public ResponseEntity<Response> deleteByTherapistServiceId(
+    @DeleteMapping("/deleteByTherapyServiceId/{id}")
+    public ResponseEntity<Response> deleteByTherapyServiceId(
             @PathVariable String id) {
 
         Response res = service.deleteTherapyById(id);
         return ResponseEntity.status(res.getStatus()).body(res);
     }
  //  NEW API → GET Therapy + Exercises 🔥
-    @GetMapping("/getTherapistServiceWithExercises/{id}/{clinicId}/{branchId}")
-    public ResponseEntity<Response> getTherapistServiceWithExercises(
+    @GetMapping("/getTherapyServiceWithExercises/{id}/{clinicId}/{branchId}")
+    public ResponseEntity<Response> getTherapyServiceWithExercises(
             @PathVariable String id,
             @PathVariable String clinicId,
             @PathVariable String branchId) {

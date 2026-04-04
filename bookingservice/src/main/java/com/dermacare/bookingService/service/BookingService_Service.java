@@ -41,5 +41,10 @@ public interface BookingService_Service {
 	public ResponseEntity<?> getInProgressAppointmentsByCustomerId(String customerId);
 	public ResponseEntity<?> getInProgressAppointmentsByPatientId(String patientId,String clinicId);
 	public BookingResponse checkBookingByDateAndTime(String date,String time,String doctorId);
-		
+	public ResponseEntity<Response> getPatientAndPriceInfo(
+	        String clinicId,
+	        String branchId,
+	        Integer number,
+	        String startDate,
+	        String endDate);	
 }
