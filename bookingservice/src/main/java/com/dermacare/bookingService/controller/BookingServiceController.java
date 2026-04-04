@@ -318,5 +318,16 @@ public class BookingServiceController {
 			return service.checkBookingByDateAndTime(temp.getServiceDate(), temp.getServicetime(), temp.getDoctorId());
 		}
 		
+		@GetMapping("/report/{clinicId}/{branchId}/{number}/{startDate}/{endDate}")
+		public ResponseEntity<Response> getReport(
+				@PathVariable String clinicId,
+				@PathVariable String branchId,
+				@PathVariable Integer number,
+				@PathVariable String startDate,
+				@PathVariable String endDate) {
+
+		    return service.getPatientAndPriceInfo(clinicId, branchId, number, startDate, endDate);
+		}
+		
 		}
 

@@ -61,5 +61,7 @@ public class BookingRequset {
 	private List<String> parts;
 	private double partAmount;
 	private double dueAmount;
+	private String referredByType;
+	private String referredByName;
 }
 

@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import com.clinicadmin.dto.BookingRequset;
 import com.clinicadmin.dto.BookingResponse;
@@ -181,6 +182,27 @@ public ResponseEntity<?> getInprogressBookingsByPatientIdAndClinicId(String pati
     ResponseStructure<List<BookingResponse>> res = new ResponseStructure<>();
     try {
         return bookingFeign.getInprogressAppointmentsByPatientIdAndClinicId(patientId, clinicId);
+    } catch (FeignException e) {
+        res = new ResponseStructure<>(
+                null,
+                ExtractFeignMessage.clearMessage(e),
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                e.status()
+        );
+        return ResponseEntity.status(res.getStatusCode()).body(res);
+    }
+}
+
+
+@Override
+public ResponseEntity<?> getReprts(String clinicId,
+		String branchId,
+		Integer number,
+	    String startDate,
+		String endDate) {
+    ResponseStructure<List<BookingResponse>> res = new ResponseStructure<>();
+    try {
+        return bookingFeign.getReport(clinicId, branchId, number, startDate, endDate);
     } catch (FeignException e) {
         res = new ResponseStructure<>(
                 null,

@@ -13,4 +13,26 @@ public interface ClinicAdminFeign {
 	 @GetMapping("/clinic-admin/customer/patientId/{patientId}/{clinicId}")
 	    public ResponseEntity<Response> getCustomerByPatientId(@PathVariable String patientId,@PathVariable String clinicId);
 	                                                                                        
+	  @GetMapping("/clinic-admin/expenses/today/{clinicId}/{branchId}")
+	    public Double getTodayExpenses(
+	    		@PathVariable String clinicId,
+	    		@PathVariable String branchId);
+	  
+	  
+	  @GetMapping("/clinic-admin/expenses/weekly/{clinicId}/{branchId}")
+	    public Double getWeeklyExpenses(
+	    		@PathVariable String clinicId,
+	    		@PathVariable String branchId);
+	  
+	  @GetMapping("/clinic-admin/expenses/monthly/{clinicId}/{branchId}")
+	    public Double getMonthlyExpenses(
+	    		@PathVariable String clinicId,
+	    		@PathVariable String branchId); 
+	  
+	  @GetMapping("/clinic-admin/expenses/custom/{startDate}/{endDate}")
+	    public Double customFilter(
+	    		@PathVariable String startDate,
+	    		@PathVariable String endDate);
+
+
 }

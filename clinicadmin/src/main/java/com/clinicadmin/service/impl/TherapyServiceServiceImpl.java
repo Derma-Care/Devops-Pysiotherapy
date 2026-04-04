@@ -87,6 +87,17 @@ public class TherapyServiceServiceImpl implements TherapyServiceService {
 
         return response;
     }
+    
+   
+    public TherapyServiceDTO getById(String id) {
+
+        Optional<TherapyService> optional =
+                repository.findById(id);
+        if (optional.isEmpty()) {
+            return null;
+        }       
+        return mapToDTO(optional.get()); 
+    }
 
  //  UPDATE BY ID ONLY
     @Override
@@ -141,12 +152,14 @@ public class TherapyServiceServiceImpl implements TherapyServiceService {
 
         return response;
     }
+    
+    
 
     // ================== MAPPERS ==================
 
     private TherapyService mapToEntity(TherapyServiceDTO dto) {
         TherapyService therapy = new TherapyService();
-
+        therapy.setId(dto.getId());
         therapy.setConsentType(dto.getConsentType());
         therapy.setExerciseIds(dto.getExerciseIds());
         therapy.setTherapyName(dto.getTherapyName());
@@ -158,7 +171,7 @@ public class TherapyServiceServiceImpl implements TherapyServiceService {
 
     private TherapyServiceDTO mapToDTO(TherapyService therapy) {
         TherapyServiceDTO dto = new TherapyServiceDTO();
-
+        dto.setId(therapy.getId());
         dto.setConsentType(therapy.getConsentType());
         dto.setExerciseIds(therapy.getExerciseIds());
         dto.setTherapyName(therapy.getTherapyName());

@@ -93,4 +93,15 @@ public class BookingServiceController {
 	       return bookingService.getInprogressBookingsByPatientIdAndClinicId(patientId, clinicId);
 	   }
 	   
+	   
+	   @GetMapping("/reprts/{clinicId}/{branchId}/{number}/{startDate}/{endDate}")
+	   public ResponseEntity<?> getReprts(@PathVariable String clinicId,
+			   @PathVariable String branchId,
+			   @PathVariable Integer number,
+			   @PathVariable  String startDate,
+			   @PathVariable String endDate) {
+
+	       return bookingService.getReprts(clinicId, branchId, number, startDate, endDate);
+	   }
+	   
 }

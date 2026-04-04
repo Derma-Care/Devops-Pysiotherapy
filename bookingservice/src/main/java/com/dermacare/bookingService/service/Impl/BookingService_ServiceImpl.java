@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -23,18 +22,21 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.bson.types.ObjectId;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+
 import com.dermacare.bookingService.dto.BookingInfoByInput;
 import com.dermacare.bookingService.dto.BookingRequset;
 import com.dermacare.bookingService.dto.BookingResponse;
 import com.dermacare.bookingService.dto.CustomerOnbordingDTO;
 import com.dermacare.bookingService.dto.DatesDTO;
 import com.dermacare.bookingService.dto.DoctorSaveDetailsDTO;
+import com.dermacare.bookingService.dto.PatientAndPriceInfo;
+import com.dermacare.bookingService.dto.PatientInfo;
 import com.dermacare.bookingService.dto.RelationInfoDTO;
 import com.dermacare.bookingService.dto.TreatmentDetailsDTO;
 import com.dermacare.bookingService.dto.TreatmentResponseDTO;
@@ -42,7 +44,7 @@ import com.dermacare.bookingService.entity.Booking;
 import com.dermacare.bookingService.entity.ReportsList;
 import com.dermacare.bookingService.feign.ClinicAdminFeign;
 import com.dermacare.bookingService.feign.DoctorFeign;
-import com.dermacare.bookingService.producer.KafkaProducer;
+//import com.dermacare.bookingService.producer.KafkaProducer;
 import com.dermacare.bookingService.repository.BookingServiceRepository;
 import com.dermacare.bookingService.service.BookingService_Service;
 import com.dermacare.bookingService.util.Response;
@@ -58,9 +60,9 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	@Autowired
 	private BookingServiceRepository repository;
 	
-	@Autowired
-	private KafkaProducer kafkaProducer;
-	
+//	@Autowired
+//	private KafkaProducer kafkaProducer;
+//	
 //	// @Autowired
 	//private NotificationFeign notificationFeign;
 	
@@ -196,15 +198,15 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	             nullifyLargeFields(updatedBooking);
 
 	             // 🔔 Publish to Kafka
-	             try {
-	            	 updatedBooking.setAttachments(null); 
-	            	 updatedBooking.setPartImage(null);
-	            	 updatedBooking.setConsentFormPdf(null);
-	            	 updatedBooking.setPrescriptionPdf(null);
-	                 kafkaProducer.publishBooking(updatedBooking);
-	             } catch (Exception e) {
-	                 System.err.println("⚠️ Kafka publish failed: " + e.getMessage());
-	             }
+//	             try {
+//	            	 updatedBooking.setAttachments(null); 
+//	            	 updatedBooking.setPartImage(null);
+//	            	 updatedBooking.setConsentFormPdf(null);
+//	            	 updatedBooking.setPrescriptionPdf(null);
+//	                 kafkaProducer.publishBooking(updatedBooking);
+//	             } catch (Exception e) {
+//	                 System.err.println("⚠️ Kafka publish failed: " + e.getMessage());
+//	             }
 
 	             BookingResponse res = toResponse(updatedBooking);
 
@@ -252,15 +254,15 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	         Booking savedBooking = repository.save(entity);
 	         nullifyLargeFields(savedBooking);
 
-	         try {
-	        	 savedBooking.setConsentFormPdf(null);
-	        	 savedBooking.setConsentFormPdf(null);
-	        	 savedBooking.setPrescriptionPdf(null); 
-	        	 savedBooking.setPartImage(null);
-	             kafkaProducer.publishBooking(savedBooking);
-	         } catch (Exception e) {
-	             System.err.println("⚠️ Kafka publish failed: " + e.getMessage());
-	         }
+//	         try {
+//	        	 savedBooking.setConsentFormPdf(null);
+//	        	 savedBooking.setConsentFormPdf(null);
+//	        	 savedBooking.setPrescriptionPdf(null); 
+//	        	 savedBooking.setPartImage(null);
+//	             kafkaProducer.publishBooking(savedBooking);
+//	         } catch (Exception e) {
+//	             System.err.println("⚠️ Kafka publish failed: " + e.getMessage());
+//	         }
 
 	         BookingResponse bRes = toResponse(savedBooking);
 	         response = ResponseStructure.buildResponse(
@@ -2598,6 +2600,145 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 				return null;
 			}
 			
+		}
+		
+		
+		@Override
+		public ResponseEntity<Response> getPatientAndPriceInfo(
+		        String clinicId,
+		        String branchId,
+		        Integer number,
+		        String startDate,
+		        String endDate) {
+
+		    try {
+
+		        List<Booking> bookings =
+		                repository.findByClinicIdAndBranchId(clinicId, branchId);
+
+		        if (bookings == null || bookings.isEmpty()) {
+		            return ResponseEntity.ok(
+		                    Response.builder()
+		                            .success(true)
+		                            .message("No data found")
+		                            .data(new PatientAndPriceInfo())
+		                            .status(HttpStatus.OK.value())
+		                            .build()
+		            );
+		        }
+
+		        // 🔥 Step 1: Decide Date Range
+		        LocalDate start;
+		        LocalDate end;
+
+		        if (startDate.isEmpty() && endDate.isEmpty()) {
+		            start = LocalDate.parse(startDate);
+		            end = LocalDate.parse(endDate);
+		        } else {
+		            LocalDate today = LocalDate.now();
+
+		            if (number == 1) {
+		                start = today;
+		                end = today;
+		            } else if (number == 2) {
+		                start = today.minusDays(6);
+		                end = today;
+		            } else if (number == 3) {
+		                start = today.withDayOfMonth(1);
+		                end = today;
+		            } else {
+		                return ResponseEntity.badRequest().body(
+		                        Response.builder()
+		                                .success(false)
+		                                .message("Invalid number value")
+		                                .status(HttpStatus.BAD_REQUEST.value())
+		                                .build()
+		                );
+		            }
+		        }
+
+		        // 🔥 Step 2: Filter + Map
+		        List<PatientInfo> patientList = new ArrayList<>();
+
+		        double totalConsultation = 0;
+		        double totalTherapy = 0;
+		        double totalDue = 0;
+
+		        for (Booking booking : bookings) {
+
+		            if (booking.getServiceDate() == null) continue;
+
+		            LocalDate bookingDate = LocalDate.parse(booking.getServiceDate());
+
+		            if ((bookingDate.isEqual(start) || bookingDate.isAfter(start)) &&
+		                (bookingDate.isEqual(end) || bookingDate.isBefore(end))) {
+
+		                PatientInfo info = new PatientInfo();
+
+		                info.setClinicId(booking.getClinicId());
+		                info.setBranchId(booking.getBranchId());
+		                info.setPatientName(booking.getName());
+		                info.setDate(booking.getServiceDate());
+		                info.setDoctorId(booking.getDoctorId());
+		                info.setConsultationFee(String.valueOf(booking.getConsultationFee()));
+		                info.setTheraphyFee(String.valueOf(booking.getTotalFee()));
+		                info.setFinalAmount(booking.getTotalFee());
+		                info.setDueAmount(booking.getDueAmount());
+		                info.setConsultationType(booking.getConsultationType());
+
+		                patientList.add(info);
+
+		                // 🔥 Aggregation
+		                totalConsultation += booking.getConsultationFee();
+		                totalTherapy += booking.getTotalFee();
+		                totalDue += booking.getDueAmount();
+		            }
+		        }
+
+		        // 🔥 Step 3: Final Calculation
+		        double grandTotal = totalConsultation + totalTherapy + totalDue;
+		        double afterExpenses = 0.0;
+		        if(number.equals(1) ) {
+		        	Double value = clinicAdminFeign.getTodayExpenses(clinicId, branchId);
+		        	 afterExpenses = grandTotal - value;
+		        }else if(number.equals(2) ){
+		        	Double value = clinicAdminFeign.getWeeklyExpenses(clinicId, branchId);
+		        	 afterExpenses = grandTotal - value;	       	
+		        }else if(number.equals(3) ) {
+		        	Double value = clinicAdminFeign.getMonthlyExpenses(clinicId, branchId);
+		        	 afterExpenses = grandTotal - value;		       
+		        }else {
+		        	if(!startDate.isEmpty() && !endDate.isEmpty()) {
+		        		Double value = clinicAdminFeign.customFilter(startDate, endDate);
+			        	 afterExpenses = afterExpenses - value;		
+		        	}
+		        }
+
+		        PatientAndPriceInfo responseDto = new PatientAndPriceInfo();
+		        responseDto.setList(patientList);
+		        responseDto.setTotalConsultationFee(String.valueOf(totalConsultation));
+		        responseDto.setTotalTheraphyFee(String.valueOf(totalTherapy));
+		        responseDto.setTotalDueAmount(String.valueOf(totalDue));
+		        responseDto.setGrandTotalAmount(String.valueOf(grandTotal));
+		        responseDto.setPriceAfterExpenses(afterExpenses);
+
+		        return ResponseEntity.ok(
+		                Response.builder()
+		                        .success(true)
+		                        .data(responseDto)
+		                        .status(HttpStatus.OK.value())
+		                        .build()
+		        );
+
+		    } catch (Exception e) {
+
+		        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+		                .body(Response.builder()
+		                        .success(false)
+		                        .message(e.getMessage())
+		                        .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+		                        .build());
+		    }
 		}
 
 

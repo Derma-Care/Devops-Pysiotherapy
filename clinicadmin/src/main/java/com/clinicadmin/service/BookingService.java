@@ -32,5 +32,10 @@ public interface BookingService {
 	
 	ResponseEntity<?> getInprogressBookingsByPatientIdAndClinicId(String patientId, String clinicId);
 		
+	public ResponseEntity<?> getReprts(String clinicId,
+			String branchId,
+			Integer number,
+		    String startDate,
+			String endDate);
 
 }
