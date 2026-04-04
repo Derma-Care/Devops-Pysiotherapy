@@ -3,6 +3,7 @@ package com.clinicadmin.service.impl;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -123,7 +124,10 @@ public class TherophyProgramServiceImpl implements TherophyProgramService {
            programWithTherophy.setId(entity.getId());
            programWithTherophy.setProgramName(entity.getProgramName());
            programWithTherophy.setTherophyData(lst);
-           programWithTherophy.setTotalTherophyIds(lst.size());
+           long count = lst.stream()
+                   .filter(Objects::nonNull)
+                   .count();
+           programWithTherophy.setTotalTherophyIds(Integer.valueOf(String.valueOf(count)));
             
             return ResponseEntity.ok(
                     Response.builder()
@@ -175,6 +179,10 @@ public class TherophyProgramServiceImpl implements TherophyProgramService {
             	   theraphyDto.setId(e.getId());
             	   theraphyDto.setProgramName(e.getProgramName());
             	   theraphyDto.setTherophy(lst);
+            	   long count = lst.stream()
+                           .filter(Objects::nonNull)
+                           .count();
+            	   theraphyDto.setTheraphyCount(count);
             	   theraphyProgramWithTheraphyNamesDto.add(theraphyDto);
             	   }}
             if(theraphyProgramWithTheraphyNamesDto != null || !theraphyProgramWithTheraphyNamesDto.isEmpty()) {
