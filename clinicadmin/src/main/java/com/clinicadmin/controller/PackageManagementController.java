@@ -82,4 +82,17 @@ public class PackageManagementController {
                 .status(response.getStatus())
                 .body(response);
     }
+    @GetMapping("/getPackageWithProgramsByUsingClinicIdBranchIdAndPackageId/{clinicId}/{branchId}/{packageId}")
+    public ResponseEntity<Response> getPackageWithPrograms(
+            @PathVariable String clinicId,
+            @PathVariable String branchId,
+            @PathVariable String packageId) {
+
+       
+        Response response = service.getPackageWithPrograms(clinicId, branchId, packageId);
+
+        return ResponseEntity
+                .status(response.getStatus())
+                .body(response);
+    }
 }

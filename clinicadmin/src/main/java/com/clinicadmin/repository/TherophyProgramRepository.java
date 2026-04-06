@@ -11,4 +11,6 @@ public interface TherophyProgramRepository extends MongoRepository<TherophyProgr
 
 List<TherophyProgramEntity> findByClinicIdAndBranchId(String cid, String bid);
 
+List<TherophyProgramEntity> findByIdIn(List<String> programIds);
+
 	}

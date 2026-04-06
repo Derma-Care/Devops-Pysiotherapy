@@ -3,7 +3,10 @@ package com.clinicadmin.service.impl;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +16,9 @@ import org.springframework.stereotype.Service;
 import com.clinicadmin.dto.PackageManagementDTO;
 import com.clinicadmin.dto.Response;
 import com.clinicadmin.entity.PackageManagement;
+import com.clinicadmin.entity.TherophyProgramEntity;
 import com.clinicadmin.repository.PackageManagementRepository;
+import com.clinicadmin.repository.TherophyProgramRepository;
 import com.clinicadmin.service.PackageManagementService;
 
 @Service
@@ -21,6 +26,10 @@ public class PackageManagementServiceImpl implements PackageManagementService {
 
     @Autowired
     private PackageManagementRepository repository;
+    
+    @Autowired
+    
+    private TherophyProgramRepository  therophyProgramRepository;
 
     // ✅ CREATE
     @Override
@@ -36,6 +45,10 @@ public class PackageManagementServiceImpl implements PackageManagementService {
 
             PackageManagementDTO responseDto = mapToDTO(saved);
 
+            // ✅ FIX: set noOfPrograms correctly
+            responseDto.setNoOfPrograms(
+                saved.getProgramIds() != null ? saved.getProgramIds().size() : 0
+            );
             response.setSuccess(true);
             response.setData(responseDto);
             response.setMessage("Package created successfully");
@@ -60,10 +73,35 @@ public class PackageManagementServiceImpl implements PackageManagementService {
             List<PackageManagement> list =
                     repository.findByClinicIdAndBranchId(clinicId, branchId);
 
-            // ✅ Convert Entity List → DTO List
-            List<PackageManagementDTO> dtoList = list.stream()
-                    .map(this::mapToDTO)
-                    .toList();
+            List<PackageManagementDTO> dtoList = new ArrayList<>();
+
+            for (PackageManagement entity : list) {
+
+                List<String> programIds = entity.getProgramIds();
+                List<TherophyProgramEntity> programList = new ArrayList<>();
+
+                // ✅ Fetch programs
+                if (programIds != null && !programIds.isEmpty()) {
+                    programList = therophyProgramRepository.findByIdIn(programIds);
+                }
+
+                // ✅ Convert package → DTO
+                PackageManagementDTO dto = mapToDTO(entity);
+
+                // ✅ Only id + programName (NO DTO change, NO null fields)
+                List<Object> cleanList = programList.stream()
+                        .map(p -> {
+                            Map<String, Object> map = new HashMap<>();
+                            map.put("id", p.getId());
+                            map.put("programName", p.getProgramName());
+                            return (Object) map;
+                        })
+                        .toList();
+
+                dto.setPrograms((List) cleanList); 
+                dto.setNoOfPrograms(cleanList.size());
+                dtoList.add(dto);
+            }
 
             response.setSuccess(true);
             response.setData(dtoList);
@@ -79,7 +117,6 @@ public class PackageManagementServiceImpl implements PackageManagementService {
 
         return response;
     }
-
     // ✅ GET by clinicId + branchId + packageId
     @Override
     public Response getByClinicBranchAndPackageId(String clinicId, String branchId, String packageId) {
@@ -199,7 +236,7 @@ public class PackageManagementServiceImpl implements PackageManagementService {
         entity.setPackageName(dto.getPackageName());
         entity.setClinicId(dto.getClinicId());
         entity.setBranchId(dto.getBranchId());       
-        entity.setPrograms(dto.getPrograms());
+        entity.setProgramIds(dto.getProgramIds());
 
         // ✅ Apply discount logic
         double finalDiscount = applyDiscountLogic(
@@ -225,12 +262,11 @@ public class PackageManagementServiceImpl implements PackageManagementService {
         dto.setClinicId(entity.getClinicId());
         dto.setBranchId(entity.getBranchId());
         dto.setPackageName(entity.getPackageName());
-        dto.setPrograms(entity.getPrograms());
+        dto.setProgramIds(entity.getProgramIds());
 
-        // ✅ IMPORTANT LINE (Missing in your case)
         dto.setNoOfPrograms(
-            entity.getPrograms() != null ? entity.getPrograms().size() : 0
-        );
+        	    entity.getProgramIds() != null ? entity.getProgramIds().size() : 0
+        	);
 
         dto.setDiscountPercentage(entity.getDiscountPercentage());
         dto.setStartOfferDate(entity.getStartOfferDate());
@@ -286,8 +322,8 @@ public class PackageManagementServiceImpl implements PackageManagementService {
             entity.setPackageName(dto.getPackageName());
         }
 
-        if (dto.getPrograms() != null) {
-            entity.setPrograms(dto.getPrograms());
+        if (dto.getProgramIds() != null) {
+            entity.setProgramIds(dto.getProgramIds());
         }
 
         if (dto.getStartOfferDate() != null) {
@@ -315,5 +351,60 @@ public class PackageManagementServiceImpl implements PackageManagementService {
 
             entity.setDiscountPercentage(finalDiscount);
         }
+    }
+    @Override
+    public Response getPackageWithPrograms( String clinicId, String branchId,String packageId) {
+
+        Response response = new Response();
+
+        try {
+            Optional<PackageManagement> optional =
+                    repository.findByClinicIdAndBranchIdAndPackageId(
+                            clinicId, branchId, packageId);
+
+            if (optional.isEmpty()) {
+                response.setSuccess(false);
+                response.setMessage("Package not found");
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return response;
+            }
+
+            PackageManagement entity = optional.get();
+
+            List<String> programIds = entity.getProgramIds();
+            List<TherophyProgramEntity> programList = new ArrayList<>();
+
+            if (programIds != null && !programIds.isEmpty()) {
+
+                programList = therophyProgramRepository.findByIdIn(programIds);
+
+                // 🔥 CLEANUP LOGIC
+                List<String> validIds = programList.stream()
+                        .map(TherophyProgramEntity::getId)
+                        .toList();
+
+                if (!programIds.equals(validIds)) {
+                    entity.setProgramIds(validIds);
+                    repository.save(entity); // ✅ removes deleted IDs
+                }
+            }
+
+            PackageManagementDTO dto = mapToDTO(entity);
+
+            dto.setPrograms(programList);
+            dto.setNoOfPrograms(programList.size());
+
+            response.setSuccess(true);
+            response.setData(dto);
+            response.setMessage("Fetched successfully with programs");
+            response.setStatus(HttpStatus.OK.value());
+
+        } catch (Exception e) {
+            response.setSuccess(false);
+            response.setMessage("Error: " + e.getMessage());
+            response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
+        }
+
+        return response;
     }
 }
