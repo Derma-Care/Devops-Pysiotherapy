@@ -14,4 +14,6 @@ public interface PackageManagementService {
     Response updatePackage(String packageId, PackageManagementDTO dto);
 
     Response deletePackage(String packageId);
+
+	Response getPackageWithPrograms(String packageId, String clinicId, String branchId);
 }

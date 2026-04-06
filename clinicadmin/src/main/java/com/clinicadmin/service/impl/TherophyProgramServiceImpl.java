@@ -3,10 +3,10 @@ package com.clinicadmin.service.impl;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-
 import com.clinicadmin.dto.ProgramWithTherophy;
 import com.clinicadmin.dto.Response;
 import com.clinicadmin.dto.TheraphyNamesDTO;
@@ -111,20 +111,23 @@ public class TherophyProgramServiceImpl implements TherophyProgramService {
     public ResponseEntity<Response> getByclinicAndBranchIdAndId(String cid,String bid,String id) {
         try {
             TherophyProgramEntity entity = repository.findByClinicIdAndBranchIdAndId(cid, bid, id);
+            ProgramWithTherophy programWithTherophy = null;           
               List<TherapyServiceDTO> lst = new ArrayList<>();
               if(entity != null) {
             	   for(String s:entity.getTherophyIds()) {
             		   TherapyServiceDTO thry = therapyServiceServiceImpl.getTherapyWithExercisesWithId(s);
-            		   lst.add(thry);
-            	   }}
-           ProgramWithTherophy programWithTherophy = new ProgramWithTherophy();
+            		  // System.out.println(thry);
+            		   lst.add(thry);}
+           programWithTherophy = new ProgramWithTherophy();
            programWithTherophy.setBranchId(entity.getBranchId());
            programWithTherophy.setClinicId(entity.getClinicId());
            programWithTherophy.setId(entity.getId());
            programWithTherophy.setProgramName(entity.getProgramName());
            programWithTherophy.setTherophyData(lst);
-           programWithTherophy.setTotalTherophyIds(lst.size());
-            
+           long count = lst.stream()
+                   .filter(Objects::nonNull)
+                   .count();
+           programWithTherophy.setTotalTherophyIds(Integer.valueOf(String.valueOf(count)));  
             return ResponseEntity.ok(
                     Response.builder()
                             .success(true)
@@ -132,7 +135,15 @@ public class TherophyProgramServiceImpl implements TherophyProgramService {
                             .message("Program fetched successfully")
                             .status(200)
                             .build()
-            );
+            );}else {
+            	 return ResponseEntity.ok(
+                         Response.builder()
+                                 .success(false)
+                                 .data(null)
+                                 .message("Program not found")
+                                 .status(404)
+                                 .build());
+            }
 
         } catch (RuntimeException e) {
             return ResponseEntity.status(404).body(
@@ -158,11 +169,11 @@ public class TherophyProgramServiceImpl implements TherophyProgramService {
     public ResponseEntity<Response> getByclinicAndBranchId(String cid,String bid) {
         try {
             List<TherophyProgramEntity> entity = repository.findByClinicIdAndBranchId(cid, bid);
-              List<TheraphyNamesDTO> lst = new LinkedList<>();
               List<TheraphyProgramWithTheraphyNamesDto> theraphyProgramWithTheraphyNamesDto = new LinkedList<>();
-              TheraphyProgramWithTheraphyNamesDto theraphyDto = new TheraphyProgramWithTheraphyNamesDto();
-              if(entity != null) {
+               if(entity != null) {
             	  for(TherophyProgramEntity e : entity) {
+            	   TheraphyProgramWithTheraphyNamesDto theraphyDto = new TheraphyProgramWithTheraphyNamesDto();   
+            	   List<TheraphyNamesDTO> lst = new LinkedList<>();
             	   for(String s:e.getTherophyIds()) {
             		   TherapyServiceDTO thry = therapyServiceServiceImpl.getById(s);
             		   if(thry != null) {
@@ -175,6 +186,10 @@ public class TherophyProgramServiceImpl implements TherophyProgramService {
             	   theraphyDto.setId(e.getId());
             	   theraphyDto.setProgramName(e.getProgramName());
             	   theraphyDto.setTherophy(lst);
+            	   long count = lst.stream()
+                           .filter(Objects::nonNull)
+                           .count();
+            	   theraphyDto.setTheraphyCount(count);
             	   theraphyProgramWithTheraphyNamesDto.add(theraphyDto);
             	   }}
             if(theraphyProgramWithTheraphyNamesDto != null || !theraphyProgramWithTheraphyNamesDto.isEmpty()) {

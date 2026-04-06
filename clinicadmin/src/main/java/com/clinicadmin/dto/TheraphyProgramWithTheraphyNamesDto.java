@@ -15,5 +15,6 @@ public class TheraphyProgramWithTheraphyNamesDto {
 	private List<TheraphyNamesDTO> therophy;
 	private String clinicId;
 	private String branchId;
+	private long theraphyCount;
 
 }

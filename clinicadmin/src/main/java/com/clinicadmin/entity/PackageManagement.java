@@ -29,7 +29,7 @@ public class PackageManagement {
 
     private String packageName;
 
-    private List<String> programs;
+    private List<String> programIds;
 
     private double discountPercentage;
 
@@ -38,4 +38,7 @@ public class PackageManagement {
     private String endOfferDate;
 
     private String offerType;
+    
+    private List<TherophyProgramEntity>programs;
 }
+
