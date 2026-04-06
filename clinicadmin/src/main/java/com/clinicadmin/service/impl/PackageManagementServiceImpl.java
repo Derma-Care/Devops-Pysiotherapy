@@ -7,19 +7,24 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import com.clinicadmin.dto.PackageManagementDTO;
+import com.clinicadmin.dto.ProgramWithTherophy;
 import com.clinicadmin.dto.Response;
 import com.clinicadmin.entity.PackageManagement;
 import com.clinicadmin.entity.TherophyProgramEntity;
 import com.clinicadmin.repository.PackageManagementRepository;
 import com.clinicadmin.repository.TherophyProgramRepository;
 import com.clinicadmin.service.PackageManagementService;
+import com.clinicadmin.service.TherophyProgramService;
 
 @Service
 public class PackageManagementServiceImpl implements PackageManagementService {
@@ -30,6 +35,9 @@ public class PackageManagementServiceImpl implements PackageManagementService {
     @Autowired
     
     private TherophyProgramRepository  therophyProgramRepository;
+    
+    @Autowired
+    private TherophyProgramService therophyProgramService;
 
     // ✅ CREATE
     @Override
@@ -352,8 +360,64 @@ public class PackageManagementServiceImpl implements PackageManagementService {
             entity.setDiscountPercentage(finalDiscount);
         }
     }
+//    @Override
+//    public Response getPackageWithPrograms( String clinicId, String branchId,String packageId) {
+//
+//        Response response = new Response();
+//
+//        try {
+//            Optional<PackageManagement> optional =
+//                    repository.findByClinicIdAndBranchIdAndPackageId(
+//                            clinicId, branchId, packageId);
+//
+//            if (optional.isEmpty()) {
+//                response.setSuccess(false);
+//                response.setMessage("Package not found");
+//                response.setStatus(HttpStatus.NOT_FOUND.value());
+//                return response;
+//            }
+//
+//            PackageManagement entity = optional.get();
+//
+//            List<String> programIds = entity.getProgramIds();
+//            List<TherophyProgramEntity> programList = new ArrayList<>();
+//
+//            if (programIds != null && !programIds.isEmpty()) {
+//
+//                programList = therophyProgramRepository.findByIdIn(programIds);
+//
+//                // 🔥 CLEANUP LOGIC
+//                List<String> validIds = programList.stream()
+//                        .map(TherophyProgramEntity::getId)
+//                        .toList();
+//
+//                if (!programIds.equals(validIds)) {
+//                    entity.setProgramIds(validIds);
+//                    repository.save(entity); // ✅ removes deleted IDs
+//                }
+//            }
+//
+//            PackageManagementDTO dto = mapToDTO(entity);
+//
+//            dto.setPrograms(programList);
+//            dto.setNoOfPrograms(programList.size());
+//
+//            response.setSuccess(true);
+//            response.setData(dto);
+//            response.setMessage("Fetched successfully with programs");
+//            response.setStatus(HttpStatus.OK.value());
+//
+//        } catch (Exception e) {
+//            response.setSuccess(false);
+//            response.setMessage("Error: " + e.getMessage());
+//            response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
+//        }
+//
+//        return response;
+//    }
+    
     @Override
-    public Response getPackageWithPrograms( String clinicId, String branchId,String packageId) {
+    public Response getPackageWithPrograms(String clinicId, String branchId, String packageId) {
 
         Response response = new Response();
 
@@ -372,31 +436,51 @@ public class PackageManagementServiceImpl implements PackageManagementService {
             PackageManagement entity = optional.get();
 
             List<String> programIds = entity.getProgramIds();
-            List<TherophyProgramEntity> programList = new ArrayList<>();
+
+            // 🔥 FULL DATA LIST (Program + Therapy + Exercise)
+            List<ProgramWithTherophy> programFullData = new ArrayList<>();
 
             if (programIds != null && !programIds.isEmpty()) {
 
-                programList = therophyProgramRepository.findByIdIn(programIds);
+                for (String programId : programIds) {
 
-                // 🔥 CLEANUP LOGIC
-                List<String> validIds = programList.stream()
-                        .map(TherophyProgramEntity::getId)
+                    ResponseEntity<Response> programResponse =
+                            therophyProgramService.getByclinicAndBranchIdAndId(
+                                    clinicId, branchId, programId);
+
+                    if (programResponse.getBody() != null &&
+                            programResponse.getBody().isSuccess()) {
+
+                        ProgramWithTherophy program =
+                                (ProgramWithTherophy) programResponse.getBody().getData();
+
+                        if (program != null) {
+                            programFullData.add(program);
+                        }
+                    }
+                }
+
+                // ✅ CLEANUP
+                List<String> validIds = programFullData.stream()
+                        .map(ProgramWithTherophy::getId)
                         .toList();
 
                 if (!programIds.equals(validIds)) {
                     entity.setProgramIds(validIds);
-                    repository.save(entity); // ✅ removes deleted IDs
+                    repository.save(entity);
                 }
             }
 
             PackageManagementDTO dto = mapToDTO(entity);
 
-            dto.setPrograms(programList);
-            dto.setNoOfPrograms(programList.size());
+          
+            dto.setPrograms((List) programFullData);
+
+            dto.setNoOfPrograms(programFullData.size());
 
             response.setSuccess(true);
             response.setData(dto);
-            response.setMessage("Fetched successfully with programs");
+            response.setMessage("Fetched successfully with full  data");
             response.setStatus(HttpStatus.OK.value());
 
         } catch (Exception e) {
