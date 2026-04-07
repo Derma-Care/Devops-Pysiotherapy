@@ -23,6 +23,11 @@ public interface PhysiotherapyService {
     // DELETE
     Response delete(String id);
 
+	Response getByMultipleFields(String clinicId, String branchId, String patientId, String bookingId,
+			String therapistRecordId);
+
+	Response getByWithoutTherapistRecordId(String clinicId, String branchId, String patientId, String bookingId);
+
   
 //	Response getTherapistDashboard(String clinicId, String branchId, String therapistId);
 

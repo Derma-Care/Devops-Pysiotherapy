@@ -61,6 +61,34 @@ public class PhysiotherapyController {
 		Response response = service.delete(id);
 		return ResponseEntity.status(response.getStatus()).body(response);
 	}
+	@GetMapping("/get-record/{clinicId}/{branchId}/{patientId}/{bookingId}/{therapistRecordId}")
+	public ResponseEntity<Response> getRecord(
+	        @PathVariable String clinicId,
+	        @PathVariable String branchId,
+	        @PathVariable String patientId,
+	        @PathVariable String bookingId,
+	        @PathVariable String therapistRecordId) {
+
+		Response response =  service.getByMultipleFields(
+	            clinicId, branchId, patientId, bookingId, therapistRecordId
+	    );
+		return ResponseEntity.status(response.getStatus()).body(response);
+
+	}
+	
+	@GetMapping("/get-record/{clinicId}/{branchId}/{patientId}/{bookingId}")
+	public ResponseEntity<Response> getRecordsWithoutTherapistId(
+	        @PathVariable String clinicId,
+	        @PathVariable String branchId,
+	        @PathVariable String patientId,
+	        @PathVariable String bookingId) {
+
+		Response response =  service.getByWithoutTherapistRecordId(
+	            clinicId, branchId, patientId, bookingId
+	    );
+		return ResponseEntity.status(response.getStatus()).body(response);
+
+	}
 //	@GetMapping("physiotherapy-record/dashboard/{clinicId}/{branchId}/{therapistId}")
 //	public ResponseEntity<Response> getDashboard(
 //	        @PathVariable String clinicId,

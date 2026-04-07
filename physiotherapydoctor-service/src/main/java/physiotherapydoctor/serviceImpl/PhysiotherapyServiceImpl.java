@@ -355,6 +355,76 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 
 	    return entity;
 	}
+	@Override
+	public Response getByMultipleFields(String clinicId, String branchId,
+	                                    String patientId, String bookingId,
+	                                    String therapistRecordId) {
+
+	    Response response = new Response();
+
+	    if (clinicId == null || branchId == null || patientId == null
+	            || bookingId == null || therapistRecordId == null) {
+
+	        response.setSuccess(false);
+	        response.setMessage("All fields are required");
+	        response.setStatus(400);
+	        return response;
+	    }
+
+	    Optional<PhysiotherapyRecord> record =
+	            repository.findByClinicIdAndBranchIdAndPatientInfoPatientIdAndBookingIdAndTherapistRecordId(
+	                    clinicId, branchId, patientId, bookingId, therapistRecordId
+	            );
+
+	    if (record.isEmpty()) {
+	        response.setSuccess(false);
+	        response.setMessage("Record not found");
+	        response.setStatus(404);
+	        return response;
+	    }
+
+	    response.setSuccess(true);
+	    response.setData(record.get());
+	    response.setMessage("Record fetched successfully");
+	    response.setStatus(200);
+
+	    return response;
+	}
+	
+	@Override
+	public Response getByWithoutTherapistRecordId(String clinicId,
+	                                              String branchId,
+	                                              String patientId,
+	                                              String bookingId) {
+
+	    Response response = new Response();
+
+	    if (clinicId == null || branchId == null || patientId == null || bookingId == null) {
+	        response.setSuccess(false);
+	        response.setMessage("All fields are required");
+	        response.setStatus(400);
+	        return response;
+	    }
+
+	    List<PhysiotherapyRecord> records =
+	            repository.findByClinicIdAndBranchIdAndPatientInfoPatientIdAndBookingId(
+	                    clinicId, branchId, patientId, bookingId
+	            );
+
+	    if (records == null || records.isEmpty()) {
+	        response.setSuccess(false);
+	        response.setMessage("No records found");
+	        response.setStatus(404);
+	        return response;
+	    }
+
+	    response.setSuccess(true);
+	    response.setData(records);
+	    response.setMessage("Records fetched successfully");
+	    response.setStatus(200);
+
+	    return response;
+	}
 
 //	@Override
 //	public Response getTherapistDashboard(String clinicId, String branchId, String therapistId) {
