@@ -7,6 +7,6 @@ import lombok.Data;
 @Data
 public class ExercisePlan {
 
-	private List<Exercise> exercises;
+	private List<HomeExercise> homeExercises;
 	private String homeAdvice;
 }

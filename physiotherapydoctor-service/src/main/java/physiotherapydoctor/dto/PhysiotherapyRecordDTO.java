@@ -17,9 +17,9 @@ public class PhysiotherapyRecordDTO {
 	    private TreatmentPlan treatmentPlan;
 	    private List<TherapySession> therapySessions;
 	    private ExercisePlan exercisePlan;
-	    private ProgressNotes progressNotes;
+//	    private ProgressNotes progressNotes;
 	    private FollowUp followUp;
-	    private ProgressAnalytics progressAnalytics;
+//	    private ProgressAnalytics progressAnalytics;
 	    private List<TreatmentTemplate> treatmentTemplates;
 	    private String createdAt;
 	    private String updatedAt;
