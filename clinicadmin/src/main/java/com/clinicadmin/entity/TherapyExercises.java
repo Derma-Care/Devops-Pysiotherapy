@@ -15,7 +15,7 @@ public class TherapyExercises {
     private String branchId;
     private String name;
     private String video;
-    private String image;
+//    private String image;
     private String session;
     private String duration;
     private String frequency;
