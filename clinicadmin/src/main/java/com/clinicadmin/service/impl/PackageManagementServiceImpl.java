@@ -455,12 +455,30 @@ public class PackageManagementServiceImpl implements PackageManagementService {
                                 (ProgramWithTherophy) programResponse.getBody().getData();
 
                         if (program != null) {
+
+                            // 🔥 REMOVE IMAGE FIELD FROM EXERCISES
+                            if (program.getTherophyData() != null) {
+
+                                program.getTherophyData().forEach(therapy -> {
+
+                                    if (therapy != null && therapy.getExercises() != null) {
+
+                                        therapy.getExercises().forEach(exercise -> {
+                                            if (exercise != null) {
+                                                exercise.setImage(null); // ✅ REMOVE IMAGE
+                                            }
+                                        });
+
+                                    }
+                                });
+                            }
+
                             programFullData.add(program);
                         }
                     }
                 }
 
-                // ✅ CLEANUP
+                // ✅ CLEANUP INVALID PROGRAM IDS
                 List<String> validIds = programFullData.stream()
                         .map(ProgramWithTherophy::getId)
                         .toList();
@@ -473,14 +491,14 @@ public class PackageManagementServiceImpl implements PackageManagementService {
 
             PackageManagementDTO dto = mapToDTO(entity);
 
-          
+            // 🔥 KEEP YOUR EXISTING STRUCTURE
             dto.setPrograms((List) programFullData);
 
             dto.setNoOfPrograms(programFullData.size());
 
             response.setSuccess(true);
             response.setData(dto);
-            response.setMessage("Fetched successfully with full  data");
+            response.setMessage("Fetched successfully with full data ");
             response.setStatus(HttpStatus.OK.value());
 
         } catch (Exception e) {
