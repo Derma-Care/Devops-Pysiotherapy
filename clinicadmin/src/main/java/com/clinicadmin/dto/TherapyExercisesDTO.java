@@ -10,7 +10,7 @@ public class TherapyExercisesDTO {
     private String therapyExercisesId;
     private String name;
     private String video;
-    private String image;
+//    private String image;
 
     private String session;
     private String duration;
