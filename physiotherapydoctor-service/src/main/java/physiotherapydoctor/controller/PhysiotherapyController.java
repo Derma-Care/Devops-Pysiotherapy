@@ -61,21 +61,21 @@ public class PhysiotherapyController {
 		Response response = service.delete(id);
 		return ResponseEntity.status(response.getStatus()).body(response);
 	}
-	@GetMapping("physiotherapy-record/dashboard/{clinicId}/{branchId}/{therapistId}")
-	public ResponseEntity<Response> getDashboard(
-	        @PathVariable String clinicId,
-	        @PathVariable String branchId,
-	        @PathVariable String therapistId) {
-
-	    Response response = service.getTherapistDashboard(clinicId, branchId, therapistId);
-	    return ResponseEntity.status(response.getStatus()).body(response);
-	}
-	
-	@PutMapping("/updateSessionFromTherapist/{therapistRecordId}/{sessionId}")
-	public void updateSessionFromTherapist(
-	        @PathVariable String therapistRecordId,
-	        @PathVariable String sessionId) {
-
-	    service.updateSessionStatusFromTherapist(therapistRecordId, sessionId);
-	}
+//	@GetMapping("physiotherapy-record/dashboard/{clinicId}/{branchId}/{therapistId}")
+//	public ResponseEntity<Response> getDashboard(
+//	        @PathVariable String clinicId,
+//	        @PathVariable String branchId,
+//	        @PathVariable String therapistId) {
+//
+//	    Response response = service.getTherapistDashboard(clinicId, branchId, therapistId);
+//	    return ResponseEntity.status(response.getStatus()).body(response);
+//	}
+//	
+//	@PutMapping("/updateSessionFromTherapist/{therapistRecordId}/{sessionId}")
+//	public void updateSessionFromTherapist(
+//	        @PathVariable String therapistRecordId,
+//	        @PathVariable String sessionId) {
+//
+//	    service.updateSessionStatusFromTherapist(therapistRecordId, sessionId);
+//	}
 }

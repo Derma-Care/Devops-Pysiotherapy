@@ -24,7 +24,7 @@ public interface PhysiotherapyService {
     Response delete(String id);
 
   
-	Response getTherapistDashboard(String clinicId, String branchId, String therapistId);
+//	Response getTherapistDashboard(String clinicId, String branchId, String therapistId);
 
-	void updateSessionStatusFromTherapist(String therapistRecordId, String sessionId);
+//	void updateSessionStatusFromTherapist(String therapistRecordId, String sessionId);
 }

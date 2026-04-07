@@ -3,7 +3,7 @@ package physiotherapydoctor.dto;
 import lombok.Data;
 
 @Data
-public class Exercise {
+public class HomeExercise {
     private String id;
     private String name;
     private String sets;
