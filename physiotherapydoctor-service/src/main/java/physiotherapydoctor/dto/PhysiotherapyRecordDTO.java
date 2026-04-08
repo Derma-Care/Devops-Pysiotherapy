@@ -6,10 +6,11 @@ import lombok.Data;
 
 @Data
 public class PhysiotherapyRecordDTO {
-	 private String id;
+	 private String therapistRecordId;
 	    private String bookingId;
 	    private String clinicId;
 	    private String branchId;
+	    private String overallStatus;
 	    private PatientInfo patientInfo;  
 	    private Complaints complaints;     
 	    private Assessment assessment;
@@ -23,7 +24,4 @@ public class PhysiotherapyRecordDTO {
 	    private List<TreatmentTemplate> treatmentTemplates;
 	    private String createdAt;
 	    private String updatedAt;
-	    private String overallStatus;
-		private String TherapistRecordId;
-		
 }

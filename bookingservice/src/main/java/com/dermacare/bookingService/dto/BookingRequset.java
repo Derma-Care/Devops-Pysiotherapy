@@ -63,5 +63,6 @@ public class BookingRequset {
 	private double dueAmount;
 	private String referredByType;
 	private String referredByName;
+	private String paymentStatus;
 	
 }

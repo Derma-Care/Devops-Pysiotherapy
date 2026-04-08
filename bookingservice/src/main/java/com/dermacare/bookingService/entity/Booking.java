@@ -82,6 +82,8 @@ public class Booking  {
    	private double dueAmount;
    	private String referredByType;
 	private String referredByName;
+	private String paymentStatus;
+	
    	
 
     public Booking(Booking booking) {
