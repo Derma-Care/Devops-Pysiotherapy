@@ -9,6 +9,7 @@ public class HomeExercise {
     private String sets;
     private String reps;
     private String duration;
+    private String frequency;
     private String instructions;
     private String videoUrl;
     private String thumbnail;

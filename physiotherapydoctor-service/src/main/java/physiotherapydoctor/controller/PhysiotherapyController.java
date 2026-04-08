@@ -89,6 +89,29 @@ public class PhysiotherapyController {
 		return ResponseEntity.status(response.getStatus()).body(response);
 
 	}
+	 // ✅ GET Assigned Patients by clinic + branch + therapist
+    @GetMapping("/assigned-patients/{clinicId}/{branchId}/{therapistId}")
+    public ResponseEntity<Response> getAssignedPatients(
+            @PathVariable String clinicId,
+            @PathVariable String branchId,
+            @PathVariable String therapistId) {
+
+    	Response response =  service.getAssignedPatients(
+                clinicId, branchId, therapistId
+        );
+		return ResponseEntity.status(response.getStatus()).body(response);
+
+    }
+    @GetMapping("/getProgramAndTherapyInfo/{clinicId}/{branchId}/{patientId}/{bookingId}")
+    public ResponseEntity<Response> getProgramAndTherapyInfo(
+            @PathVariable String clinicId,
+            @PathVariable String branchId,
+            @PathVariable String patientId, @PathVariable String bookingId) {
+
+    	Response response =  service.getProgramAndTherapyInfo(clinicId,branchId,patientId,bookingId);
+		return ResponseEntity.status(response.getStatus()).body(response);
+
+    }
 //	@GetMapping("physiotherapy-record/dashboard/{clinicId}/{branchId}/{therapistId}")
 //	public ResponseEntity<Response> getDashboard(
 //	        @PathVariable String clinicId,

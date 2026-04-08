@@ -6,15 +6,16 @@ import lombok.Data;
 
 @Data
 public class TherapySession {
-	 private String id;
-	    private String programName;
 
-	    private String clinicId;
-	    private String branchId;
+	private String programId;
+	private String programName;
+	private String clinicId;
+	private String branchId;
+	private int totalTherapyIds;
+	private String serviceType; // Program or package;
+	private List<TherapyData> therapyData;
 
-	    private int totalTherapyIds;
 
-	    private List<TherapyData> therapyData;
 //	private String sessionId;
 //	private String sessionDate;
 //	private String status;
