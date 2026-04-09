@@ -20,6 +20,7 @@ public class AssignTherapistPatientListDTO {
 	private String serivceType; // program or package
 	private String clinicId;
 	private String branchId;
+	private String overallStatus; // 1 pending  2= active , 3=completed
 	
 	
 
