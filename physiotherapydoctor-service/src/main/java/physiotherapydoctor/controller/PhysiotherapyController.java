@@ -90,14 +90,16 @@ public class PhysiotherapyController {
 
 	}
 	 // ✅ GET Assigned Patients by clinic + branch + therapist
-    @GetMapping("/assigned-patients/{clinicId}/{branchId}/{therapistId}")
+    @GetMapping("/assigned-patients/{clinicId}/{branchId}/{therapistId}/{overallStatus}")
     public ResponseEntity<Response> getAssignedPatients(
             @PathVariable String clinicId,
             @PathVariable String branchId,
-            @PathVariable String therapistId) {
+            @PathVariable String therapistId,
+            @PathVariable Integer overallStatus) {
+    	
 
     	Response response =  service.getAssignedPatients(
-                clinicId, branchId, therapistId
+                clinicId, branchId, therapistId,overallStatus
         );
 		return ResponseEntity.status(response.getStatus()).body(response);
 
