@@ -52,10 +52,11 @@ public class Booking  {
     private double consultationFee;
     private String reasonForCancel;
     private String notes;
+    private List<String> status;
+	private String currentStatus;
     private List<ReportsList> reports;
     private String channelId;
     private String bookedAt;
-    private String status;
     private Integer visitCount;
     private List<byte[]> attachments;
     private byte[] consentFormPdf;
@@ -83,7 +84,13 @@ public class Booking  {
    	private String referredByType;
 	private String referredByName;
 	private String paymentStatus;
-	
+	private String previousInjuries;
+	private String currentMedications;
+	private String allergies;
+	private String occupation;
+	private String insuranceProvider;
+	private String policyNumber;
+	private List<String> activityLevels;
    	
 
     public Booking(Booking booking) {

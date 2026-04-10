@@ -39,7 +39,8 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 	        return new QuestionsEntity(
 	                d.getQuestionId(),
 	                d.getQuestion(),
-	                d.getType()
+	                d.getType(),
+	                d.getOptions()
 	        );
 	    }
 
@@ -47,7 +48,8 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 	        return new QuestionsDTO(
 	                e.getQuestionId(),
 	                e.getQuestion(),
-	                e.getType()
+	                e.getType(),
+	                e.getOptions()
 	        );
 	    }
 
