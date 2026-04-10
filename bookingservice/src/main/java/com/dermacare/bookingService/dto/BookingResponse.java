@@ -55,7 +55,8 @@ public class BookingResponse {
 	private String notes;
 	private List<ReportsDtoList> reports;
 	private String BookedAt;
-	private String status;
+	private List<String> status;
+	private String currentStatus;
 	private double totalFee;
 	private List<String> attachments;
 	private String consentFormPdf;
@@ -68,6 +69,7 @@ public class BookingResponse {
 	private Integer currentSitting;
 	private String followupDate;
 	private String foc;
+	private String focReason;
 	private String followupStatus;
 	private String treatmentName;
 	private String treatmentDate;
@@ -86,6 +88,13 @@ public class BookingResponse {
    	private String referredByType;
 	private String referredByName;
 	private String paymentStatus;
+	private String previousInjuries;
+	private String currentMedications;
+	private String allergies;
+	private String occupation;
+	private String insuranceProvider;
+	private String policyNumber;
+	private List<String> activityLevels;
 	
    	
 }

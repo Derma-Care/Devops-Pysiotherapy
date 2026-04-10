@@ -117,7 +117,7 @@ public class GenerateTableServiceImpl implements GenerateTableService {
                                 ? Integer.parseInt(ex.get("session").toString())
                                 : 1;
 
-                        // 🔥 renamed field
+                       
                         exDTO.setNoOfSessions(totalSessions);
 
                         List<SessionDTO> sessions =
@@ -175,6 +175,8 @@ public class GenerateTableServiceImpl implements GenerateTableService {
 
             s.setDate(date.getMonthValue() + "/" + date.getDayOfMonth() + "/" + date.getYear());
             s.setStatus("Pending");
+            s.setPaymentStatus("unpaid");
+
             s.setSessionId(generateSessionId(date, index++));
 
             list.add(s);
