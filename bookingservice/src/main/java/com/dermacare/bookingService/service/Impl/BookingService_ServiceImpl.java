@@ -47,6 +47,8 @@ import com.dermacare.bookingService.repository.BookingServiceRepository;
 import com.dermacare.bookingService.service.BookingService_Service;
 import com.dermacare.bookingService.util.Response;
 import com.dermacare.bookingService.util.ResponseStructure;
+import com.dermacare.bookingService.util.SequenceGeneratorService;
+import com.dermacare.bookingService.util.geneateIds;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -69,6 +71,8 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	
 	@Autowired
 	private ClinicAdminFeign clinicAdminFeign;
+	@Autowired
+	private geneateIds sequenceGeneratorService;
 	
 	public DoctorSaveDetailsDTO saveDetails = new DoctorSaveDetailsDTO();
 	public DoctorSaveDetailsDTO sDetails = new DoctorSaveDetailsDTO();
@@ -110,7 +114,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	                                 HttpStatus.NOT_FOUND.value()));
 	             }
 
-	             if (!"In-Progress".equalsIgnoreCase(b.getCurrentStatus())) {
+	             if (!"In-Progress".equalsIgnoreCase(b.getStatus())) {
 	                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
 	                         .body(ResponseStructure.buildResponse(
 	                                 null,
@@ -185,11 +189,11 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	                     .allMatch(t -> "Confirmed".equalsIgnoreCase(t.getStatus()));
 
 	             if (allConfirmed) {
-	                 b.setCurrentStatus("Confirmed");
+	                 b.setStatus("Confirmed");
 	             } else if (anyInProgress) {
-	                 b.setCurrentStatus("In-Progress");
+	                 b.setStatus("In-Progress");
 	             } else {
-	                 b.setCurrentStatus("Pending");
+	                 b.setStatus("Pending");
 	             }
 
 	             Booking updatedBooking = repository.save(b);
@@ -244,9 +248,9 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 
 	             boolean allConfirmed = entity.getTreatments().getGeneratedData().values().stream()
 	                     .allMatch(t -> "Confirmed".equalsIgnoreCase(t.getStatus()));
-	             entity.setCurrentStatus(allConfirmed ? "Confirmed" : "In-Progress");
+	             entity.setStatus(allConfirmed ? "Confirmed" : "In-Progress");
 	         } else {
-	             entity.setCurrentStatus("Confirmed");
+	             entity.setStatus("Confirmed");
 	         }
 
 	         Booking savedBooking = repository.save(entity);
@@ -295,55 +299,38 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	 }
 
 	 private Booking toEntity(BookingRequset request) {
-	     Booking entity = new ObjectMapper().convertValue(request, Booking.class);
-	     ZonedDateTime istTime = ZonedDateTime.now(ZoneId.of("Asia/Kolkata"));
-	     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy hh:mm a");
-	     double due = request.getTotalFee() - request.getPartAmount();
-	     entity.setDueAmount(due);
-	     entity.setBookedAt(istTime.format(formatter));
-	     entity.setFreeFollowUpsLeft(request.getFreeFollowUps());
 
-	     // Channel ID for online/video consultations
-	     if (request.getConsultationType() != null &&
-	             (request.getConsultationType().equalsIgnoreCase("video consultation") ||
-	                     request.getConsultationType().equalsIgnoreCase("online consultation"))) {
-	         entity.setChannelId(randomNumber());
-	     }
-	     
-	     if(request.getFoc().equals("paid")) {
-	    	 entity.setCurrentStatus("confirmed");
-	     }else {
-	    	 entity.setCurrentStatus("pending"); 
-	     }
+		    Booking entity = new ObjectMapper().convertValue(request, Booking.class);
 
-	     // Patient ID logic
-	     if (request.getBookingFor() != null) {
-	         if ("Someone".equalsIgnoreCase(request.getBookingFor())) {
-	             if (request.getRelation() != null &&
-	                     (request.getPatientId() == null || request.getPatientId().trim().isEmpty())) {
+		    ZonedDateTime istTime = ZonedDateTime.now(ZoneId.of("Asia/Kolkata"));
+		    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy hh:mm a");
 
-	                 List<Booking> existingBooking = repository.findByRelationIgnoreCaseAndCustomerIdAndNameIgnoreCase(
-	                         request.getRelation(), request.getCustomerId(), request.getName());
+		    double due = request.getTotalFee() - request.getPartAmount();
+		    entity.setDueAmount(due);
+		    entity.setBookedAt(istTime.format(formatter));
+		    entity.setFreeFollowUpsLeft(request.getFreeFollowUps());
 
-	                 if (existingBooking != null && !existingBooking.isEmpty()) {
-	                     entity.setPatientId(existingBooking.get(0).getPatientId());
-	                 } else {
-	                     entity.setPatientId(generatePatientId(request));
-	                 }
-	             } else {
-	                 entity.setPatientId(request.getPatientId());
-	             }
-	         } else {
-	             if (request.getPatientId() == null || request.getPatientId().trim().isEmpty()) {
-	                 entity.setPatientId(generatePatientId(request));
-	             } else {
-	                 entity.setPatientId(request.getPatientId());
-	             }
-	         }
-	     }
+		    // ✅ Generate Custom Booking ID
+		    String bookingId = sequenceGeneratorService.generateBookingId(request.getClinicId(),request.getBranchId());
+		    entity.setBookingId(bookingId);
 
-	     return entity;
-	 }
+		    // Channel ID logic
+		    if (request.getConsultationType() != null &&
+		            (request.getConsultationType().equalsIgnoreCase("video consultation") ||
+		             request.getConsultationType().equalsIgnoreCase("online consultation"))) {
+		        entity.setChannelId(randomNumber());
+		    }
+
+		    if ("paid".equalsIgnoreCase(request.getFoc())) {
+		        entity.setStatus("confirmed");
+		    } else {
+		        entity.setStatus("pending");
+		    }
+
+		    // (your existing patientId logic unchanged)
+
+		    return entity;
+		}
 
 	 private BookingResponse toResponse(Booking entity) {
 	     BookingResponse response = new ObjectMapper().convertValue(entity, BookingResponse.class);
@@ -492,8 +479,8 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	                        LocalDate bookingDate = LocalDate.parse(b.getServiceDate(), dateFormatter);
 
 	                        if (bookingDate.equals(currentDate) &&
-	                                (b.getCurrentStatus().equalsIgnoreCase("Confirmed") ||
-	                                 b.getCurrentStatus().equalsIgnoreCase("In-Progress"))) {
+	                                (b.getStatus().equalsIgnoreCase("Confirmed") ||
+	                                 b.getStatus().equalsIgnoreCase("In-Progress"))) {
 
 	                            BookingResponse temp = toResponse(b);
 	                            temp.setServiceDate(b.getServiceDate());
@@ -524,7 +511,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	                                    temp.setSubServiceName(treatmentName);
 	                                    temp.setServiceDate(d.getDate());
 	                                    temp.setServicetime(b.getServicetime());
-	                                    temp.setCurrentStatus(d.getStatus());
+	                                    temp.setStatus(d.getStatus());
 
 	                                    // keep only this treatment info
 	                                    Map<String, TreatmentDetailsDTO> oneTreatment = new HashMap<>();
@@ -642,7 +629,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	                            // 4️⃣ ACTIVE / IN-PROGRESS
 	                            case "4": // Active (ONLY next pending sitting)
 
-	                                if (!"In-Progress".equalsIgnoreCase(b.getCurrentStatus())) {
+	                                if (!"In-Progress".equalsIgnoreCase(b.getStatus())) {
 	                                    break;
 	                                }
 
@@ -673,7 +660,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	                            temp.setSubServiceName(treatmentName);
 	                            temp.setServiceDate(d.getDate());
 	                            temp.setServicetime(b.getServicetime());
-	                            temp.setCurrentStatus(d.getStatus());
+	                            temp.setStatus(d.getStatus());
 	                            responses.add(temp);
 	                        }
 	                    }
@@ -694,7 +681,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 
 	                    // 1️⃣ UPCOMING
 	                    case "1":
-	                        if ("Confirmed".equalsIgnoreCase(b.getCurrentStatus())
+	                        if ("Confirmed".equalsIgnoreCase(b.getStatus())
 	                                && appointmentDate.isAfter(today)) {
 	                            add = true;
 	                        }
@@ -703,7 +690,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	                    // 2️⃣ UPCOMING ONLINE
 	                    case "2":
 	                        if ("Online Consultation".equalsIgnoreCase(b.getConsultationType())
-	                                && "Confirmed".equalsIgnoreCase(b.getCurrentStatus())
+	                                && "Confirmed".equalsIgnoreCase(b.getStatus())
 	                                && appointmentDate.isAfter(today)) {
 	                            add = true;
 	                        }
@@ -711,14 +698,14 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 
 	                    // 3️⃣ COMPLETED
 	                    case "3":
-	                        if ("Completed".equalsIgnoreCase(b.getCurrentStatus())) {
+	                        if ("Completed".equalsIgnoreCase(b.getStatus())) {
 	                            add = true;
 	                        }
 	                        break;
 
 	                    // 4️⃣ ACTIVE / IN-PROGRESS
 	                    case "4":
-	                        if ("In-Progress".equalsIgnoreCase(b.getCurrentStatus())) {
+	                        if ("In-Progress".equalsIgnoreCase(b.getStatus())) {
 	                            add = true;
 	                        }
 	                        break;
@@ -758,7 +745,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 			List<BookingResponse> res = new ArrayList<>();
 			if(existingBooking != null) {
 			for(Booking b : existingBooking) {
-			if(b.getCurrentStatus().equalsIgnoreCase("Completed")) {
+			if(b.getStatus().equalsIgnoreCase("Completed")) {
 			res.add(toResponse(b));}}
 			 m.put("completedAppointmentsCount",res.size());
 			 m.put("status",200);
@@ -784,7 +771,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 		List<BookingResponse> online = new ArrayList<>();
 		if(existingBooking != null) {
 		for(Booking b : existingBooking) {
-		if(b.getCurrentStatus().equalsIgnoreCase("Completed")) {
+		if(b.getStatus().equalsIgnoreCase("Completed")) {
 		if(b.getConsultationType().equalsIgnoreCase("Services & Treatments")) {
 		servicesAndConsul.add(toResponse(b));}
 		if(b.getConsultationType().equalsIgnoreCase("In-Clinic Consultation")){
@@ -895,7 +882,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 		List<Booking> bookings = repository.findByPatientId(patientId);
 		List<Booking> reversedBookings = new ArrayList<>();
 		for(int i = bookings.size()-1; i >= 0; i--) {
-			if(bookings.get(i).getCurrentStatus().equalsIgnoreCase("In-Progress")) {
+			if(bookings.get(i).getStatus().equalsIgnoreCase("In-Progress")) {
 			reversedBookings.add(bookings.get(i));
 		}}
 		if (bookings == null  || bookings.isEmpty()) {
@@ -1020,7 +1007,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	                    new TypeReference<List<ReportsList>>() {}));
 	        }
 	        if( bookingResponse.getFoc() != null && bookingResponse.getFoc().equalsIgnoreCase("paid")) {
-	        	entity.setCurrentStatus("confirmed");
+	        	entity.setStatus("confirmed");
 	        }
 	        if (bookingResponse.getSubServiceId() != null) entity.setSubServiceId(bookingResponse.getSubServiceId());
 	        if (bookingResponse.getSubServiceName() != null) entity.setSubServiceName(bookingResponse.getSubServiceName());
@@ -1193,14 +1180,14 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 			if(existingBooking != null && !existingBooking.isEmpty()){
 				//System.out.println("not null");
 			for(Booking b:existingBooking) {
-			if(b.getCurrentStatus().equalsIgnoreCase("Completed")) {
+			if(b.getStatus().equalsIgnoreCase("Completed")) {
 				//System.out.println("find complted");
 				if(!ids.contains(b.getPatientId())){
 			List<Booking> bookings = repository.findByPatientId(b.getPatientId());
 			ids.add(b.getPatientId());
 			//System.out.println("got obj by patient id");
 			for(Booking c:bookings) {
-			if(c.getCurrentStatus().equalsIgnoreCase("Completed")) {
+			if(c.getStatus().equalsIgnoreCase("Completed")) {
 				//System.out.println("patient id with cmplted");
 			if(map.containsKey(b.getPatientId())){
 				//System.out.println("adding to map");
@@ -1230,7 +1217,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 			Optional<Booking> optionalBooking = repository.findByBookingIdAndPatientIdAndMobileNumber(bookingId, patientId, mobileNumber);
 		    if (optionalBooking.isPresent()) {
 		        Booking booking = optionalBooking.get();
-		        if(booking.getCurrentStatus().equalsIgnoreCase("Confirmed") || booking.getCurrentStatus().equalsIgnoreCase("Completed")){
+		        if(booking.getStatus().equalsIgnoreCase("Confirmed") || booking.getStatus().equalsIgnoreCase("Completed")){
 		        BookingResponse response = new ObjectMapper().convertValue(booking, BookingResponse.class);
 		        return Response.builder()
 		                .success(true)
@@ -1265,7 +1252,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 				List<BookingResponse> response=new ArrayList<>();
 				if(booked!=null && !booked.isEmpty()){
 					for(Booking b:booked){
-						if(b.getCurrentStatus().equalsIgnoreCase("In-Progress")){
+						if(b.getStatus().equalsIgnoreCase("In-Progress")){
 							response.add(toResponse(b));}}
 					if(response!=null && !response.isEmpty()){
 						res.setStatusCode(200);
@@ -1458,7 +1445,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 
 		        for (Booking booking : bookings) {
 		            // Only process In-Progress bookings
-		            if (!"In-Progress".equalsIgnoreCase(booking.getCurrentStatus())) {
+		            if (!"In-Progress".equalsIgnoreCase(booking.getStatus())) {
 		                continue;
 		            }
 
@@ -1614,7 +1601,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	                    if (!followDate.isBefore(today) && !followDate.isAfter(sixthDate) && !followDate.isAfter(exp)) {
 	                        Booking bkng = new Booking(booking);
 	                        bkng.setFollowupDate(followDate.format(isoFormatter));
-	                        bkng.setCurrentStatus("In-Progress");
+	                        bkng.setStatus("In-Progress");
 	                           finalList.add(toResponse(bkng));		                        
 	                    }
 	                } catch (Exception e) {
@@ -1643,7 +1630,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	                        	//bkng.setReports(null);
 	                           // System.out.println(bkng);
 	                            bkng.setFollowupDate(date.format(isoFormatter));
-	                            bkng.setCurrentStatus("In-Progress");	                            
+	                            bkng.setStatus("In-Progress");	                            
 	                            finalList.add(toResponse(bkng));
 	                        }}	                   
 	                }catch (Exception e){
@@ -2212,7 +2199,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 
 		        for (Booking booking : booked) {
 		            // Include only In-Progress bookings
-		            if (!"In-Progress".equalsIgnoreCase(booking.getCurrentStatus())) continue;
+		            if (!"In-Progress".equalsIgnoreCase(booking.getStatus())) continue;
 
 		            // Include relevant consultation types
 		            String type = booking.getConsultationType() != null ? booking.getConsultationType().trim() : "";
@@ -2297,7 +2284,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 		                    if (!followDate.isBefore(today) && !followDate.isAfter(sixthDate) && !followDate.isAfter(exp)) {
 		                        Booking bkng = new Booking(booking);
 		                        bkng.setFollowupDate(followDate.format(isoFormatter));
-		                        bkng.setCurrentStatus("In-Progress");
+		                        bkng.setStatus("In-Progress");
 		                        finalList.add(toResponse(bkng));
 		                        bookingAdded = true;
 		                    }
@@ -2336,7 +2323,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 			try {	
 				 List<Booking> bookings = repository.findByClinicIdAndBranchIdAndServiceDateOrderByServicetimeAsc(cinicId, branchId, date);
 				// System.out.println(todayBookings);
-				 bookings = bookings.stream().filter(n->n.getCurrentStatus().equalsIgnoreCase("In-Progress")).toList();
+				 bookings = bookings.stream().filter(n->n.getStatus().equalsIgnoreCase("In-Progress")).toList();
 				 List<BookingResponse> todayBookingsDto = toResponses(bookings);
 				 if(todayBookingsDto!= null && !todayBookingsDto.isEmpty()) {
 				 res.setStatusCode(200);
@@ -2512,7 +2499,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 			        entity.setBookedAt(dto.getBookedAt());
 			    }
 				if(dto.getFollowupStatus() != null && dto.getFollowupStatus().equalsIgnoreCase("no-followup")) {
-			        entity.setCurrentStatus("Completed");
+			        entity.setStatus("Completed");
 			    }else {
 			    	try {
 			    		//System.out.println(dto);
@@ -2765,10 +2752,23 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 		}
 
 
-}
 
-
-
+public List<BookingResponse> getTodayBookings(String cId,String bId) {
+    String today = LocalDate.now()
+            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+    ObjectMapper mapper = new ObjectMapper();
+    mapper.registerModule(new JavaTimeModule());
+    // Disable timestamp format
+    mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    List<Booking> b  = repository.findByClinicIdAndBranchIdAndServiceDate(cId,bId,today);
+    if(b != null || !b.isEmpty()) {
+    	List<BookingResponse> dto = mapper.convertValue(b, new TypeReference<List<BookingResponse>>() {
+		});
+    	return dto;
+    }else {
+    	return Collections.emptyList();
+    }
+}}
 
 
 

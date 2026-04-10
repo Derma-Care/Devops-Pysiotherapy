@@ -16,7 +16,8 @@ import lombok.NoArgsConstructor;
 @Document(collection = "Appointments")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Booking  {
-    @Id
+    
+	@Id
     private String bookingId;
     private String bookingFor;
     private String relation;
@@ -52,8 +53,8 @@ public class Booking  {
     private double consultationFee;
     private String reasonForCancel;
     private String notes;
-    private List<String> status;
-	private String currentStatus;
+    private List<String> currentStatus;
+	private String status;
     private List<ReportsList> reports;
     private String channelId;
     private String bookedAt;
