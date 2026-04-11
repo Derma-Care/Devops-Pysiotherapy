@@ -46,14 +46,17 @@ public class BookingRequset {
 	private String followupDate;
 	private String consultationType;
 	private double consultationFee;
-	private double totalFee;
+	private double totalFee;    ///theraphy fee
 	private String paymentType;
 	private List<String> attachments;
+	private List<String> currentStatus;
+	private String status;
 	private String consentFormPdf;
 	private String doctorRefCode;
 	private String bookedAt;
 	private String followupStatus;
 	private String foc;
+	private String focReason;
 	private String bodyPartId;
 	private String bodyPartName;
 	private String partImage;
@@ -61,5 +64,15 @@ public class BookingRequset {
 	private List<String> parts;
 	private double partAmount;	
 	private double dueAmount;
+	private String referredByType;
+	private String referredByName;
+	private String paymentStatus;
+	private String previousInjuries;
+	private String currentMedications;
+	private String allergies;
+	private String occupation;
+	private String insuranceProvider;
+	private String policyNumber;
+	private List<String> activityLevels;
 	
 }

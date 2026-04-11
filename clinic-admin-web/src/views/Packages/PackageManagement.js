@@ -1,5 +1,5 @@
 /* eslint-disable react/jsx-key */
-import React, { useState } from 'react'
+import React, { useState,useEffect } from 'react'
 import {
   CButton,
   CTable,
@@ -13,10 +13,17 @@ import {
   CModalBody,
   CRow,
   CCol,
+  CModalTitle,
 } from '@coreui/react'
 
 import { Eye, Edit2, Trash2 } from 'lucide-react'
-import TreatmentPackageForm from './TreatmentPackageForm'
+import TreatmentPackageForm from '././TreatmentPackageForm'
+import {
+  getAllPackages,
+  addPackage,
+  updatePackage,
+  deletePackage
+} from './TreatmentPackageAPI'
 
 const TreatmentPackages = () => {
   const [packages, setPackages] = useState([])
@@ -25,33 +32,78 @@ const TreatmentPackages = () => {
   const [viewMode, setViewMode] = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
 const [deleteId, setDeleteId] = useState(null)
+const [therapyOptions, setTherapyOptions] = useState([])
+
+
+const clinicId = localStorage.getItem('HospitalId')
+const branchId = localStorage.getItem('branchId')
+
+const fetchPackages = async () => {
+  try {
+    const res = await getAllPackages()
+    console.log(res.data.data)
+
+    const packages = res.data.data || []
+
+    const therapies = packages.flatMap(pkg => pkg.therapies || [])
+
+    const uniqueTherapies = [
+      ...new Map(therapies.map(t => [t.name, t])).values()
+    ]
+
+    setTherapyOptions(uniqueTherapies)
+    setPackages(packages)
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+
+useEffect(() => {
+  fetchPackages()
+}, [])
 
   // SAVE
-  const handleSave = (data) => {
-    if (selectedPackage) {
-      setPackages((prev) =>
-        prev.map((p) =>
-          p.id === selectedPackage.id ? { ...p, ...data } : p,
-        ),
-      )
-    } else {
-      setPackages((prev) => [
-        ...prev,
-        { ...data, id: Date.now().toString() },
-      ])
+ const handleSave = async (data) => {
+  try {
+    const clinicId = localStorage.getItem('HospitalId')
+    const branchId = localStorage.getItem('branchId')
+
+    const payload = {
+      ...data,
+      clinicId,
+      branchId,
     }
+
+    if (selectedPackage?.id) {
+      // ✅ UPDATE
+      await updatePackage(selectedPackage.id, payload)
+    } else {
+      // ✅ ADD
+      await addPackage(payload)
+    }
+
+    await fetchPackages()
 
     setModalVisible(false)
     setSelectedPackage(null)
+  } catch (err) {
+    console.error('Save failed:', err)
   }
-
-  // DELETE
-  const confirmDelete = () => {
-  setPackages(packages.filter((p) => p.id !== deleteId))
-  setDeleteModal(false)
-  setDeleteId(null)
 }
+  // DELETE
+ const confirmDelete = async () => {
+  try {
+    await deletePackage(deleteId)
 
+    setDeleteModal(false)
+    setDeleteId(null)
+
+    fetchPackages()
+  } catch (err) {
+    console.error(err)
+  }
+}
   // VIEW FIELD COMPONENT
   const Field = ({ label, value }) => (
     <div className="mb-2">
@@ -76,7 +128,7 @@ const [deleteId, setDeleteId] = useState(null)
             setModalVisible(true)
           }}
         >
-           Add Package
+           Add Program
         </CButton>
       </div>
 
@@ -84,10 +136,12 @@ const [deleteId, setDeleteId] = useState(null)
       <CTable bordered className="pink-table">
         <CTableHead>
           <CTableRow>
+            <CTableHeaderCell>S.No</CTableHeaderCell>
             <CTableHeaderCell>Name</CTableHeaderCell>
-            <CTableHeaderCell>Sessions</CTableHeaderCell>
-            <CTableHeaderCell>Price</CTableHeaderCell>
-            <CTableHeaderCell>Validity</CTableHeaderCell>
+            <CTableHeaderCell>Program Price</CTableHeaderCell>
+            <CTableHeaderCell>Discount %</CTableHeaderCell>
+            <CTableHeaderCell>Discounted Price</CTableHeaderCell>
+            <CTableHeaderCell>Final Price <br/> <small>(including Tax)</small></CTableHeaderCell>
             <CTableHeaderCell className="text-center">
               Actions
             </CTableHeaderCell>
@@ -95,12 +149,19 @@ const [deleteId, setDeleteId] = useState(null)
         </CTableHead>
 
         <CTableBody>
-          {packages.map((pkg) => (
+          {packages.map((pkg,index) => (
             <CTableRow key={pkg.id}>
-              <CTableDataCell>{pkg.name}</CTableDataCell>
-              <CTableDataCell>{pkg.sessions}</CTableDataCell>
-              <CTableDataCell>₹{pkg.price}</CTableDataCell>
-              <CTableDataCell>{pkg.validity} days</CTableDataCell>
+              <CTableDataCell>{index+1}</CTableDataCell>
+              <CTableDataCell>{pkg.packageName}</CTableDataCell>
+              <CTableDataCell>₹ {pkg.packagePrice}</CTableDataCell>
+              <CTableDataCell>₹ {pkg.discount || 'N/A'}</CTableDataCell>
+             <CTableDataCell>
+  ₹ {Number(pkg.afterDiscountPrice || 0).toFixed(2)}
+</CTableDataCell>
+
+<CTableDataCell>
+  ₹ {Number(pkg.finalPrice || 0).toFixed(2)}
+</CTableDataCell>
 
               <CTableDataCell className="text-center">
                 <div className="d-flex justify-content-center gap-2">
@@ -148,96 +209,128 @@ const [deleteId, setDeleteId] = useState(null)
       </CTable>
 
       {/* MODAL */}
-      <CModal visible={modalVisible} onClose={() => setModalVisible(false)} size="lg" backdrop="static">
-        <CModalHeader>
-          {viewMode
-            ? 'Package Details'
-            : selectedPackage
-            ? 'Edit Package'
-            : 'Add Package'}
-        </CModalHeader>
+      <CModal visible={modalVisible} onClose={() => setModalVisible(false)} size="lg" backdrop="static" className='custom-modal'>
+        {/* <CModalTitle>{viewMode ? 'Personal Information' : 'Add / Edit Receptionist'}</CModalTitle> */}
+       
+       <CModalHeader>
+  <CModalTitle
+    style={{
+      fontSize: "22px",
+      fontWeight: "700", // bold
+      color: "var(--color-black)",
+   
+    }}
+  >
+    {viewMode
+      ? "Program Details"
+      : selectedPackage
+      ? "Edit Program"
+      : "Add Program"}
+  </CModalTitle>
+</CModalHeader>
 
         <CModalBody>
           {viewMode ? (
-            // ✅ VIEW MODE (NO INPUTS)
-          <div>
+   <div className="p-3">
 
   {/* ================= BASIC ================= */}
-  <h6>Basic Information</h6>
-  <CRow>
-    <CCol md={6}>
-      <Field label="Package Name" value={selectedPackage?.packageName} />
-    </CCol>
-  </CRow>
+  <div className="mb-4">
+    <h6 className="fw-bold mb-3 border-bottom pb-2">Basic Information</h6>
 
-  <Field label="Description" value={selectedPackage?.description} />
+    <CRow className="g-3">
+      <CCol md={6}>
+        <Field label="Program Name" value={selectedPackage?.packageName} />
+      </CCol>
+
+      <CCol md={6}>
+        <Field label="Description" value={selectedPackage?.description} />
+      </CCol>
+    </CRow>
+  </div>
 
   {/* ================= PRICING ================= */}
-  <h6 className="mt-3">Pricing</h6>
-  <CRow>
-    <CCol md={3}>
-      <Field label="Price" value={`₹${selectedPackage?.packagePrice}`} />
-    </CCol>
+  <div className="mb-4">
+    <h6 className="fw-bold mb-3 border-bottom pb-2">Pricing Details</h6>
 
-    <CCol md={3}>
-      <Field label="Discount" value={`${selectedPackage?.discount}%`} />
-    </CCol>
+    <CRow className="g-3">
+      <CCol md={3}>
+        <Field label="Price" value={`₹ ${selectedPackage?.packagePrice}`} />
+      </CCol>
 
-    <CCol md={3}>
-      <Field label="GST" value={`${selectedPackage?.gst}%`} />
-    </CCol>
+      <CCol md={3}>
+        <Field label="Discount" value={`${selectedPackage?.discount}%`} />
+      </CCol>
 
-    <CCol md={3}>
-      <Field label="Other Taxes" value={`${selectedPackage?.otherTaxes}%`} />
-    </CCol>
-  </CRow>
+      <CCol md={3}>
+        <Field label="GST" value={`${selectedPackage?.gst}%`} />
+      </CCol>
+
+      <CCol md={3}>
+        <Field label="Other Taxes" value={`${selectedPackage?.otherTaxes}%`} />
+      </CCol>
+    </CRow>
+  </div>
 
   {/* ================= PAYMENT ================= */}
-  <h6 className="mt-3">Payment</h6>
-  <Field label="Payment Type" value={selectedPackage?.paymentType} />
+  <div className="mb-4">
+    <h6 className="fw-bold mb-3 border-bottom pb-2">Payment Details</h6>
+
+    <CRow className="g-3">
+      <CCol md={6}>
+        <Field label="Payment Type" value={selectedPackage?.paymentType} />
+      </CCol>
+    </CRow>
+  </div>
 
   {/* ================= OFFER ================= */}
-  <h6 className="mt-3">Offer</h6>
-  <CRow>
-    <CCol md={6}>
-      <Field label="Start Date" value={selectedPackage?.offerStartDate || 'N/A'} />
-    </CCol>
+  <div className="mb-4">
+    <h6 className="fw-bold mb-3 border-bottom pb-2">Offer Period</h6>
 
-    <CCol md={6}>
-      <Field label="End Date" value={selectedPackage?.offerEndDate || 'N/A'} />
-    </CCol>
-  </CRow>
+    <CRow className="g-3">
+      <CCol md={6}>
+        <Field label="Start Date" value={selectedPackage?.offerStartDate || 'N/A'} />
+      </CCol>
+
+      <CCol md={6}>
+        <Field label="End Date" value={selectedPackage?.offerEndDate || 'N/A'} />
+      </CCol>
+    </CRow>
+  </div>
 
   {/* ================= THERAPIES ================= */}
-  <h6 className="mt-3">Therapies</h6>
+  <div className="mb-3">
+    <h6 className="fw-bold mb-3 border-bottom pb-2">Therapies Included</h6>
 
-  {selectedPackage?.therapies?.length ? (
-    selectedPackage.therapies.map((t, i) => (
-      <div key={i} className="border p-2 mb-2 rounded">
+    {selectedPackage?.therapies?.length ? (
+      selectedPackage.therapies.map((t, i) => (
+        <div
+          key={i}
+          className="border rounded p-3 mb-3"
+          style={{ backgroundColor: "#f9fafb" }}
+        >
+          <CRow className="g-3 align-items-start">
+            <CCol md={3}>
+              <Field label="Therapy" value={t.name} />
+            </CCol>
 
-        <CRow>
-          <CCol md={3}>
-            <Field label="Therapy Name" value={t.name} />
-          </CCol>
+            <CCol md={3}>
+              <Field label="Sessions" value={t.sessions} />
+            </CCol>
 
-          <CCol md={3}>
-            <Field label="Sessions" value={t.sessions} />
-          </CCol>
+            <CCol md={3}>
+              <Field label="Duration" value={`${t.sessionDuration} mins`} />
+            </CCol>
 
-          <CCol md={3}>
-            <Field label="Duration" value={`${t.sessionDuration} mins`} />
-          </CCol>
-
-          <CCol md={3}>
-            <Field label="Validity" value={`${t.validity} days`} />
-          </CCol>
-        </CRow>
-
-      </div>
-    ))
-  ) : (
-    <p>No therapies added</p>
-  )}
+            <CCol md={3}>
+              <Field label="Validity" value={`${t.validity} days`} />
+            </CCol>
+          </CRow>
+        </div>
+      ))
+    ) : (
+      <p className="text-muted">No therapies added</p>
+    )}
+  </div>
 
 </div>
           ) : (
@@ -246,6 +339,8 @@ const [deleteId, setDeleteId] = useState(null)
               data={selectedPackage}
               onSave={handleSave}
               viewMode={false}
+              therapyOptions={therapyOptions} 
+              onCancel={false}
             />
           )}
         </CModalBody>

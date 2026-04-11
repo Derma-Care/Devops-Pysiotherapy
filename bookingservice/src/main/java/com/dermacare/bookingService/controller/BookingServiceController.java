@@ -49,6 +49,17 @@ public class BookingServiceController {
 						HttpStatus.OK, HttpStatus.OK.value()), HttpStatus.OK);}}
 	
 	
+	@GetMapping("/getTodayBookings/{clincId}/{branchId}")
+	public ResponseEntity<ResponseStructure<List<BookingResponse>>> getTodayBookings(@PathVariable String clincId,@PathVariable String branchId) {
+		List<BookingResponse> response = service.getTodayBookings(clincId, branchId);
+		if(response != null || !response.isEmpty()) {
+			return new ResponseEntity<>(ResponseStructure.buildResponse(response, "Booked Service Fetched Sucessfully",
+					HttpStatus.OK, HttpStatus.OK.value()), HttpStatus.OK);}
+			else {
+				return new ResponseEntity<>(ResponseStructure.buildResponse(null, "Booked Service Not Found",
+						HttpStatus.OK, HttpStatus.OK.value()), HttpStatus.OK);}}
+	
+	
 
 	@GetMapping("/getBookedServiceById/{id}")
 	public ResponseEntity<ResponseStructure<BookingResponse>> getBookedService(@PathVariable String id) {
@@ -302,21 +313,31 @@ public class BookingServiceController {
 			
 		@GetMapping("/appointments/byInput/{input}/{clinicId}")	
 		public ResponseEntity<?> retrieveAppointnmentsByInput(@PathVariable String input,@PathVariable String clinicId){
-			List<BookingInfoByInput> response = service.bookingByInput(input,clinicId);
-			if (response == null || response.isEmpty()) {
+			BookingInfoByInput response = service.bookingByInput(input,clinicId);
+			if (response == null) {
 				return new ResponseEntity<>(ResponseStructure.buildResponse(null,
 						"No booking yet" + input, HttpStatus.OK, HttpStatus.OK.value()),
 						HttpStatus.OK);}
 			return new ResponseEntity<>(ResponseStructure.buildResponse(response,
 					"Booking fetched sucessfully on clinicId" + input, HttpStatus.OK, HttpStatus.OK.value()),
-					HttpStatus.OK);
-
-		}
+					HttpStatus.OK);}
+	
 		
 		@PostMapping("/appointments/serviceDate/serviceTime/DoctorId")
 		public BookingResponse blockingSlot(@RequestBody TempBlockingSlot temp)
 		{
 			return service.checkBookingByDateAndTime(temp.getServiceDate(), temp.getServicetime(), temp.getDoctorId());
+		}
+		
+		@GetMapping("/report/{clinicId}/{branchId}/{number}/{startDate}/{endDate}")
+		public ResponseEntity<Response> getReport(
+				@PathVariable String clinicId,
+				@PathVariable String branchId,
+				@PathVariable Integer number,
+				@PathVariable String startDate,
+				@PathVariable String endDate) {
+
+		    return service.getPatientAndPriceInfo(clinicId, branchId, number, startDate, endDate);
 		}
 		
 		}

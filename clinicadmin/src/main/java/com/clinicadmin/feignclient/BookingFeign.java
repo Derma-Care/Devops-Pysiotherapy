@@ -98,4 +98,16 @@ public interface BookingFeign {
 	@GetMapping("/api/v1/appointments/Inprogress/patientId/{patientId}/{clinicId}")
 	public ResponseEntity<?> getInprogressAppointmentsByPatientIdAndClinicId(@PathVariable String patientId,@PathVariable String clinicId );
 	
+	
+	@GetMapping("/api/v1/report/{clinicId}/{branchId}/{number}/{startDate}/{endDate}")
+	public ResponseEntity<Response> getReport(
+			@PathVariable String clinicId,
+			@PathVariable String branchId,
+			@PathVariable Integer number,
+			@PathVariable String startDate,
+			@PathVariable String endDate);
+	
+	@GetMapping("api/v1/getTodayBookings/{clincId}/{branchId}")
+	public ResponseEntity<ResponseStructure<List<BookingResponse>>> getTodayBookings(@PathVariable String clincId,@PathVariable String branchId);
+	
 }

@@ -1131,7 +1131,7 @@ const ServiceManagement = () => {
 
       <div>
         <CForm className="d-flex justify-content-end mb-3">
-          {can('Procedure Management', 'create') && (
+          {can('Therapy Management', 'create') && (
             <div
               className=" w-100"
               style={{
@@ -1148,7 +1148,7 @@ const ServiceManagement = () => {
                 }}
                 onClick={() => openAddModal()}
               >
-                Add Procedure Details
+                Add Therapy Details
               </CButton>
             </div>
           )}
@@ -1189,7 +1189,7 @@ const ServiceManagement = () => {
                   <span className="text-muted">{viewService.serviceId || 'N/A'}</span>
                 </CCol>
                 <CCol sm={6}>
-                  <p className="mb-1 fw-semibold">Category Name:</p>
+                  <p className="mb-1 fw-semibold">Therapy Category:</p>
                   <span className="text-muted">{viewService.categoryName || 'N/A'}</span>
                 </CCol>
                 <CCol sm={6}>
@@ -1384,7 +1384,7 @@ const ServiceManagement = () => {
       >
         <CModalHeader>
           <CModalTitle style={{ textAlign: 'center', width: '100%' }}>
-            {modalMode === 'edit' ? 'Edit Procedure Details' : 'Add New Procedure Details'}
+            {modalMode === 'edit' ? 'Edit Therapy Details' : 'Add New Therapy Details'}
           </CModalTitle>
         </CModalHeader>
         <CModalBody>
@@ -1393,7 +1393,7 @@ const ServiceManagement = () => {
             <CRow className="mb-4">
               <CCol md={4}>
                 <h6>
-                  Category Name <span className="text-danger">*</span>
+                 Therapy Category <span className="text-danger">*</span>
                 </h6>
                 <CFormSelect
                   name="categoryName"
@@ -1415,7 +1415,7 @@ const ServiceManagement = () => {
 
               <CCol md={4}>
                 <h6>
-                  Service Name <span className="text-danger">*</span>
+                 Therapy Service<span className="text-danger">*</span>
                 </h6>
                 <CFormSelect
                   name="serviceName"
@@ -1437,7 +1437,7 @@ const ServiceManagement = () => {
 
               <CCol md={4}>
                 <h6>
-                  Procedure Name <span className="text-danger">*</span>
+                  Therapy Name <span className="text-danger">*</span>
                 </h6>
                 <CFormSelect
                   name="subServiceId"
@@ -1462,7 +1462,7 @@ const ServiceManagement = () => {
             <CRow className="mb-4">
               <CCol md={4}>
                 <h6>
-                  Procedure Image <span className="text-danger">*</span>
+                  Therapy Image <span className="text-danger">*</span>
                 </h6>
 
                 <CFormInput
@@ -1504,7 +1504,7 @@ const ServiceManagement = () => {
 
               <CCol md={4}>
                 <h6>
-                  View Description <span className="text-danger">*</span>
+                  Therapy Description <span className="text-danger">*</span>
                 </h6>
                 <CFormTextarea
                   type="text"
@@ -1535,7 +1535,7 @@ const ServiceManagement = () => {
             <CRow className="mb-4">
               <CCol md={4}>
                 <h6>
-                  Consent Form Type <span className="text-danger">*</span>
+                  Consent Type <span className="text-danger">*</span>
                 </h6>
                 <CFormSelect
                   name="consentFormType"
@@ -1544,7 +1544,7 @@ const ServiceManagement = () => {
                 >
                   <option value="">Select consentFormType</option>
                   <option value="1">Generic ConsentForm</option>
-                  <option value="2">Procedure ConsentForm</option>
+                  <option value="2">Therapy ConsentForm</option>
                 </CFormSelect>
                 {errors.consentFormType && (
                   <CFormText className="text-danger">{errors.consentFormType}</CFormText>
@@ -1611,11 +1611,11 @@ const ServiceManagement = () => {
             <CRow className="mb-4">
               <CCol md={3}>
                 <h6>
-                  Procedure Price <span className="text-danger">*</span>
+                  Therapy Fee <span className="text-danger">*</span>
                 </h6>
                 <CFormInput
                   type="text"
-                  placeholder="Procedure Price"
+                  placeholder="Therapy Fee"
                   name="price"
                   value={newService.price || ''}
                   onChange={handleChange}
@@ -1736,8 +1736,8 @@ const ServiceManagement = () => {
           <CTableHead className="pink-table w-auto">
             <CTableRow>
               <CTableHeaderCell style={{ paddingLeft: '40px' }}>S.No</CTableHeaderCell>
-              <CTableHeaderCell>Procedure Name</CTableHeaderCell>
-              <CTableHeaderCell>Servic eName</CTableHeaderCell>
+              <CTableHeaderCell>Therapy Name</CTableHeaderCell>
+              <CTableHeaderCell>Service Name</CTableHeaderCell>
               <CTableHeaderCell>Category Name</CTableHeaderCell>
               <CTableHeaderCell>Price</CTableHeaderCell>
               <CTableHeaderCell className="text-end">Actions</CTableHeaderCell>
@@ -1756,7 +1756,7 @@ const ServiceManagement = () => {
                   <CTableDataCell>₹{test.price || 'NA'}</CTableDataCell>
                   <CTableDataCell className="text-end">
                     <div className="d-flex justify-content-end gap-2  ">
-                      {can('Procedure Management', 'read') && (
+                      {can('Therapy Management', 'read') && (
                         <button
                           className="actionBtn"
                           onClick={() => setViewService(test)}
@@ -1765,7 +1765,7 @@ const ServiceManagement = () => {
                           <Eye size={18} />
                         </button>
                       )}
-                      {can('Procedure Management', 'update') && (
+                      {can('Therapy Management', 'update') && (
                         <button
                           className="actionBtn"
                           onClick={() => openEditModal(test)}
@@ -1775,7 +1775,7 @@ const ServiceManagement = () => {
                         </button>
                       )}
 
-                      {can('Procedure Management', 'delete') && (
+                      {can('Therapy Management', 'delete') && (
                         <button
                           className="actionBtn"
                           onClick={() => handleServiceDelete(test)}
