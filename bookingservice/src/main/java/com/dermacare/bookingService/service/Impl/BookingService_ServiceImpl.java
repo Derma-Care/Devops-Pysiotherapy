@@ -301,7 +301,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	 private Booking toEntity(BookingRequset request) {
 
 		    Booking entity = new ObjectMapper().convertValue(request, Booking.class);
-
+		    entity.setPatientId(generatePatientId(request.getBranchId()));	  
 		    ZonedDateTime istTime = ZonedDateTime.now(ZoneId.of("Asia/Kolkata"));
 		    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy hh:mm a");
 
@@ -320,15 +320,12 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 		             request.getConsultationType().equalsIgnoreCase("online consultation"))) {
 		        entity.setChannelId(randomNumber());
 		    }
-
-		    if ("paid".equalsIgnoreCase(request.getFoc())) {
+            if(request.getPaymentType() != null) {
+		    if ("paid".equalsIgnoreCase(request.getPaymentType())) {
 		        entity.setStatus("confirmed");
 		    } else {
 		        entity.setStatus("pending");
-		    }
-
-		    // (your existing patientId logic unchanged)
-
+		    }}
 		    return entity;
 		}
 
@@ -372,10 +369,10 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	 }
 
 	 
-	  private static String generatePatientId(BookingRequset request) {	       
+	  private static String generatePatientId(String id) {	       
 	        String uuid = UUID.randomUUID().toString();
 	        String randomPart = uuid.replaceAll("-", "").substring(0, 6).toUpperCase();
-	        return request.getBranchId()+"_"+"PT_" + randomPart;
+	        return id+"_"+"PT_" + randomPart;
 	    }
 	
 	
