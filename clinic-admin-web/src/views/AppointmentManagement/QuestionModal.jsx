@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   CModal,
   CModalHeader,
@@ -9,9 +9,12 @@ import {
   CButton,
   CFormInput,
   CFormCheck,
+  CSpinner,
 } from "@coreui/react";
+import axios from "axios";
+import { getQuestionsByKey } from "../EmployeeManagement/Therapist/therapistApi";
 
-import { questionsByPart } from "./questions";
+// import { questionsByPart } from "./questions";
 
 export default function QuestionModal({
   visible,
@@ -23,7 +26,9 @@ export default function QuestionModal({
   const partIds = Array.isArray(partId) ? partId : [partId];
 
   const [answers, setAnswers] = useState({});
-
+  console.log(partIds)
+ const [loadingQuestions, setLoadingQuestions] = useState(false)
+const [questionsByPart, setQuestionsByPart] = useState({});
   const handleChange = (key, value) => {
     setAnswers((prev) => ({
       ...prev,
@@ -31,36 +36,93 @@ export default function QuestionModal({
     }));
   };
 
+
+const fetchQuestions = async () => {
+  if (!partIds || partIds.length === 0) return;
+
+  try {
+    setLoadingQuestions(true)
+
+    const res = await getQuestionsByKey(partIds)
+
+    if (res?.data) {
+      setQuestionsByPart(res.data)
+    }
+  } catch (err) {
+    console.log(err)
+  } finally {
+    setLoadingQuestions(false)
+  }
+}
+
+// const handleSave = () => {
+
+//   const therapyQuestion = partIds.map((part) => {
+
+//     const questions = questionsByPart[part] || [];
+
+//     const ans = questions.map((q) => {
+
+//       const key = part + "_" + q.questionId;
+
+//       return {
+//         questionId: q.questionId,
+//         answer: answers[key] || "",
+//       };
+
+//     });
+
+//     return {
+//       bodyPart: part,
+//       answers: ans,
+//     };
+
+//   });
+
+//   onSave({
+//     therapyQuestion,
+//   });
+
+// };
 const handleSave = () => {
 
   const therapyQuestion = partIds.map((part) => {
-
-    const questions = questionsByPart[part] || [];
+    const questions = questionsByPart?.[part] || [];
 
     const ans = questions.map((q) => {
-
       const key = part + "_" + q.questionId;
 
       return {
         questionId: q.questionId,
         answer: answers[key] || "",
       };
-
     });
 
     return {
       bodyPart: part,
       answers: ans,
     };
-
   });
 
+  // ✅ convert to backend format
+  const formattedAnswers = {};
+
+  therapyQuestion.forEach((item) => {
+    formattedAnswers[item.bodyPart] = item.answers;
+  });
+
+  // ✅ FINAL CORRECT STRUCTURE
   onSave({
-    therapyQuestion,
+    parts: partIds,               // ✅ FIX (was missing / empty)
+    answerData: formattedAnswers, // ✅ NOT array
   });
-
 };
-
+useEffect(() => {
+  if (partId) {
+    setQuestionsByPart({})   // ✅ clear old data FIRST
+    fetchQuestions()         // ✅ then fetch
+  }
+}, [partId])
   return (
     <CModal visible={visible} onClose={onClose} size="lg">
 
@@ -81,9 +143,11 @@ const handleSave = () => {
 
               <h5>{part.toUpperCase()}</h5>
 
-              {questions.length === 0 && (
-                <p>No questions</p>
-              )}
+           {loadingQuestions ? (
+  <p><CSpinner size="sm" />Loading questions...</p>   // 🔄 loading state
+) : questions.length === 0 ? (
+  <p>No questions</p>          // ❌ only if truly empty
+) : null}
 
               {questions.map((q) => {
 

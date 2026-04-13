@@ -46,7 +46,7 @@ public class BookingRequset {
 	private String followupDate;
 	private String consultationType;
 	private double consultationFee;
-	private double totalFee;
+	private double totalFee;    ///theraphy fee
 	private String paymentType;
 	private List<String> attachments;
 	private String consentFormPdf;
@@ -61,5 +61,7 @@ public class BookingRequset {
 	private List<String> parts;
 	private double partAmount;	
 	private double dueAmount;
+	private String referredByType;
+	private String referredByName;
 	
 }

@@ -1,9 +1,9 @@
 package com.clinicadmin.service.impl;
+
 import java.util.Base64;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
-import java.util.Base64;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -21,13 +21,11 @@ public class TherapyExercisesServiceImpl implements TherapyExercisesService {
     @Autowired
     private TherapyExercisesRepository repository;
 
-
     // ================= CREATE =================
     @Override
     public ResponseStructure<TherapyExercisesDTO> createTherapyExercises(TherapyExercisesDTO dto) {
 
         TherapyExercises entity = toEntity(dto);
-
         entity.setTherapyExercisesId(generateUniqueId());
 
         TherapyExercises saved = repository.save(entity);
@@ -40,11 +38,9 @@ public class TherapyExercisesServiceImpl implements TherapyExercisesService {
         );
     }
 
-   
     // ================= GET BY ID =================
     @Override
-    public ResponseStructure<TherapyExercisesDTO> getTherapyExercisesById(
-            String therapyExercisesId) {
+    public ResponseStructure<TherapyExercisesDTO> getTherapyExercisesById(String therapyExercisesId) {
 
         TherapyExercises entity = repository.findByTherapyExercisesId(therapyExercisesId)
                 .orElseThrow(() -> new RuntimeException("Therapy Exercise Not Found"));
@@ -76,8 +72,7 @@ public class TherapyExercisesServiceImpl implements TherapyExercisesService {
         );
     }
 
-    
-    
+ // ================= UPDATE =================
     @Override
     public ResponseStructure<TherapyExercisesDTO> updateTherapyExercisesById(
             String therapyExercisesId, TherapyExercisesDTO dto) {
@@ -85,7 +80,7 @@ public class TherapyExercisesServiceImpl implements TherapyExercisesService {
         TherapyExercises entity = repository.findByTherapyExercisesId(therapyExercisesId)
                 .orElseThrow(() -> new RuntimeException("Therapy Exercise Not Found"));
 
-        // ✅ Update fields
+        // Basic fields
         if (dto.getClinicId() != null)
             entity.setClinicId(dto.getClinicId());
 
@@ -95,7 +90,6 @@ public class TherapyExercisesServiceImpl implements TherapyExercisesService {
         if (dto.getName() != null)
             entity.setName(dto.getName());
 
-        // ✅ Encode before saving
         if (dto.getVideo() != null)
             entity.setVideo(encode(dto.getVideo()));
 
@@ -114,31 +108,55 @@ public class TherapyExercisesServiceImpl implements TherapyExercisesService {
         if (dto.getNotes() != null)
             entity.setNotes(dto.getNotes());
 
+        // ✅ NEW FIELDS
+        if (dto.getPricePerSession() != 0)
+            entity.setPricePerSession(dto.getPricePerSession());
+
+        if (dto.getGst() != 0)
+            entity.setGst(dto.getGst());
+
+        if (dto.getOtherTax() != 0)
+            entity.setOtherTax(dto.getOtherTax());
+
+        if (dto.getSets() != 0)
+            entity.setSets(dto.getSets());
+
+        if (dto.getRepetitions() != 0)
+            entity.setRepetitions(dto.getRepetitions());
+
+        // ✅ DISCOUNT (add this if not already)
+        if (dto.getDiscountPercentage() != 0)
+            entity.setDiscountPercentage(dto.getDiscountPercentage());
+
+        // ================= CALCULATION =================
+
+        double base = entity.getPricePerSession();
+
+        // ✅ Discount first
+        double discountAmount = base * entity.getDiscountPercentage() / 100;
+        double discountedPrice = base - discountAmount;
+
+        // ✅ Taxes after discount
+        double gstAmount = discountedPrice * entity.getGst() / 100;
+        double otherTaxAmount = discountedPrice * entity.getOtherTax() / 100;
+
+        // ✅ Final total
+        double finalTotal = discountedPrice + gstAmount + otherTaxAmount;
+
+        entity.setDiscountAmount(discountAmount);
+        entity.setTotalPrice((int) finalTotal);
+
+        // ================= SAVE =================
         TherapyExercises updated = repository.save(entity);
 
-        // ✅ Decode before sending response
-        TherapyExercisesDTO responseDto = new TherapyExercisesDTO();
-
-        responseDto.setTherapyExercisesId(updated.getTherapyExercisesId());
-        responseDto.setClinicId(updated.getClinicId());
-        responseDto.setBranchId(updated.getBranchId());
-        responseDto.setName(updated.getName());
-
-        responseDto.setVideo(decode(updated.getVideo()));   // ✅ decode
-        responseDto.setImage(decode(updated.getImage()));   // ✅ decode
-
-        responseDto.setSession(updated.getSession());
-        responseDto.setDuration(updated.getDuration());
-        responseDto.setFrequency(updated.getFrequency());
-        responseDto.setNotes(updated.getNotes());
-
         return ResponseStructure.buildResponse(
-                responseDto,
+                toDTO(updated),
                 "Updated Successfully",
                 HttpStatus.OK,
                 200
         );
     }
+
     // ================= GET BY clinicId + branchId + therapyExercisesId =================
     @Override
     public ResponseStructure<TherapyExercisesDTO> getByClinicIdBranchIdAndTherapyId(
@@ -159,8 +177,7 @@ public class TherapyExercisesServiceImpl implements TherapyExercisesService {
 
     // ================= DELETE =================
     @Override
-    public ResponseStructure<String> deleteTherapyExercisesById(
-            String therapyExercisesId) {
+    public ResponseStructure<String> deleteTherapyExercisesById(String therapyExercisesId) {
 
         TherapyExercises entity = repository.findByTherapyExercisesId(therapyExercisesId)
                 .orElseThrow(() -> new RuntimeException("Therapy Exercise Not Found"));
@@ -174,7 +191,8 @@ public class TherapyExercisesServiceImpl implements TherapyExercisesService {
                 200
         );
     }
- // ================= CUSTOM ID =================
+
+    // ================= ID GENERATION =================
     private String generateCustomId() {
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         StringBuilder sb = new StringBuilder();
@@ -203,7 +221,6 @@ public class TherapyExercisesServiceImpl implements TherapyExercisesService {
         e.setBranchId(dto.getBranchId());
         e.setName(dto.getName());
 
-        // ✅ Encode before saving
         e.setVideo(encode(dto.getVideo()));
         e.setImage(encode(dto.getImage()));
 
@@ -211,21 +228,45 @@ public class TherapyExercisesServiceImpl implements TherapyExercisesService {
         e.setDuration(dto.getDuration());
         e.setFrequency(dto.getFrequency());
         e.setNotes(dto.getNotes());
+        e.setPricePerSession(dto.getPricePerSession());
+        e.setGst(dto.getGst());
+        e.setOtherTax(dto.getOtherTax());
+        e.setSets(dto.getSets());
+        e.setRepetitions(dto.getRepetitions());
+        e.setDiscountAmount(dto.getDiscountAmount());
+        e.setDiscountPercentage(dto.getDiscountPercentage());
 
-        return e;
+     // ✅ TOTAL PRICE (Per Session Only)
+        double base = dto.getPricePerSession();
+
+     // ✅ Discount first
+     double discountAmount = base * dto.getDiscountPercentage() / 100;
+     double discountedPrice = base - discountAmount;
+
+     // ✅ Taxes after discount
+     double gstAmount = discountedPrice * dto.getGst() / 100;
+     double otherTaxAmount = discountedPrice * dto.getOtherTax() / 100;
+
+     // ✅ Final total
+     double finalTotal = discountedPrice + gstAmount + otherTaxAmount;
+
+     // Set values
+     e.setDiscountPercentage(dto.getDiscountPercentage());
+     e.setDiscountAmount(discountAmount);
+     e.setTotalPrice((int) finalTotal);
+     return e;
+     
     }
-
     // ================= ENTITY → DTO =================
     private TherapyExercisesDTO toDTO(TherapyExercises e) {
         TherapyExercisesDTO dto = new TherapyExercisesDTO();
 
         dto.setTherapyExercisesId(e.getTherapyExercisesId());
-        dto.setClinicId(e.getClinicId()); // ⚠️ you missed this earlier
+        dto.setClinicId(e.getClinicId());
         dto.setBranchId(e.getBranchId());
         dto.setName(e.getName());
 
-        // ✅ Decode before sending response
-        dto.setVideo(decode(e.getVideo()));
+        dto.setVideo(e.getVideo());
         dto.setImage(decode(e.getImage()));
 
         dto.setSession(e.getSession());
@@ -233,8 +274,20 @@ public class TherapyExercisesServiceImpl implements TherapyExercisesService {
         dto.setFrequency(e.getFrequency());
         dto.setNotes(e.getNotes());
 
+        // ✅ NEW FIELDS
+        dto.setPricePerSession(e.getPricePerSession());
+        dto.setGst(e.getGst());
+        dto.setOtherTax(e.getOtherTax());
+        dto.setSets(e.getSets());
+        dto.setRepetitions(e.getRepetitions());
+        dto.setTotalPrice(e.getTotalPrice());
+        dto.setDiscountAmount(e.getDiscountAmount());
+        dto.setDiscountPercentage(e.getDiscountPercentage());
+
         return dto;
     }
+
+    // ================= ENCODE / DECODE =================
     private String encode(String value) {
         if (value == null) return null;
         return Base64.getEncoder().encodeToString(value.getBytes());
@@ -244,5 +297,4 @@ public class TherapyExercisesServiceImpl implements TherapyExercisesService {
         if (value == null) return null;
         return new String(Base64.getDecoder().decode(value));
     }
-
 }

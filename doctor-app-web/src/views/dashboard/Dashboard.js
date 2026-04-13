@@ -71,9 +71,12 @@ const Dashboard = () => {
     setPatientData(null);
     fetchAppointments(); // immediate
 
-    const intervalId = setInterval(fetchAppointments, 60000);
-    return () => clearInterval(intervalId);
-  }, [fetchAppointments, setPatientData]);
+    const interval = setInterval(() => {
+      fetchAppointments()
+    }, 10000)
+
+    return () => clearInterval(interval)
+  }, [doctorDetails])
 
   // Filter patients by type & branch
   const filteredPatients = todayAppointments.filter((item) => {
@@ -94,12 +97,11 @@ const Dashboard = () => {
     return acc;
   }, {});
 
-  const handleCalendarClick = (appointment) => {
-    if (!appointment) return;
-    setPatientData(appointment);
-    navigate(`/tab-content/${appointment.patientId}`, { state: { patient: appointment } });
-  };
-
+ const handleCalendarClick = (appointment) => {
+    if (!appointment) return
+    setPatientData(appointment)
+    navigate(`/tab-content/${appointment.patientId}`, { state: { patient: appointment } })
+  }
   return (
     <div className="container-fluid mt-3">
       <h5 className="mb-4" style={{ fontSize: SIZES.medium, color: COLORS.black }}>
@@ -213,7 +215,7 @@ const Dashboard = () => {
                       <CTableDataCell>{idx + 1}</CTableDataCell>
                       <CTableDataCell>{item.patientId}</CTableDataCell>
                       <CTableDataCell>{capitalizeFirst(item.name)}</CTableDataCell>
-                      <CTableDataCell>{item.mobileNumber}</CTableDataCell>
+                      <CTableDataCell>{item.patientMobileNumber}</CTableDataCell>
                       <CTableDataCell>{item.serviceDate}</CTableDataCell>
                       <CTableDataCell>{item.servicetime}</CTableDataCell>
                       <CTableDataCell>{item.consultationType}</CTableDataCell>
