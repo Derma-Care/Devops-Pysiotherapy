@@ -18,9 +18,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +34,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
 import com.clinicadmin.dto.BookingResponse;
 import com.clinicadmin.dto.Branch;
 import com.clinicadmin.dto.ChangeDoctorPasswordDTO;
@@ -65,12 +66,14 @@ import com.clinicadmin.repository.DoctorLoginCredentialsRepository;
 import com.clinicadmin.repository.DoctorSlotRepository;
 import com.clinicadmin.repository.DoctorsRepository;
 import com.clinicadmin.service.DoctorService;
+import com.clinicadmin.service.EmailService;
 import com.clinicadmin.utils.Base64CompressionUtil;
 import com.clinicadmin.utils.DoctorMapper;
 import com.clinicadmin.utils.DoctorSlotMapper;
 import com.clinicadmin.utils.ExtractFeignMessage;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
 
@@ -106,6 +109,9 @@ public class DoctorServiceImpl implements DoctorService {
 
 	@Autowired
 	private BookingFeign bookingFeign;
+	
+	@Autowired
+	private EmailService emailService;
 
 	private List<TempBlockingSlot> slots = new CopyOnWriteArrayList<>();
 
@@ -215,7 +221,7 @@ public class DoctorServiceImpl implements DoctorService {
 					}
 				}
 			}
-
+			
 			// Validate services
 			if (dto.getService() != null) {
 				for (DoctorServicesDTO DoctorSerDTO : dto.getService()) {
@@ -287,10 +293,33 @@ public class DoctorServiceImpl implements DoctorService {
 			DoctorLoginCredentials credentials = DoctorLoginCredentials.builder().staffId(savedDoctor.getDoctorId())
 					.staffName(savedDoctor.getDoctorName()).hospitalId(savedDoctor.getHospitalId())
 					.hospitalName(savedDoctor.getHospitalName()).branchId(savedDoctor.getBranchId()).username(username)
-					.password(encodedPassword).role(dto.getRole()).permissions(savedDoctor.getPermissions()).build();
+					.password(encodedPassword).role(dto.getRole()).emailId(savedDoctor.getDoctorEmail()).permissions(savedDoctor.getPermissions()).build();
 
 			credentialsRepository.save(credentials);
 			log.info("Logib credentials created successfully for doctorId={}", savedDoctor.getDoctorId());
+			// -------------------- Send Email to Doctor --------------------
+						try {
+						    Map<String, String> mailData = new HashMap<>();
+						    mailData.put("subject", "Doctor Onboarding Successful");
+						    mailData.put("message",
+						            "Welcome to CCMS!\n\n" +
+						            "Your account has been created successfully.\n" +
+						            "Please use the below credentials to login.\n\n" +
+						            "Doctor ID: " + savedDoctor.getDoctorId()
+						    );
+
+						    // Send login credentials
+						    mailData.put("username", username);
+						    mailData.put("password", rawPassword);
+
+						    emailService.sendEmail(savedDoctor.getDoctorEmail(), mailData);
+
+						    log.info("Doctor onboarding email sent to {}", savedDoctor.getDoctorEmail());
+
+						} catch (Exception e) {
+						    log.error("Failed to send doctor onboarding email: {}", e.getMessage());
+						}
+
 			DoctorsDTO toDTO = DoctorMapper.mapDoctorEntityToDoctorDTO(savedDoctor);
 			Map<String, Object> data = new HashMap<>();
 			data.put("doctor", toDTO);
@@ -313,6 +342,160 @@ public class DoctorServiceImpl implements DoctorService {
 		log.info("Add Doctor request completed. status={}", response.getStatus());
 		return response;
 	}
+	
+//	@Override
+//	public Response startVerificationProcess(String doctorId) {
+//
+//	    Response response = new Response();
+//
+//	    try {
+//	        Optional<Doctors> optionalDoctor = doctorsRepository.findByDoctorId(doctorId);
+//
+//	        if (optionalDoctor.isEmpty()) {
+//	            response.setSuccess(false);
+//	            response.setStatus(404);
+//	            response.setMessage("Doctor not found");
+//	            return response;
+//	        }
+//
+//	        Doctors doctor = optionalDoctor.get();
+//
+//	        if (!"PENDING".equals(doctor.getStatus())) {
+//	            response.setSuccess(false);
+//	            response.setStatus(400);
+//	            response.setMessage("Doctor is not in PENDING state");
+//	            return response;
+//	        }
+//
+//	        // ✅ Update status
+//	        doctor.setStatus("VERIFICATION_IN_PROGRESS");
+//	        doctorsRepository.save(doctor);
+//
+//	        // 📧 Email
+//	        Map<String, String> mailData = new HashMap<>();
+//	        mailData.put("subject", "Doctor Verification Started");
+//	        mailData.put("message",
+//	                "Your verification process has started.\n" +
+//	                "Our team is reviewing your details.");
+//
+//	        emailService.sendEmail(doctor.getDoctorEmail(), mailData);
+//
+//	        // ✅ Response
+//	        response.setSuccess(true);
+//	        response.setStatus(200);
+//	        response.setMessage("Verification started successfully");
+//	        response.setData(doctorId);
+//
+//	    } catch (Exception e) {
+//	        response.setSuccess(false);
+//	        response.setStatus(500);
+//	        response.setMessage("Failed to start verification: " + e.getMessage());
+//	    }
+//
+//	    return response;
+//	}
+//
+//	    @Override
+//	    public Response verifyDoctor(String doctorId) {
+//
+//	        Response response = new Response();
+//
+//	        try {
+//	            Optional<Doctors> optionalDoctor = doctorsRepository.findByDoctorId(doctorId);
+//
+//	            if (optionalDoctor.isEmpty()) {
+//	                response.setSuccess(false);
+//	                response.setStatus(404);
+//	                response.setMessage("Doctor not found");
+//	                return response;
+//	            }
+//
+//	            Doctors doctor = optionalDoctor.get();
+//
+//	            if (!"VERIFICATION_IN_PROGRESS".equals(doctor.getStatus())) {
+//	                response.setSuccess(false);
+//	                response.setStatus(400);
+//	                response.setMessage("Doctor is not under verification");
+//	                return response;
+//	            }
+//
+//	            // ✅ Update status
+//	            doctor.setStatus("VERIFIED");
+//	            doctorsRepository.save(doctor);
+//
+//	            // 📧 Email
+//	            Map<String, String> mailData = new HashMap<>();
+//	            mailData.put("subject", "Doctor Verified Successfully");
+//	            mailData.put("message",
+//	                    "Congratulations! Your profile has been verified successfully.");
+//
+//	            emailService.sendEmail(doctor.getDoctorEmail(), mailData);
+//
+//	            response.setSuccess(true);
+//	            response.setStatus(200);
+//	            response.setMessage("Doctor verified successfully");
+//	            response.setData(doctorId);
+//
+//	            return response;
+//
+//	        } catch (Exception e) {
+//	            response.setSuccess(false);
+//	            response.setStatus(500);
+//	            response.setMessage("Failed to verify doctor: " + e.getMessage());
+//	            return response;
+//	        }
+//	    }
+	    
+//	    @Override
+//	    public Response rejectDoctor(String doctorId, String reason) {
+//
+//	        Response response = new Response();
+//
+//	        try {
+//	            Optional<Doctors> optionalDoctor = doctorsRepository.findByDoctorId(doctorId);
+//
+//	            if (optionalDoctor.isEmpty()) {
+//	                response.setSuccess(false);
+//	                response.setStatus(404);
+//	                response.setMessage("Doctor not found");
+//	                return response;
+//	            }
+//
+//	            Doctors doctor = optionalDoctor.get();
+//
+//	            if ("VERIFIED".equals(doctor.getStatus())) {
+//	                response.setSuccess(false);
+//	                response.setStatus(400);
+//	                response.setMessage("Verified doctor cannot be rejected");
+//	                return response;
+//	            }
+//
+//	            doctor.setStatus("REJECTED");
+//	            doctorsRepository.save(doctor);
+//
+//	            // 📧 Email
+//	            Map<String, String> mailData = new HashMap<>();
+//	            mailData.put("subject", "Doctor Registration Rejected");
+//	            mailData.put("message",
+//	                    "Unfortunately, your registration has been rejected.");
+//	            mailData.put("reason", reason);
+//
+//	            emailService.sendEmail(doctor.getDoctorEmail(), mailData);
+//
+//	            response.setSuccess(true);
+//	            response.setStatus(200);
+//	            response.setMessage("Doctor rejected successfully");
+//	            response.setData(doctorId);
+//
+//	            return response;
+//
+//	        } catch (Exception e) {
+//	            response.setSuccess(false);
+//	            response.setStatus(500);
+//	            response.setMessage("Failed to reject doctor: " + e.getMessage());
+//	            return response;
+//	        }
+//	    }
 
 	@Override
 	public Response getAllDoctors() {
@@ -526,13 +709,13 @@ public class DoctorServiceImpl implements DoctorService {
 			if (dto.getDoctorFees() != null)
 				doctor.setDoctorFees(DoctorMapper.mapDoctorFeeDTOtoEntity(dto.getDoctorFees()));
 
-			if (dto.getConsultation() != null) {
-				ConsultationType consultation = new ConsultationType();
-				consultation.setServiceAndTreatments(dto.getConsultation().getServiceAndTreatments());
-				consultation.setInClinic(dto.getConsultation().getInClinic());
-				consultation.setVideoOrOnline(dto.getConsultation().getVideoOrOnline());
-				doctor.setConsultation(consultation);
-			}
+//			if (dto.getConsultation() != null) {
+//				ConsultationType consultation = new ConsultationType();
+//				consultation.setServiceAndTreatments(dto.getConsultation().getServiceAndTreatments());
+//				consultation.setInClinic(dto.getConsultation().getInClinic());
+//				consultation.setVideoOrOnline(dto.getConsultation().getVideoOrOnline());
+//				doctor.setConsultation(consultation);
+//			}
 
 			doctor.setDoctorAvailabilityStatus(dto.isDoctorAvailabilityStatus());
 			doctor.setRecommendation(dto.isRecommendation());

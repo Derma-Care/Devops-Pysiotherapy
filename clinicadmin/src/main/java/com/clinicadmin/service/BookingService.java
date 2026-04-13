@@ -32,5 +32,15 @@ public interface BookingService {
 	
 	ResponseEntity<?> getInprogressBookingsByPatientIdAndClinicId(String patientId, String clinicId);
 		
+	public ResponseEntity<?> getReprts(String clinicId,
+			String branchId,
+			Integer number,
+		    String startDate,
+			String endDate);
+	
+	public ResponseEntity<ResponseStructure<List<BookingResponse>>> getTodayBookings(String clinicId,
+			String branchId);
+	
+	public ResponseEntity<?> physioAppointment(BookingRequset bookingResponse);
 
 }

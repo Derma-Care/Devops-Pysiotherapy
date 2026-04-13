@@ -56,6 +56,8 @@ public class BookingRequset {
 	private String bookedAt;
 	private String followupStatus;
 	private String foc;
+	private String focReason;
+	private List<String> currentStatus;
 	private String bodyPartId;
 	private String bodyPartName;
 	private String partImage;
@@ -63,4 +65,13 @@ public class BookingRequset {
 	private List<String> parts;
 	private double partAmount;
 	private double dueAmount;
+	private String paymentStatus;
+	private String previousInjuries;
+	private String currentMedications;
+	private String allergies;
+	private String occupation;
+	private String insuranceProvider;
+	private String policyNumber;
+	private List<String> activityLevels;
+	
 }

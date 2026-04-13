@@ -38,6 +38,13 @@ public class BookingServiceController {
 	}
 	
 	
+	@GetMapping("/getTodayBookings/{clinicId}/{branchId}")
+	public ResponseEntity<?> getTodayBookings(@PathVariable String clinicId,@PathVariable String branchId) {
+		return bookingService.getTodayBookings(clinicId, branchId);
+		
+	}
+	
+	
 	@GetMapping("/appointments/byIds/{clinicId}/{branchId}")
 	public ResponseEntity<?> retrieveOneWeekAppointments(@PathVariable String clinicId,@PathVariable String branchId) {
 		return bookingService.retrieveOneWeekAppointments(clinicId, branchId);
@@ -80,17 +87,36 @@ public class BookingServiceController {
 	   			 return null;
 	   		 }
 	   	}
+	   
 	   @GetMapping("/bookings/Inprogress/patientId/{patientId}")
 	   public ResponseEntity<?> getInprogressAppointmentsByPatientId(
 				 @PathVariable String patientId){
 		   return bookingService.getInprogressBookingsByPatientId(patientId);
 	 }
+	   
+	   @PostMapping("/physioAppointment")
+	   public ResponseEntity<?> physioAppointment(
+			   @RequestBody BookingRequset req){
+		   return bookingService.physioAppointment(req);
+	 }
+	   
 	   @GetMapping("/bookings/Inprogress/patientId/{patientId}/{clinicId}")
 	   public ResponseEntity<?> getInprogressAppointmentsByPatientIdAndClinicId(
 	           @PathVariable String patientId,
 	           @PathVariable String clinicId) {
 
 	       return bookingService.getInprogressBookingsByPatientIdAndClinicId(patientId, clinicId);
+	   }
+	   
+	   
+	   @GetMapping("/reprts/{clinicId}/{branchId}/{number}/{startDate}/{endDate}")
+	   public ResponseEntity<?> getReprts(@PathVariable String clinicId,
+			   @PathVariable String branchId,
+			   @PathVariable Integer number,
+			   @PathVariable  String startDate,
+			   @PathVariable String endDate) {
+
+	       return bookingService.getReprts(clinicId, branchId, number, startDate, endDate);
 	   }
 	   
 }
