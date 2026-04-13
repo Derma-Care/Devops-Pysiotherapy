@@ -45,7 +45,7 @@ public class BookingRequset {
 	private String servicetime;
 	private String followupDate;
 	private String consultationType;
-	private double consultationFee;
+	private double consultationFee;	
 	private double totalFee;    ///theraphy fee
 	private String paymentType;
 	private List<String> attachments;
@@ -74,5 +74,6 @@ public class BookingRequset {
 	private String insuranceProvider;
 	private String policyNumber;
 	private List<String> activityLevels;
+	private String reasonforVisit;
 	
 }
