@@ -405,8 +405,11 @@ public class BookingService_ServiceImpl implements BookingService_Service {
     }
 
 	
-	private List<BookingResponse> toResponses(List<Booking> bookings) {		
-		List<BookingResponse> res = new ObjectMapper().convertValue(bookings,new TypeReference<List<BookingResponse>>(){});
+	private List<BookingResponse> toResponses(List<Booking> bookings) {	
+		 ObjectMapper mapper = new ObjectMapper();
+         mapper.registerModule(new JavaTimeModule());
+         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);	            
+		List<BookingResponse> res = mapper.convertValue(bookings,new TypeReference<List<BookingResponse>>(){});
 		for(BookingResponse bres : res) {
 			//System.out.println(bres.getBookingId());
 			DoctorSaveDetailsDTO dto = getPrescriptionpdf(bres.getBookingId());
@@ -2892,14 +2895,9 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 public List<BookingResponse> getTodayBookings(String cId,String bId) {
     String today = LocalDate.now()
             .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-    ObjectMapper mapper = new ObjectMapper();
-    mapper.registerModule(new JavaTimeModule());
-    // Disable timestamp format
-    mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     List<Booking> b  = repository.findByClinicIdAndBranchIdAndServiceDate(cId,bId,today);
     if(b != null || !b.isEmpty()) {
-    	List<BookingResponse> dto = mapper.convertValue(b, new TypeReference<List<BookingResponse>>() {
-		});
+    	List<BookingResponse> dto = toResponses(b);
     	return dto;
     }else {
     	return Collections.emptyList();
