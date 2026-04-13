@@ -325,12 +325,15 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 		             request.getConsultationType().equalsIgnoreCase("online consultation"))) {
 		        entity.setChannelId(randomNumber());
 		    }
-            if(request.getPaymentType() != null) {
-		    if ("paid".equalsIgnoreCase(request.getPaymentType())) {
-		        entity.setStatus("confirmed");
-		    } else {
+            if(request.getFoc() != null && request.getPaymentType() != null) {
+            	
+		    if ("paid".equalsIgnoreCase(request.getFoc())&&"not paid".equalsIgnoreCase(request.getPaymentType())) {
 		        entity.setStatus("pending");
-		    }}
+		    } else if("foc".equalsIgnoreCase(request.getFoc())&&"not paid".equalsIgnoreCase(request.getPaymentType()))  {
+		        entity.setStatus("confirmed");
+		    }else {
+		    	if("foc".equalsIgnoreCase(request.getFoc())&&"paid".equalsIgnoreCase(request.getPaymentType()))  {
+			        entity.setStatus("confirmed");}}}
             	List<Status> status = new LinkedList<>();
             	Status s = new Status();
             	ZoneId zone = ZoneId.of("Asia/Kolkata");
@@ -346,7 +349,10 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	 
 
 	 private BookingResponse toResponse(Booking entity) {
-	     BookingResponse response = new ObjectMapper().convertValue(entity, BookingResponse.class);
+		  ObjectMapper mapper = new ObjectMapper();
+	         mapper.registerModule(new JavaTimeModule());
+	         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);	        
+	     BookingResponse response = mapper.convertValue(entity, BookingResponse.class);
 
 	     // Attach prescription PDF if exists
 	     DoctorSaveDetailsDTO dto = getPrescriptionpdf(response.getBookingId());
@@ -512,7 +518,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	        List<Booking> existingBookings = repository.findByClinicIdAndDoctorId(hospitalId, doctorId);
 	        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 	        LocalDate currentDate = LocalDate.now(ZoneId.of("Asia/Kolkata"));
-
+                //System.out.println(currentDate); 
 	        if (existingBookings != null && !existingBookings.isEmpty()) {
 
 	            for (Booking b : existingBookings) {
