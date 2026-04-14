@@ -29,6 +29,9 @@ import { useHospital } from '../Usecontext/HospitalContext'
 import { GetProcedureFormData } from '../ConsentForms/ConsentFormsAPI'
 import ConsentFormHandler from '../ConsentForms/ConsentFormHandler'
 import { showCustomToast } from '../../Utils/Toaster'
+import PaymentAccordion from './PaymentProgram'
+import ProgramPayment from './PaymentProgram'
+import PhysioConsentForm from './PhysioConsentForm'
 
 const AppointmentDetails = () => {
   const { id } = useParams()
@@ -38,14 +41,14 @@ const AppointmentDetails = () => {
   const [doctor, setDoctor] = useState(null)
   const [vitals, setVitals] = useState(null)
   const [showModal, setShowModal] = useState(false)
-    const [loading, setLoading] = useState(false)
-  
+  const [loading, setLoading] = useState(false)
+
   const [formData, setFormData] = useState({
     height: '',
     weight: '',
     bloodPressure: '',
     temperature: '',
-    bmi: '',
+    bmi: calculateBMI(formData.height, formData.weight),
   })
   const appointment = location.state?.appointment
   const { hospitalId, selectedHospital } = useHospital()
@@ -69,6 +72,7 @@ const AppointmentDetails = () => {
   const showConfirmed = normalizedStatus === 'confirmed'
   const showCompletedOrActive = ['completed', 'active'].includes(normalizedStatus)
   const showVitalsCard = ['completed', 'active', 'confirmed'].includes(normalizedStatus) && vitals
+  const showPayment = ['active',].includes(normalizedStatus)
   const showConfirmedOrCompleted = ['confirmed', 'completed', 'active'].includes(normalizedStatus)
 
   const [validationErrors, setValidationErrors] = useState({})
@@ -121,7 +125,7 @@ const AppointmentDetails = () => {
     } catch (error) {
       console.error('Error fetching vitals:', error)
     }
-    
+
   }
 
   // Handle vitals form input
@@ -168,25 +172,52 @@ const AppointmentDetails = () => {
 
   const handleSubmitVitals = async () => {
     if (!validateVitals()) {
-      showCustomToast('Please fix validation errors before submitting.','error')
+      showCustomToast('Please fix validation errors before submitting.', 'error')
       return
     }
-    console.log('Submitting vitals data:', formData)
+
     try {
       setLoading(true)
-      await postVitalsData({ ...formData, patientId: appointment.patientId }, appointment.bookingId)
 
-      showCustomToast('Vitals added successfully! ', 'success')
+      const payload = {
+        patientId: appointment.patientId,
+        bookingId: appointment.bookingId,
+        height: formData.height,
+        weight: Number(formData.weight) || 0,
+        bloodPressure: formData.bloodPressure,
+        temperature: formData.temperature,
+        bmi: formData.bmi,
+        date: new Date().toISOString(), // optional but recommended
+      }
+
+      console.log('Submitting vitals data:', payload)
+
+      await postVitalsData(payload)
+
+      showCustomToast('Vitals added successfully!', 'success')
 
       setShowModal(false)
-      setFormData({ height: '', weight: '', bloodPressure: '', temperature: '', bmi: '' })
+
+      setFormData({
+        height: '',
+        weight: '',
+        bloodPressure: '',
+        temperature: '',
+        bmi: '',
+      })
+
       fetchVitals()
     } catch (error) {
-      // showCustomToast('Failed to add vitals','error')
-    }
-    finally{
+      console.error(error)
+      showCustomToast('Failed to add vitals', 'error')
+    } finally {
       setLoading(false)
     }
+  }
+
+  const calculateBMI = (height, weight) => {
+    const h = Number(height) / 100
+    return h > 0 ? (weight / (h * h)).toFixed(2) : ''
   }
   const handleUpdateVitals = async () => {
     try {
@@ -262,24 +293,7 @@ const AppointmentDetails = () => {
       return null
     }
   }
-  // const getMimeTypeFromBase64 = (base64String) => {
-  //   if (base64String.startsWith('JVBERi0')) {
-  //     return 'application/pdf' // PDF
-  //   }
-  //   if (base64String.startsWith('/9j/')) {
-  //     return 'image/jpeg' // JPEG
-  //   }
-  //   if (base64String.startsWith('iVBORw0KGgo')) {
-  //     return 'image/png' // PNG
-  //   }
-  //   if (base64String.startsWith('data:')) {
-  //     // If it's already a data URL, extract the MIME type
-  //     const mimeMatch = base64String.match(/^data:(.*?);base64/)
-  //     return mimeMatch ? mimeMatch[1] : 'application/octet-stream'
-  //   }
-  //   // Default to a generic binary type if the type cannot be determined
-  //   return 'application/octet-stream'
-  // }
+
 
   const getMimeTypeFromBase64 = (base64String) => {
     if (base64String.startsWith('JVBERi0')) return 'application/pdf' // PDF
@@ -345,6 +359,25 @@ const AppointmentDetails = () => {
   const showPrescription =
     ['active', 'completed'].includes(normalizedStatus) && appointment?.prescriptionPdf
 
+
+
+
+  const handlePaymentClick = () => {
+    if (showPayment && normalizedStatus === "active") {
+      console.log("Navigating to payment with appointment:", appointment)
+      navigate("/program-payment" + `/${id}`, {
+        state: {
+          bookingId: appointment.bookingId,
+          doctorId: appointment.doctorId,
+          clinicId: appointment.clinicId,
+          branchId: appointment.branchId,
+          patientId: appointment.patientId,
+        }
+      })
+    } else {
+      alert("Payment allowed only for active status")
+    }
+  }
   return (
     <div className="container mt-4">
       {/* Header */}
@@ -365,6 +398,15 @@ const AppointmentDetails = () => {
               Add Vitals
             </CButton>
           )}
+          {
+            showPayment && (<CButton
+              color="success"
+              onClick={() => handlePaymentClick()}
+              disabled={!showPayment} // optional disable
+            >
+              Payment
+            </CButton>)
+          }
           {/* <CButton
             color="secondary"
             size="sm"
@@ -375,9 +417,19 @@ const AppointmentDetails = () => {
           </CButton> */}
         </div>
       </div>
+      <CButton className='mt-2'
+        style={{ backgroundColor: 'var(--color-black)', color: 'white' }}
+        onClick={() =>
+          navigate("/physio-consent-form", {
+            state: { bookingDetails: appointment },
+          })
+        }
+      >
+        Go to Consent Form
+      </CButton>
 
       <div
-        className="mt-4 p-4 border rounded shadow-sm bg-white"
+        className="mt-2 p-4 border rounded shadow-sm bg-white"
         style={{ color: 'var(--color-black)' }}
       >
         <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
@@ -405,7 +457,7 @@ const AppointmentDetails = () => {
               <CFormInput
                 label="Height"
                 name="height"
-                 placeholder="Enter height (e.g., 170 cm)"
+                placeholder="Enter height (e.g., 170 cm)"
                 value={formData.height}
                 onChange={handleChange}
                 className="mb-2"
@@ -417,7 +469,7 @@ const AppointmentDetails = () => {
               <CFormInput
                 label="Weight"
                 name="weight"
-                 placeholder="Enter weight (e.g., 65 kg)"
+                placeholder="Enter weight (e.g., 65 kg)"
                 value={formData.weight}
                 onChange={handleChange}
                 className="mb-2"
@@ -429,7 +481,7 @@ const AppointmentDetails = () => {
               <CFormInput
                 label="Blood Pressure"
                 name="bloodPressure"
-                  placeholder="Enter BP (e.g., 120/80 mmHg)"
+                placeholder="Enter BP (e.g., 120/80 mmHg)"
                 value={formData.bloodPressure}
                 onChange={handleChange}
                 className="mb-2"
@@ -441,7 +493,7 @@ const AppointmentDetails = () => {
               <CFormInput
                 label="Temperature"
                 name="temperature"
-                 placeholder="Enter temperature (e.g., 98.6 °F)"
+                placeholder="Enter temperature (e.g., 98.6 °F)"
                 value={formData.temperature}
                 onChange={handleChange}
                 className="mb-2"
@@ -453,7 +505,7 @@ const AppointmentDetails = () => {
               <CFormInput
                 label="BMI"
                 name="bmi"
-                 placeholder="Enter BMI (e.g., 22.5)"
+                placeholder="Enter BMI (e.g., 22.5)"
                 value={formData.bmi}
                 onChange={handleChange}
                 className="mb-2"
@@ -468,23 +520,23 @@ const AppointmentDetails = () => {
             <CButton color="secondary" onClick={() => setShowModal(false)}>
               Close
             </CButton>
-          <CButton
-  style={{ backgroundColor: 'var(--color-black)', color: 'white' }}
-  onClick={handleSubmitVitals}
-  disabled={loading} // disable while loading
->
-  {loading ? (
-    <>
-      <span
-        className="spinner-border spinner-border-sm me-2 text-white"
-        role="status"
-      />
-      Saving...
-    </>
-  ) : (
-    'Save'
-  )}
-</CButton>
+            <CButton
+              style={{ backgroundColor: 'var(--color-black)', color: 'white' }}
+              onClick={handleSubmitVitals}
+              disabled={loading} // disable while loading
+            >
+              {loading ? (
+                <>
+                  <span
+                    className="spinner-border spinner-border-sm me-2 text-white"
+                    role="status"
+                  />
+                  Saving...
+                </>
+              ) : (
+                'Save'
+              )}
+            </CButton>
 
           </CModalFooter>
         </CModal>
@@ -495,7 +547,7 @@ const AppointmentDetails = () => {
             <strong>Patient Name:</strong> {appointment?.name}
           </div>
           <div className="col-md-4">
-            <strong>Mobile Number:</strong> {appointment?.mobileNumber}
+            <strong>Mobile Number:</strong> {appointment?.patientMobileNumber}
           </div>
           <div className="col-md-4">
             <strong>Booking For:</strong> {appointment?.bookingFor}
@@ -506,6 +558,10 @@ const AppointmentDetails = () => {
           <div className="col-md-4">
             <strong>Gender:</strong> {appointment?.gender}
           </div>
+          <div className="col-md-4">
+            <strong>Visit Type:</strong> {appointment?.visitType}
+          </div>
+
           <div className="col-12">
             <strong>Problem:</strong>{' '}
             <p style={{ color: 'var(--color-black)' }}>{appointment?.problem}</p>
@@ -560,6 +616,8 @@ const AppointmentDetails = () => {
         {showVitalsCard && (
           <div className="card shadow-sm p-3 mb-3 mt-4" style={{ color: 'var(--color-black)' }}>
             <div className="d-flex justify-content-between align-items-center">
+
+
               <h5>Vitals Card</h5>
               {showConfirmed && !vitals && (
                 <CButton
@@ -569,6 +627,7 @@ const AppointmentDetails = () => {
                   Add Vitals
                 </CButton>
               )}
+
             </div>
             {vitals ? (
               <div className="row mt-3">
@@ -598,13 +657,17 @@ const AppointmentDetails = () => {
           </div>
         )}
 
+
+
+
+
         {showConfirmedOrCompleted && doctor && (
           <>
             <div className="mt-4">
               <CAccordion activeItemKey={1}>
                 {/* Consent Form Accordion */}
                 {/* {appointment?.consentFormPdf != '' && ( */}
-
+                {/* <PhysioConsentForm /> */}
                 {appointment?.consultationType?.toLowerCase() === 'services & treatments' &&
                   appointment?.consultationType?.toLowerCase() === 'services & treatments' &&
                   new Date(appointment?.serviceDate) <= new Date() &&
@@ -673,7 +736,7 @@ const AppointmentDetails = () => {
                             <small style={{ color: 'GrayText' }}>{appointment?.serviceDate}</small>
                           </div>
 
-                        <div className="d-flex gap-2 ">
+                          <div className="d-flex gap-2 ">
                             <CButton
                               style={{
                                 color: 'var(--color-black)',
@@ -783,7 +846,7 @@ const AppointmentDetails = () => {
                     })
                   }
                 >
-                    View Details
+                  View Details
                 </CButton>
               </div>
             </div>

@@ -99,7 +99,7 @@ a {
 /* modal heigth */
 
 .custom-modal .modal-content {
-  height: 90vh;         /* modal height */
+  /* height: 90vh;          */
   max-height: 90vh;     /* restrict max height */
   display: flex;
   flex-direction: column;
@@ -108,4 +108,12 @@ a {
 .custom-modal .modal-body {
   overflow-y: auto;     /* enable vertical scroll */
   flex: 1;              /* take available space */
+}
+
+.expand-modal .modal-content {
+  max-height: 100vh !important;
+}
+
+.expand-modal .modal-body {
+  overflow: visible !important;
 }

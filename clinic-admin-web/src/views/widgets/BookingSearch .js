@@ -30,28 +30,31 @@ const BookingSearch = ({
 
   // 🧠 Common API handler
   const fetchBookings = async (apiFunc, searchValue) => {
-    const query = searchValue?.trim()
-    if (!query) return
+    const query = searchValue?.trim();
+    if (!query) return;
 
-    setLoading(true)
+    setLoading(true);
     try {
-      const res = await apiFunc(query)
+      const res = await apiFunc(query);
 
-      setBookingData(res?.data?.data || [])
-      console.log('Fetched bookings:', res?.data?.data || [])
-      console.log('Fetched bookings:', res|| [])
+      const apiData = res?.data?.data;
+
+      // ✅ FIX HERE
+      setBookingData(Array.isArray(apiData) ? apiData : [apiData]);
+
+      console.log("Final bookingData:", apiData);
     } catch (err) {
-      console.error('Error fetching bookings:', err)
-      setBookingData([])
+      console.error("Error fetching bookings:", err);
+      setBookingData([]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // 🔍 Manual search on button click
   const handleSearch = async () => {
     if (!patientSearch.trim()) {
-      showCustomToast('Please enter a valid Patient ID / Name / Mobile','error')
+      showCustomToast('Please enter a valid Patient ID / Name / Mobile', 'error')
       return
     }
 
@@ -62,8 +65,8 @@ const BookingSearch = ({
     if (visitType === 'followup') {
       await fetchBookings(getInProgressfollowupBookings, patientSearch)
     } else {
-  await fetchBookings(getBookingsByPatientId, patientSearch)
-  
+      await fetchBookings(getBookingsByPatientId, patientSearch)
+
     }
   }
 
@@ -77,7 +80,7 @@ const BookingSearch = ({
     }
 
     const delayDebounce = setTimeout(async () => {
-      setSelectedBooking(null) // Reset before new fetch
+      setSelectedBooking(null)
       setModalVisible(false)
       if (visitType === 'followup') {
         await fetchBookings(getInProgressfollowupBookings, patientSearch)
@@ -121,7 +124,7 @@ const BookingSearch = ({
     if (visitType === 'followup') {
       if (!booking?.doctorId) {
         console.warn('Doctor ID missing for follow-up booking:', booking)
-        showCustomToast('Doctor details missing for this booking.','error')
+        showCustomToast('Doctor details missing for this booking.', 'error')
         return
       }
 
@@ -145,43 +148,41 @@ const BookingSearch = ({
         <CCol md={10}>
           <CFormInput
             type="text"
-            placeholder={visitType === 'followup' ? "Search by Patient ID":"Search by Name / Patient ID / Mobile"}
-            value={patientSearch}
+            placeholder={visitType === 'followup' ? "Search by Patient ID" : "Search by Name / Patient ID / Mobile"}
+            value={patientSearch.toUpperCase()}
             onChange={(e) => setPatientSearch(e.target.value)}
           />
         </CCol>
         <CCol md={2}>
-          <CButton  style={{color:"white",backgroundColor:"var(--color-black)"}} onClick={handleSearch} disabled={loading}>
+          <CButton style={{ color: "white", backgroundColor: "var(--color-black)" }} onClick={handleSearch} disabled={loading}>
             {loading ? 'Searching...' : 'Search'}
           </CButton>
         </CCol>
       </CRow>
 
       {/* 📋 Booking List */}
-    {bookingData && !selectedBooking && (
-  <CListGroup className="shadow-sm mb-4">
-    {[bookingData].map((item) => (
-      <CListGroupItem
-        key={item.patientId}
-        action
-        onClick={() => handleSelectBooking(item)}
-        style={{
-          cursor: 'pointer',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <strong>{item.name}</strong>
-        <span className="text-muted">{item.patientId}</span>
-
-        {/* ❗ These are not in API */}
-        <span className="text-muted">{item.doctorName || '-'}</span>
-        <span className="text-muted">{item.branchname || '-'}</span>
-      </CListGroupItem>
-    ))}
-  </CListGroup>
-)}
+      {bookingData.length > 0 && !selectedBooking && (
+        <CListGroup className="shadow-sm mb-4">
+          {bookingData.map((item) => (
+            <CListGroupItem
+              key={item.patientId}
+              action
+              onClick={() => handleSelectBooking(item)}
+              style={{
+                cursor: 'pointer',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <strong>{item.name}</strong>
+              <span className="text-muted">{item.patientId}</span>
+              <span className="text-muted">{item.doctorName || '-'}</span>
+              <span className="text-muted">{item.branchname || '-'}</span>
+            </CListGroupItem>
+          ))}
+        </CListGroup>
+      )}
 
       {/* 🧾 Modal */}
       <CModal

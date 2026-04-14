@@ -47,7 +47,7 @@ import BookingSearch from '../widgets/BookingSearch '
 import LoadingIndicator from '../../Utils/loader'
 import { postBooking } from '../../APIs/BookServiceAPi'
 
-import { DoctorData } from '../Doctors/DoctorAPI'
+
 import { addCustomer } from '../customerManagement/CustomerManagementAPI'
 import { showCustomToast } from '../../Utils/Toaster'
 import imageCompression from 'browser-image-compression'
@@ -60,7 +60,7 @@ const BookAppointmentModal = ({ visible, onClose }) => {
   const [appointmentType, setAppointmentType] = useState('services') // services / inclinic / online
   const [patientSearch, setPatientSearch] = useState('')
   const [selectedPatient, setSelectedPatient] = useState(null)
-  const [doctorData, setDoctorData] = useState([]) // initialize as empty array
+
   const [slotsForSelectedDate, setSlotsForSelectedDate] = useState([])
   const [selectedSlots, setSelectedSlots] = useState([])
   const [selectedDate, setSelectedDate] = useState('')
@@ -70,23 +70,36 @@ const BookAppointmentModal = ({ visible, onClose }) => {
   const navigate = useNavigate()
   const [slots, setSlots] = useState([])
   const [referDoctor, setReferDoctor] = useState([])
-  const[loading,setLoading] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const [selectedBooking, setSelectedBooking] = useState(null)
   const [mvisible, setMVisible] = useState(false)
   const [part, setPart] = useState([])
- const [theraphyQuestions, setTheraphyQuestions] = useState({});
+  const [theraphyQuestions, setTheraphyQuestions] = useState({});
   const [markedImage, setMarkedImage] = useState('')
 
   const [showAllSlots, setShowAllSlots] = useState(false)
   const [subServiceInfo, setSubServiceInfo] = useState(null)
   const [selectedSubServiceInfo, setSelectedSubServiceInfo] = useState(null)
 
-  const { fetchHospital, selectedHospital } = useHospital()
+  const { fetchHospital, selectedHospital, fetchDoctors, doctorData } = useHospital()
   const [postOffices, setPostOffices] = useState([])
   const [selectedPO, setSelectedPO] = useState(null)
   const pincodeTimer = useRef(null)
+  const [activityLevel, setActivityLevel] = useState("");
 
+  const activityOptions = [
+    "Sedentary",
+    "Moderate",
+    "Active",
+    "Athlete"
+  ];
+  const reasonforVisitOption = [
+    "Chronic Pain",
+    "Sports Rehab",
+    "Neuro Rehab",
+    "Others"
+  ];
   // dropdown lists
   const [categories, setCategories] = useState([])
   const [selectedProcedure, setSelectedProcedure] = useState('')
@@ -109,7 +122,12 @@ const BookAppointmentModal = ({ visible, onClose }) => {
   const [onboardToCustomer, setOnboardToCustomer] = useState(false)
 
   const type = appointmentType.trim().toLowerCase()
+  const [otherReason, setOtherReason] = useState("");
+  const [originalConsultationFee, setOriginalConsultationFee] = useState('')
 
+  const [errors, setErrors] = useState({})
+  const [activityLevels, setActivityLevels] = useState([]);
+  const [reasonForVisit, setReasonForVisit] = useState([]);
   const initialBookingDetails = {
     branchId: localStorage.getItem('branchId') || '',
     branchname: localStorage.getItem('branchName') || '',
@@ -123,6 +141,14 @@ const BookAppointmentModal = ({ visible, onClose }) => {
     serviceId: '',
     subServiceName: '',
     subServiceId: '',
+    previousInjuries: "",
+    currentMedications: "",
+    allergies: "",
+    occupation: "",
+    activityLevels: [],
+    reasonForVisit: "",
+    insuranceProvider: "",
+    policyNumber: "",
 
     doctorId: '',
     doctorName: '',
@@ -146,9 +172,9 @@ const BookAppointmentModal = ({ visible, onClose }) => {
     gender: '',
     symptomsDuration: '',
     problem: '',
-    foc: '',
+    foc: 'Paid',
     // parts:part,
-
+    focReason: "",
     attachments: [],
     freeFollowUps: selectedHospital.data.freeFollowUps,
     consentFormPdf: '',
@@ -157,7 +183,8 @@ const BookAppointmentModal = ({ visible, onClose }) => {
 
     serviceDate: '',
     servicetime: '',
-
+    referredByType: '',
+    referredByName: '',
     address: {
       houseNo: '',
       street: '',
@@ -170,56 +197,29 @@ const BookAppointmentModal = ({ visible, onClose }) => {
     },
   }
   const [bookingDetails, setBookingDetails] = useState(initialBookingDetails)
-  const [originalConsultationFee, setOriginalConsultationFee] = useState('')
+  const handleChange = (level) => {
+    if (activityLevels.includes(level)) {
+      // remove if already selected
+      setActivityLevels(activityLevels.filter(item => item !== level));
 
-  const [errors, setErrors] = useState({})
 
-  // const handlePatientFollowupSearch = async () => {
-  //   if (!patientSearch.trim()) {
-  //     toast.error('Please enter a valid Patient ID / Name / Mobile')
-  //     alert('Please enter a valid Patient ID / Name / Mobile')
-  //     return
-  //   }
+    } else {
+      // add if not selected
+      setActivityLevels([...activityLevels, level]);
 
-  //   setSLoading(true)
-  //   try {
-  //     const res = await getInProgressfollowupBookings(patientSearch)
-  //     console.log(patientSearch)
-  //     setBookingData(res.data.data || [])
-  //     console.log(res.data.data)
-  //   } catch (err) {
-  //     console.error('Error fetching bookings:', err)
-  //     setBookingData([])
-  //   } finally {
-  //     setSLoading(false)
-  //   }
-  // }
+    }
+  };
+  const handleReasonChange = (value) => {
+    setBookingDetails((prev) => ({
+      ...prev,
+      reasonForVisit: value,
+    }));
 
-  //   const handlePatientSearch = async () => {
-  //   if (!patientSearch.trim()) {
-  //     toast.error('Please enter a valid Patient ID / Name / Mobile')
-  //     alert('Please enter a valid Patient ID / Name / Mobile')
-  //     return
-  //   }
-
-  //   setSLoading(true)
-  //   try {
-  //     const res = await getBookingsByPatientId(patientSearch)
-  //     console.log(patientSearch)
-  //     setBookingData(res.data.data || [])
-  //     console.log(res.data.data)
-  //   } catch (err) {
-  //     console.error('Error fetching bookings:', err)
-  //     setBookingData([])
-  //   } finally {
-  //     setSLoading(false)
-  //   }
-  // }
-
-  // const handleSelectBooking = (booking) => {
-  //   setSelectedBooking(booking)
-  //   setMVisible(true)
-  // }
+    // reset other input if not "Others"
+    if (value !== "Others") {
+      setOtherReason("");
+    }
+  };
 
   const formatDate = (date) => {
     if (!date) return null
@@ -227,20 +227,6 @@ const BookAppointmentModal = ({ visible, onClose }) => {
     if (isNaN(d)) return null
     return d.toISOString().split('T')[0] // 'yyyy-mm-dd'
   }
-  // 'yyyy-mm-dd'
-
-  // useEffect(() => {
-  //   if (!patientSearch) return
-
-  //   getInProgressBookings(patientSearch)
-  //     .then((res) => {
-  //       setBookingData(res.data.data) // ✅ because response structure has { data: [...] }
-  //     })
-  //     .catch((err) => {
-  //       console.error('Error fetching bookings:', err)
-  //     })
-  //     .finally(() => setLoading(false))
-  // }, [patientSearch])
 
   // ✅ Fetch Categories
   useEffect(() => {
@@ -260,7 +246,7 @@ const BookAppointmentModal = ({ visible, onClose }) => {
     fetchCategories()
   }, []) // fetch once on mount
 
-  // ✅ Fetch Services when Category changes
+
   useEffect(() => {
     if (!selectedCategory) {
       setServices([])
@@ -366,15 +352,7 @@ const BookAppointmentModal = ({ visible, onClose }) => {
           }))
           setOriginalConsultationFee(subServiceInfo.consultationFee || 0)
         }
-        // setBookingDetails((prev) => ({
-        //   ...prev,
-        //   servicecost: subServiceInfo.price,
-        //   discountAmount: subServiceInfo.discountedCost || 0,
-        //   discountPercentage: subServiceInfo.discountPercentage || 0,
-        //   totalFee: subServiceInfo.finalCost, // Adjust formula as needed
-        // }))
 
-        // Optional: store the subservice info
       } catch (err) {
         console.error('Error fetching sub-service info:', err)
         setSubServices([])
@@ -455,50 +433,48 @@ const BookAppointmentModal = ({ visible, onClose }) => {
   // ✅ Example: Fetch Doctors when Branch & SubService are chosen
   // ✅ Fetch Doctors when Branch & SubService are chosen
 
-  useEffect(() => {
-    fetchDoctors()
-  }, [appointmentType, bookingDetails.branchId, selectedSubService])
 
-  const fetchDoctors = async () => {
-    setLoadingDoctors(true)
 
-    try {
-      let doctorsList = []
+  // const fetchDoctors = async () => {
+  //   setLoadingDoctors(true)
 
-      if (appointmentType !== 'services') {
-        const clinicId = localStorage.getItem('HospitalId')
-        const branchId = localStorage.getItem('branchId')
+  //   try {
+  //     let doctorsList = []
 
-        if (!clinicId || !branchId) {
-          console.warn('Missing clinicId or branchId')
-          setDoctors([])
-          return
-        }
+  //     if (appointmentType !== 'services') {
+  //       const clinicId = localStorage.getItem('HospitalId')
+  //       const branchId = localStorage.getItem('branchId')
 
-        const response = await getDoctorByClinicIdData(clinicId, branchId)
+  //       if (!clinicId || !branchId) {
+  //         console.warn('Missing clinicId or branchId')
+  //         setDoctors([])
+  //         return
+  //       }
 
-        doctorsList = Array.isArray(response?.data) ? response.data : []
-      } else if (appointmentType === 'services' && bookingDetails.branchId && selectedSubService) {
-        const clinicId = localStorage.getItem('HospitalId')
-        const branchId = bookingDetails.branchId
-        const subServiceId = selectedSubService
+  //       const response = await getDoctorByClinicIdData(clinicId, branchId)
 
-        const url = `${BASE_URL}/doctors/${clinicId}/${branchId}/${subServiceId}`
-        const response = await axios.get(url)
+  //       doctorsList = Array.isArray(response?.data) ? response.data : []
+  //     } else if (appointmentType === 'services' && bookingDetails.branchId && selectedSubService) {
+  //       const clinicId = localStorage.getItem('HospitalId')
+  //       const branchId = bookingDetails.branchId
+  //       const subServiceId = selectedSubService
 
-        doctorsList = Array.isArray(response?.data?.data) ? response.data.data : []
-      } else {
-        doctorsList = []
-      }
+  //       const url = `${BASE_URL}/doctors/${clinicId}/${branchId}/${subServiceId}`
+  //       const response = await axios.get(url)
 
-      setDoctors(doctorsList)
-    } catch (err) {
-      console.error('Error fetching doctors:', err)
-      setDoctors([])
-    } finally {
-      setLoadingDoctors(false)
-    }
-  }
+  //       doctorsList = Array.isArray(response?.data?.data) ? response.data.data : []
+  //     } else {
+  //       doctorsList = []
+  //     }
+
+  //     setDoctors(doctorsList)
+  //   } catch (err) {
+  //     console.error('Error fetching doctors:', err)
+  //     setDoctors([])
+  //   } finally {
+  //     setLoadingDoctors(false)
+  //   }
+  // }
 
   const fetchSlots = async (doctorId) => {
     try {
@@ -546,44 +522,33 @@ const BookAppointmentModal = ({ visible, onClose }) => {
   useEffect(() => {
     fetchRefferrDoctor()
   }, [])
-  const handleFeeTypeChange = async (e) => {
-    const selectedType = e.target.value
-    const hospitalId = localStorage.getItem('HospitalId')
-    const { subServiceId, subServiceName, consultationType } = bookingDetails
+  const handleFeeTypeChange = (e) => {
+    const selectedType = e.target.value;
 
-    try {
-      // 1 = FOC, 2 = Paid
-      const feeTypeCode = selectedType === 'FOC' ? 1 : 2
+    setBookingDetails((prev) => ({
+      ...prev,
+      foc: selectedType,
 
-      const url = `${BASE_URL}/calculateAmountByConsultationType/${hospitalId}/${subServiceId}/${subServiceName}/${feeTypeCode}`
+      // ✅ Consultation fee logic
+      consultationFee:
+        selectedType === 'FOC'
+          ? 0
+          : originalConsultationFee || 0,
 
-      const response = await axios.get(url, {
-        params: { feeType: feeTypeCode },
-      })
-
-      console.log('Fee API response:', response.data)
-
-      setBookingDetails((prev) => ({
-        ...prev,
-        foc: selectedType,
-        consultationFee: selectedType === 'FOC' ? 0 : response.data?.data?.consultationFee || 0,
-        totalFee: response.data?.data?.finalCost ?? 0,
-      }))
-    } catch (error) {
-      console.error('Error calculating fee amount:', error)
-    }
-  }
+      // ✅ Add this (important)
+      focReason: selectedType === 'FOC' ? prev.focReason : '',
+    }));
+  };
   useEffect(() => {
     if (
       bookingDetails.subServiceId &&
       bookingDetails.subServiceName &&
-      bookingDetails.consultationType
+      bookingDetails.consultationType &&
+      !bookingDetails.foc // ✅ only when not selected
     ) {
-      // Fetch the default Paid amount (feeType = 2)
-      handleFeeTypeChange('Paid', bookingDetails, setBookingDetails)
+      handleFeeTypeChange('Paid')
     }
   }, [bookingDetails.subServiceId, bookingDetails.subServiceName, bookingDetails.consultationType])
-
   // Watch for appointmentType changes and reset related fields
 
   // Fetch available slots for a doctor
@@ -699,21 +664,26 @@ const BookAppointmentModal = ({ visible, onClose }) => {
     // Real-time validation
     setErrors((prev) => {
       const updatedErrors = { ...prev }
+
       if (section === 'address') {
         if (!updatedErrors.address) updatedErrors.address = {}
 
         if (field === 'postalCode') {
-          if (/^\d{6}$/.test(value)) {
-            delete updatedErrors.address[field]
-          } else {
+          if (!value || !/^\d{6}$/.test(value)) {
             updatedErrors.address[field] = 'Postal code must be 6 digits'
+          } else {
+            delete updatedErrors.address[field]
           }
         } else {
-          if (value.trim() !== '') delete updatedErrors.address[field]
+          // REMOVE validation for other fields
+          delete updatedErrors.address[field]
         }
 
-        if (Object.keys(updatedErrors.address).length === 0) delete updatedErrors.address
+        if (Object.keys(updatedErrors.address).length === 0) {
+          delete updatedErrors.address
+        }
       }
+
       return updatedErrors
     })
 
@@ -801,142 +771,73 @@ const BookAppointmentModal = ({ visible, onClose }) => {
   }
 
   const validate = () => {
-    const newErrors = {}
+    const newErrors = {};
 
-    // Visit Type
-    if (!visitType) newErrors.visitType = 'Please select visit type'
-
-    // Appointment Type (required only for first visit)
-
-    // if (appointmentType)
-    //   newErrors.appointmentType = 'Please select appointment type'
-
-    // Contact Info (only for new patients)
-    if (!selectedBooking && visitType !== 'followup') {
-      const name = bookingDetails.name?.trim() || ''
-
-      if (!name) {
-        newErrors.name = 'Name is required'
-      } else if (name.length < 3) {
-        newErrors.name = 'Name must be at least 3 characters'
-      } else if (!/^[A-Za-z\s]+$/.test(name)) {
-        // Only letters and spaces
-        newErrors.name = 'Name can only contain letters'
-      } else {
-        delete newErrors.name
+    if (!bookingDetails.name?.trim()) newErrors.name = 'Name is required';
+    // ✅ DOB only required for NEW patients
+    if (!selectedBooking) {
+      if (!bookingDetails.dob) {
+        newErrors.dob = 'DOB required';
       }
+    }
+    // if (!bookingDetails.dob) newErrors.dob = 'DOB required';
+    if (!bookingDetails.gender) newErrors.gender = 'Select gender';
 
-      if (!bookingDetails.dob) newErrors.dob = 'Date of Birth is required'
+    if (!bookingDetails.patientMobileNumber) {
+      newErrors.patientMobileNumber = 'Mobile required';
+    } else if (!/^[6-9]\d{9}$/.test(bookingDetails.patientMobileNumber)) {
+      newErrors.patientMobileNumber = 'Invalid mobile';
+    }
 
-      if (!bookingDetails.gender) {
-        newErrors.gender = 'Please select gender'
-      }
-
-      setErrors(newErrors)
-
-      if (!bookingDetails.patientMobileNumber) {
-        newErrors.patientMobileNumber = 'Mobile number is required'
-      } else if (!/^[6-9]\d{9}$/.test(bookingDetails.patientMobileNumber)) {
-        newErrors.patientMobileNumber = 'Enter a valid 10-digit mobile number starting with 6-9'
-      } else {
-        delete newErrors.patientMobileNumber
-      }
+    // if (!bookingDetails.problem?.trim()) newErrors.problem = 'Problem required';
+    if (appointmentType?.toLowerCase().trim() !== 'services') {
       if (!bookingDetails.problem?.trim()) {
-        errors.problem = 'Symptoms/Problem is required.'
-      } else if (bookingDetails.problem.trim().length < 5) {
-        errors.problem = 'Symptoms/Problem must be at least 5 characters.'
+        newErrors.problem = 'Problem required';
       }
-
+    }
+    // if (!bookingDetails.symptomsDuration) newErrors.symptomsDuration = 'Duration required';
+    if (appointmentType?.toLowerCase().trim() !== 'services') {
       if (!bookingDetails.symptomsDuration) {
-        errors.symptomsDuration = 'Symptoms duration is required.'
+        newErrors.symptomsDuration = 'Duration required';
       }
 
       if (!bookingDetails.unit) {
-        errors.unit = 'Please select a duration unit.'
-      }
-
-      // Address validations
-      const addressErrors = {}
-      const addressFields = bookingDetails.address || {}
-
-      for (let field in addressFields) {
-        if (field === 'landmark') continue // ✅ Landmark is optional
-
-        if (!addressFields[field] || addressFields[field].trim() === '') {
-          addressErrors[field] = `${field} is required`
-        } else if (field === 'postalCode' && !/^\d{6}$/.test(addressFields[field])) {
-          addressErrors[field] = 'Postal code must be 6 digits'
-        }
-      }
-
-      if (Object.keys(addressErrors).length > 0) newErrors.address = addressErrors
-    }
-    // Services (if service appointment)
-    if (visitType !== 'followup' && appointmentType?.includes('service')) {
-      if (!selectedCategory) newErrors.selectedCategory = 'Select a category'
-      if (!selectedService) newErrors.selectedService = 'Select a service'
-      if (!selectedSubService) newErrors.selectedSubService = 'Select a procedure'
-    }
-
-    // Branch & Doctor
-    if (visitType !== 'followup') {
-      if (!bookingDetails.branchId) newErrors.branchname = 'Select a branch'
-      if (!bookingDetails.doctorId) newErrors.doctorName = 'Select a doctor'
-    }
-
-    // Slots
-    if (visitType !== 'followup' && selectedSlots.length === 0)
-      newErrors.slot = 'Please select a time slot'
-
-    // Payment
-    if (visitType !== 'followup' && !bookingDetails.paymentType)
-      newErrors.paymentType = 'Select payment type'
-
-    // Symptoms (optional)
-    if (
-      bookingDetails.problem &&
-      (bookingDetails.problem.length < 5 || bookingDetails.problem.length > 300)
-    )
-      newErrors.problem = 'Problem description must be 5-300 characters'
-
-    if (
-      bookingDetails.symptomsDuration &&
-      (bookingDetails.symptomsDuration < 1 || bookingDetails.symptomsDuration > 365)
-    )
-      newErrors.symptomsDuration = 'Duration must be between 1 and 365'
-
-    // Doctor Referral Code (optional)
-
-    if (appointmentType?.toLowerCase().trim() === 'inclinic') {
-      // Symptoms/Problem
-      if (!bookingDetails.problem?.trim()) {
-        newErrors.problem = 'Symptoms/Problem is required'
-      } else if (bookingDetails.problem.trim().length < 5) {
-        newErrors.problem = 'Symptoms/Problem must be at least 5 characters'
-      } else {
-        delete newErrors.problem
-      }
-
-      // Symptoms Duration
-      if (!bookingDetails.symptomsDuration) {
-        newErrors.symptomsDuration = 'Symptoms duration is required'
-      } else if (bookingDetails.symptomsDuration < 1 || bookingDetails.symptomsDuration > 365) {
-        newErrors.symptomsDuration = 'Duration must be between 1 and 365'
-      } else {
-        delete newErrors.symptomsDuration
-      }
-
-      // Unit
-      if (!bookingDetails.unit) {
-        newErrors.unit = 'Please select a duration unit'
-      } else {
-        delete newErrors.unit
+        newErrors.unit = 'Select unit';
       }
     }
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+    if (bookingDetails.foc === 'FOC' && !bookingDetails.focReason?.trim()) {
+      newErrors.focReason = 'Please enter reason for FOC';
+      return;
+    }
+    // if (!bookingDetails.unit) newErrors.unit = 'Select unit';
+
+    if (!bookingDetails.branchId) newErrors.branchname = 'Select branch';
+    if (!bookingDetails.doctorId) newErrors.doctorName = 'Select doctor';
+    if (!bookingDetails.servicetime) newErrors.slot = 'Select slot';
+    if (!bookingDetails.paymentType) newErrors.paymentType = 'Select payment';
+
+    if (!part || part.length === 0) newErrors.part = 'Select body part';
+    if (!markedImage) newErrors.markedImage = 'Mark image';
+
+    // ✅ POSTAL CODE VALIDATION
+    if (!bookingDetails.address?.postalCode) {
+      if (!newErrors.address) newErrors.address = {};
+      newErrors.address.postalCode = "Postal Code is required";
+    } else if (!/^\d{6}$/.test(bookingDetails.address.postalCode)) {
+      if (!newErrors.address) newErrors.address = {};
+      newErrors.address.postalCode = "Postal Code must be 6 digits";
+    }
+    // if (!theraphyQuestions || Object.keys(theraphyQuestions).length === 0) {
+    //   newErrors.therapy = "Answer therapy questions";
+    // }
+
+    console.log("🚨 VALIDATION ERRORS:", newErrors); // ✅ THIS IS KEY
+
+    setErrors(newErrors);
+
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleAppointmentTypeChange = (type) => {
     setBookingDetails((prev) => ({
@@ -958,15 +859,18 @@ const BookAppointmentModal = ({ visible, onClose }) => {
     console.log('Validating bookingDetails...', bookingDetails)
     console.log('Validating bookingDetails...', part)
 
-    if (!validate()) {
-      // showCustomToast('Please fix the errors before submitting.', 'error')
+    if (!validate()) { //TODO: Fix validation to show all errors and prevent submission
+      showCustomToast('Please fix the errors before submitting.', 'error')
       return
     }
     try {
       setSaveLoading(true)
       // Build payload explicitly, excluding 'slot'
       const { unit, address, slot, ...rest } = bookingDetails
-
+      const finalReason =
+        bookingDetails.reasonForVisit === "Others"
+          ? otherReason
+          : bookingDetails.reasonForVisit;
       const payloadToSend = {
         ...rest,
         name: combinedName,
@@ -976,6 +880,14 @@ const BookAppointmentModal = ({ visible, onClose }) => {
         partImage: markedImage,
         theraphyAnswers: theraphyQuestions,
         parts: part,
+        previousInjuries: bookingDetails.previousInjuries,
+        currentMedications: bookingDetails.currentMedications,
+        allergies: bookingDetails.allergies,
+        occupation: bookingDetails.occupation,
+        activityLevels: bookingDetails.activityLevels,
+        reasonForVisit: finalReason,
+        insuranceProvider: bookingDetails.insuranceProvider,
+        policyNumber: bookingDetails.policyNumber,
       }
 
       console.log('Payload without slot:', payloadToSend)
@@ -1036,7 +948,7 @@ const BookAppointmentModal = ({ visible, onClose }) => {
       else if (err.message?.includes('timeout'))
         showCustomToast('Request timed out. Please try again.', 'error')
       else showCustomToast('Failed to submit booking. Please try again.', 'error')
-    }finally{
+    } finally {
       setSaveLoading(false)
     }
   }
@@ -1047,6 +959,37 @@ const BookAppointmentModal = ({ visible, onClose }) => {
       // Call your API for services appointment
     }
   }
+
+
+  useEffect(() => {
+    if (!bookingDetails.branchId) return
+
+    // ✅ Reset doctor + fee + slots
+    setBookingDetails((prev) => ({
+      ...prev,
+      doctorId: '',
+      doctorName: '',
+      doctorDeviceId: '',
+      consultationFee: 0,
+      servicetime: '',
+      serviceDate: '',
+    }))
+
+    // ✅ Reset slots UI
+    setSlotsForSelectedDate([])
+    setSelectedSlots([])
+    setSelectedDate('')
+
+    // ✅ Optional: clear errors
+    setErrors((prev) => ({
+      ...prev,
+      doctorName: '',
+      slot: '',
+    }))
+
+    console.log("Branch changed → Reset doctor, fee, slots")
+
+  }, [bookingDetails.branchId])
 
   const handleInClinicSubmit = () => {
     if (validate()) {
@@ -1086,19 +1029,34 @@ const BookAppointmentModal = ({ visible, onClose }) => {
       // showCustomToast('Failed to submit follow-up booking', 'error')
     }
   }
-const parseAddress = (addressStr = "") => {
-  const parts = addressStr.split(",");
 
-  return {
-    houseNo: parts[0]?.trim() || "",
-    street: parts[1]?.trim() || "",
-    landmark: parts[2]?.trim() || "",
-    city: parts[3]?.trim() || "",
-    state: parts[4]?.trim() || "",
-    postalCode: parts[5]?.trim() || "",
-    country: parts[6]?.trim() || "India",
+  useEffect(() => {
+    if (!bookingDetails.branchId || !doctorData?.data) {
+      setDoctors([])
+      return
+    }
+
+    const filteredDoctors = doctorData.data.filter(
+      (doc) => doc.branchId === bookingDetails.branchId
+    )
+
+    console.log("Filtered Doctors:", filteredDoctors)
+
+    setDoctors(filteredDoctors)
+  }, [bookingDetails.branchId, doctorData])
+  const parseAddress = (addressStr = "") => {
+    const parts = addressStr.split(",");
+
+    return {
+      houseNo: parts[0]?.trim() || "",
+      street: parts[1]?.trim() || "",
+      landmark: parts[2]?.trim() || "",
+      city: parts[3]?.trim() || "",
+      state: parts[4]?.trim() || "",
+      postalCode: parts[5]?.trim() || "",
+      country: parts[6]?.trim() || "India",
+    };
   };
-};
   useEffect(() => {
     if (selectedBooking) {
       setBookingDetails((prev) => ({
@@ -1117,84 +1075,96 @@ const parseAddress = (addressStr = "") => {
   }, [selectedBooking, setBookingDetails])
 
   console.log(`appointmenttype ${appointmentType}`)
-
+  useEffect(() => {
+    setBookingDetails(prev => ({
+      ...prev,
+      activityLevels: activityLevels,
+      reasonForVisit: reasonForVisit
+    }))
+  }, [activityLevels, reasonForVisit])
   // const [part, setPart] = useState("");
- const convertToBase64 = async (image) => {
-  try {
-    // ✅ already base64
-    if (typeof image === "string" && image.startsWith("data:image")) {
-      return image.split(",")[1]
+  const convertToBase64 = async (image) => {
+    try {
+      // ✅ already base64
+      if (typeof image === "string" && image.startsWith("data:image")) {
+        return image.split(",")[1]
+      }
+
+      // ✅ File / Blob
+      if (image instanceof File || image instanceof Blob) {
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.readAsDataURL(image)
+          reader.onloadend = () => resolve(reader.result.split(",")[1])
+          reader.onerror = reject
+        })
+      }
+
+      // ✅ URL / blob URL
+      if (typeof image === "string") {
+        const res = await fetch(image)
+        const blob = await res.blob()
+
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.readAsDataURL(blob)
+          reader.onloadend = () => resolve(reader.result.split(",")[1])
+          reader.onerror = reject
+        })
+      }
+
+      return ""
+    } catch (err) {
+      console.error("Base64 error:", err)
+      return ""
     }
-
-    // ✅ File / Blob
-    if (image instanceof File || image instanceof Blob) {
-      return await new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.readAsDataURL(image)
-        reader.onloadend = () => resolve(reader.result.split(",")[1])
-        reader.onerror = reject
-      })
-    }
-
-    // ✅ URL / blob URL
-    if (typeof image === "string") {
-      const res = await fetch(image)
-      const blob = await res.blob()
-
-      return await new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.readAsDataURL(blob)
-        reader.onloadend = () => resolve(reader.result.split(",")[1])
-        reader.onerror = reject
-      })
-    }
-
-    return ""
-  } catch (err) {
-    console.error("Base64 error:", err)
-    return ""
-  }
-}
-
-const handlePartClick = async (data) => {
-  console.log("RAW DATA:", data)
-
-  let actualData = data
-
-  // 🔥 unwrap if array
-  if (Array.isArray(data.answerData)) {
-    actualData = data.answerData[0]
   }
 
-  console.log("FIXED DATA:", actualData)
+  const handlePartClick = async (data) => {
+    console.log("RAW DATA:", data)
 
-  // ✅ Convert image to base64
-  let base64Image = ""
-  if (data.image) {
-    base64Image = await convertToBase64(data.image)
+    let actualData = data
+
+    // 🔥 unwrap if array
+    if (Array.isArray(data.answerData)) {
+      actualData = data.answerData[0]
+    }
+
+    console.log("FIXED DATA:", actualData)
+
+    // ✅ Convert image to base64
+    let base64Image = ""
+    if (data.image) {
+      base64Image = await convertToBase64(data.image)
+    }
+
+    setPart(actualData.parts || [])
+    setMarkedImage(base64Image) // ✅ now always base64
+    setTheraphyQuestions(actualData.answerData || {})
+    setErrors((prev) => ({
+      ...prev,
+      part: '',
+      markedImage: '',
+    }));
   }
 
-  setPart(actualData.parts || [])
-  setMarkedImage(base64Image) // ✅ now always base64
-  setTheraphyQuestions(actualData.answerData || {})
-}
 
-// const handlePartClick = (data) => {
-//   console.log("RAW DATA:", data);
+  // const handlePartClick = (data) => {
+  //   console.log("RAW DATA:", data);
 
-//   let actualData = data;
+  //   let actualData = data;
 
-//   // 🔥 FIX: unwrap if array
-//   if (Array.isArray(data.answerData)) {
-//     actualData = data.answerData[0];
-//   }
+  //   // 🔥 FIX: unwrap if array
+  //   if (Array.isArray(data.answerData)) {
+  //     actualData = data.answerData[0];
+  //   }
 
-//   console.log("FIXED DATA:", actualData);
+  //   console.log("FIXED DATA:", actualData);
 
-//   setPart(actualData.parts || []);
-//   setMarkedImage(data.image);
-//   setTheraphyQuestions(actualData.answerData || {});
-// };
+  //   setPart(actualData.parts || []);
+  //   setMarkedImage(data.image);
+  //   setTheraphyQuestions(actualData.answerData || {});
+  // };
   return (
     <COffcanvas
       placement="end"
@@ -1248,66 +1218,8 @@ const handlePartClick = async (data) => {
           </CCol>
         </CRow>
 
-        {/* SECTION: Appointment Type */}
-        {visitType !== 'followup' && (
-          <div>
-            <h6 className="mb-3 border-bottom pb-2">Appointment Type</h6>
-            <CRow className="mb-4">
-              <CCol md={6}>
-                <CFormCheck
-                  type="radio"
-                  label="Therapy"
-                  name="appointmentTypeRadio"
-                  value="services"
-                  checked={appointmentType === 'services'}
-                  onChange={(e) => {
-                    // handleAppointmentTypeChange(e.target.value)
-                    setAppointmentType('services')
-                    setBookingDetails((prev) => ({
-                      ...prev,
-                      consultationType: 'Services & Treatments',
-                    }))
-                  }}
-                />
-              </CCol>
-              <CCol md={6}>
-                <CFormCheck
-                  type="radio"
-                  label="In-Clinic"
-                  name="appointmentTypeRadio"
-                  value="inclinic"
-                  checked={appointmentType === 'inclinic'}
-                  onChange={(e) => {
-                    fetchDoctors()
-                    // handleAppointmentTypeChange(e.target.value)
-                    setAppointmentType('inclinic')
-                    setBookingDetails((prev) => ({
-                      ...prev,
-                      consultationType: 'In-Clinic Consultation',
-                    }))
-                  }}
-                />
-              </CCol>
-              {/* <CCol md={4}>
-                <CFormCheck
-                  type="radio"
-                  label="Online"
-                  name="appointmentTypeRadio"
-                  value="online"
-                  checked={appointmentType === 'Online Consultation'}
-                  onChange={(e) => {
-                    // handleAppointmentTypeChange(e.target.value)
-                    setAppointmentType('online')
-                    setBookingDetails((prev) => ({ ...prev, consultationType: 'online' }))
-                  }}
-                />
-              </CCol> */}
-            </CRow>
-            {errors.appointmentType && (
-              <div className="text-danger mb-3">{errors.appointmentType}</div>
-            )}
-          </div>
-        )}
+
+
 
         <BookingSearch
           visitType={visitType}
@@ -1468,7 +1380,7 @@ const handlePartClick = async (data) => {
                               className="text-capitalize"
                             >
                               {field === 'po' ? 'PO Address' : field}{' '}
-                              {field !== 'landmark' && <span className="text-danger">*</span>}
+                              {/* {field !== 'postalCode' && <span className="text-danger">*</span>} */}
                             </CFormLabel>
 
                             {field === 'po' ? (
@@ -1507,7 +1419,7 @@ const handlePartClick = async (data) => {
                                 onChange={(e) =>
                                   handleNestedChange('address', field, e.target.value)
                                 }
-                                required={field !== 'landmark'}
+                                required={field !== 'postalCode'}
                               />
                             )}
 
@@ -1524,177 +1436,17 @@ const handlePartClick = async (data) => {
             </div>
           )}
 
-          {/* 🔹 Show read-only data if patient selected */}
-          {/* {selectedBooking && (
-            <div>
-              <h6 className="mb-3 border-bottom pb-2">Patient Information</h6>
-              <p>
-                <strong>Name:</strong> {bookingDetails.name}
-              </p>
-              <p>
-                <strong>Patient ID:</strong> {bookingDetails.patientId}
-              </p>
-              <p>
-                <strong>DOB:</strong> {bookingDetails.dob}
-              </p>
-              <p>
-                <strong>Age:</strong> {bookingDetails.age}
-              </p>
-              <p>
-                <strong>Gender:</strong> {bookingDetails.gender}
-              </p>
-              <p>
-                <strong>Mobile:</strong> {bookingDetails.patientMobileNumber}
-              </p>
-              <p>
-                <strong>Address:</strong> {selectedBooking.patientAddress}
-              </p>
-            </div>
-          )} */}
+
+
         </div>
 
-        {/* SECTION: Services Selection */}
-        {visitType !== 'followup' && appointmentType.includes('service') && (
-          <>
-            <h6 className="mb-3 border-bottom pb-2">Select Service</h6>
-            <CRow className="mb-4">
-              <CCol md={4}>
-                <CFormLabel style={{ color: 'var(--color-black)' }}>
-                  Category Name <span className="text-danger">*</span>
-                </CFormLabel>
-                <CFormSelect
-                  value={selectedCategory}
-                  onChange={(e) => {
-                    const selectedId = e.target.value
-                    const selectedObj = categories.find((cat) => cat.categoryId === selectedId)
-
-                    setSelectedCategory(selectedId)
-
-                    setBookingDetails((prev) => ({
-                      ...prev,
-                      categoryId: selectedObj?.categoryId || '',
-                      categoryName: selectedObj?.categoryName || '',
-                    }))
-
-                    // Remove error when selected
-                    setErrors((prev) => ({ ...prev, selectedCategory: '' }))
-                  }}
-                >
-                  <option value="">Select Category</option>
-                  {categories.map((cat) => (
-                    <option key={cat.categoryId} value={cat.categoryId}>
-                      {cat.categoryName}
-                    </option>
-                  ))}
-                </CFormSelect>
-
-                {errors.selectedCategory && (
-                  <div className="text-danger mt-1">{errors.selectedCategory}</div>
-                )}
-              </CCol>
-
-              <CCol md={4}>
-                <CFormLabel style={{ color: 'var(--color-black)' }}>
-                  Service <span className="text-danger">*</span>
-                </CFormLabel>
-
-                <CFormSelect
-                  value={selectedService}
-                  onChange={(e) => {
-                    const selectedId = e.target.value
-                    const selectedObj = services.find((service) => service.serviceId === selectedId)
-
-                    console.log('Selected service:', selectedObj)
-
-                    setSelectedService(selectedId)
-
-                    // ✅ Update bookingDetails for backend
-                    setBookingDetails((prev) => ({
-                      ...prev,
-                      serviceId: selectedObj?.serviceId || '',
-                      servicename: selectedObj?.serviceName || '',
-                    }))
-
-                    // ✅ Optional: clear subservices when service changes
-                    setSelectedSubService('')
-                    setSubServices([])
-
-                    // ✅ Clear error when valid selection made
-                    setErrors((prev) => ({
-                      ...prev,
-                      selectedService: selectedId ? '' : 'Please select a service',
-                    }))
-                  }}
-                >
-                  <option value="">Select Service</option>
-                  {services.map((service) => (
-                    <option key={service.serviceId} value={service.serviceId}>
-                      {service.serviceName}
-                    </option>
-                  ))}
-                </CFormSelect>
-
-                {errors.selectedService && (
-                  <div className="text-danger mt-1">{errors.selectedService}</div>
-                )}
-              </CCol>
-
-              <CCol md={4}>
-                <CFormLabel style={{ color: 'var(--color-black)' }}>
-                  Therapy Name <span className="text-danger">*</span>
-                </CFormLabel>
-                <CFormSelect
-                  value={selectedSubService}
-                  onChange={(e) => {
-                    const selectedId = e.target.value
-                    const selectedObj = subServices.find((sub) => sub.subServiceId === selectedId)
-
-                    setSelectedSubService(selectedId)
-
-                    // ✅ Update bookingDetails with sub-service info
-                    setBookingDetails((prev) => ({
-                      ...prev,
-                      subServiceId: selectedObj?.subServiceId || '',
-                      subServiceName: selectedObj?.subServiceName || '',
-                    }))
-
-                    // ✅ Real-time validation clearing / setting
-                    setErrors((prev) => ({
-                      ...prev,
-                      selectedSubService: selectedId ? '' : 'Please select a procedure name',
-                    }))
-                  }}
-                  disabled={!selectedService || !subServices || subServices.length === 0}
-                >
-                  <option value="">Select Sub-Service</option>
-                  {subServices && subServices.length > 0 ? (
-                    subServices.map((sub) => (
-                      <option key={sub.subServiceId} value={sub.subServiceId}>
-                        {sub.subServiceName}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="" disabled>
-                      No sub-services available
-                    </option>
-                  )}
-                </CFormSelect>
-
-                {/* ✅ Error message below */}
-                {errors.selectedSubService && (
-                  <div className="text-danger mt-1">{errors.selectedSubService}</div>
-                )}
-              </CCol>
-            </CRow>
-          </>
-        )}
 
         {/* SECTION: Patient & Booking Details */}
         {visitType !== 'followup' && (
           <div>
             <h6 className="mb-3 border-bottom pb-2">Patient & Booking Details</h6>
             <CRow className="mb-4">
-              <CCol md={4}>
+              <CCol md={6}>
                 <CFormLabel style={{ color: 'var(--color-black)' }}>
                   Branch <span className="text-danger">*</span>
                 </CFormLabel>
@@ -1703,8 +1455,9 @@ const handlePartClick = async (data) => {
                   value={bookingDetails.branchId || ''}
                   onChange={(e) => {
                     const selectedBranch = branches.find(
-                      (branch) => branch.branchId === e.target.value,
+                      (branch) => branch.branchId === e.target.value
                     )
+
                     setBookingDetails((prev) => ({
                       ...prev,
                       branchId: selectedBranch?.branchId || '',
@@ -1727,7 +1480,7 @@ const handlePartClick = async (data) => {
                 {errors.branchname && <div className="text-danger">{errors.branchname}</div>}
               </CCol>
 
-              <CCol md={4}>
+              <CCol md={6}>
                 <CFormLabel style={{ color: 'var(--color-black)' }}>
                   Doctor Name <span className="text-danger">*</span>
                 </CFormLabel>
@@ -1768,10 +1521,16 @@ const handlePartClick = async (data) => {
                         doctorId: selectedDoctor.doctorId,
                         doctorName: selectedDoctor.doctorName,
                         doctorDeviceId: selectedDoctor.doctorDeviceId,
-                        ...(appointmentType?.toLowerCase() === 'inclinic' && {
-                          consultationFee: selectedDoctor.doctorFees.inClinicFee || 0,
-                        }),
+
+                        // ✅ FIX HERE
+                        consultationFee:
+                          prev.foc === 'FOC'
+                            ? 0
+                            : selectedDoctor.doctorFees.inClinicFee || 0,
                       }))
+                      setOriginalConsultationFee(
+                        selectedDoctor.doctorFees.inClinicFee || 0
+                      )
 
                       // ✅ Clear previous slots if needed
                       setSlots([])
@@ -1824,61 +1583,50 @@ const handlePartClick = async (data) => {
                 {errors.doctorName && <div className="text-danger mt-1">{errors.doctorName}</div>}
               </CCol>
             </CRow>
-          </div>
-        )}
-
-        {/* SECTION: Consultation & Payment */}
-        {visitType !== 'followup' && appointmentType.includes('service') && (
-          <>
-            <h6 className="mb-3 border-bottom pb-2">Consultation & Payment</h6>
-            <CRow className="mb-4 g-3">
-              {/* Consultation Fee */}
-              <CCol md={4}>
+            <CRow className='mb-4'>
+              <CCol md={6}>
                 <CFormLabel style={{ color: 'var(--color-black)' }}>
                   Consultation Fee <span className="text-danger">*</span>
                 </CFormLabel>
                 <CFormInput type="number" value={bookingDetails.consultationFee || 0} disabled />
               </CCol>
-              <CCol md={4}>
-                <CFormLabel style={{ color: 'var(--color-black)' }}>
-                 Therapy Fee<span className="text-danger">*</span>
-                </CFormLabel>
-                <CFormInput type="number" value={bookingDetails.servicecost || 0} disabled />
-              </CCol>
-
-              <CCol md={4}>
-                <CFormLabel style={{ color: 'var(--color-black)' }}>
-                  Discounted Amount <span className="text-danger">*</span>
-                </CFormLabel>
-                <CFormInput type="number" value={bookingDetails.discountAmount || 0} disabled />
-              </CCol>
-
-              <CCol md={4}>
-                <CFormLabel style={{ color: 'var(--color-black)' }}>
-                  Discount(%) <span className="text-danger">*</span>
-                </CFormLabel>
-                <CFormInput type="number" value={bookingDetails.discountPercentage || 0} disabled />
-              </CCol>
-
-              <CCol md={4}>
-                <CFormLabel style={{ color: 'var(--color-black)' }}>
-                  Total Amount <span className="text-danger">*</span>
-                </CFormLabel>
-                <CFormInput type="number" value={bookingDetails.totalFee || 0} disabled />
-              </CCol>
-              <CCol md={4}>
+              <CCol md={6}>
                 <CFormLabel style={{ color: 'var(--color-black)' }}>
                   Consultation Fee Type <span className="text-danger">*</span>
                 </CFormLabel>
-                <CFormSelect value={bookingDetails.foc || 'Paid'} onChange={handleFeeTypeChange}>
-                  <option value="">-- Select Fee Type --</option>
+                <CFormSelect
+                  value={bookingDetails.foc}
+                  onChange={handleFeeTypeChange}
+                >
                   <option value="FOC">FOC (Free of Consultation)</option>
                   <option value="Paid">Paid</option>
+                  {/* <option value="Unpaid">Unpaid</option> */}
+
                 </CFormSelect>
               </CCol>
+              {bookingDetails.foc === 'FOC' && (
+                <CCol md={6} className='mt-3'>
+                  <CFormLabel>
+                    Reason for FOC <span className="text-danger">*</span>
+                  </CFormLabel>
+                  <CFormInput
+                    value={bookingDetails.focReason || ''}
+                    placeholder="Enter reason"
+                    onChange={(e) =>
+                      setBookingDetails((prev) => ({
+                        ...prev,
+                        focReason: e.target.value,
+                      }))
+                    }
+                  />
+                  {errors.focReason && <div className="text-danger mt-1">{errors.focReason}</div>}
+                </CCol>
+              )}
             </CRow>
-          </>
+          </div>
         )}
+
+
 
         {/* ==================== Available Slots ==================== */}
         <h6 className="mb-3 border-bottom pb-2">Available Slots</h6>
@@ -2024,7 +1772,7 @@ const handlePartClick = async (data) => {
         {visitType !== 'followup' && (
           <>
             {/* SECTION: Symptoms */}
-            <h6 className="mb-3 border-bottom pb-2">Symptoms</h6>
+            <h6 className="mb-3 border-bottom pb-2"> Medical & Lifestyle History</h6>
 
             <CRow className="mb-4">
               <CCol md={5}>
@@ -2096,11 +1844,140 @@ const handlePartClick = async (data) => {
                 {errors.unit && <p className="text-danger small">{errors.unit}</p>}
               </CCol>
             </CRow>
+            <CRow>
+              <CCol md={4}>
+                <CFormLabel style={{ color: 'var(--color-black)' }}>
+                  Previous Injuries
+
+                </CFormLabel>
+                <CFormInput
+                  name="previousInjuries"
+                  value={bookingDetails.previousInjuries}
+                  onChange={handleBookingChange}
+                />
+              </CCol>
+
+              <CCol md={4}>
+                <CFormLabel style={{ color: 'var(--color-black)' }}>
+                  Current Medications
+
+                </CFormLabel>
+                <CFormInput
+                  name="currentMedications"
+                  value={bookingDetails.currentMedications}
+                  onChange={handleBookingChange}
+                />
+              </CCol>
+
+              <CCol md={4}>
+                <CFormLabel style={{ color: 'var(--color-black)' }}>
+                  Allergies
+
+                </CFormLabel>
+                <CFormInput
+                  name="allergies"
+                  value={bookingDetails.allergies}
+                  onChange={handleBookingChange}
+                />
+              </CCol>
+
+            </CRow>
+            <CRow className='mt-3'>
+
+
+              <CCol md={4}>
+                <CFormLabel style={{ color: 'var(--color-black)' }}>
+                  Occupation
+
+                </CFormLabel>
+                <CFormInput
+                  name="occupation"
+                  value={bookingDetails.occupation}
+                  onChange={handleBookingChange}
+                />
+              </CCol>
+
+              <CCol md={6}>
+                <CFormLabel>Reason for Visit</CFormLabel>
+
+                <div className="d-flex gap-3 mt-1">
+                  {reasonforVisitOption.map((item) => (
+                    <div key={item} className="d-flex align-items-center">
+                      <input
+                        type="radio"
+                        name="reasonForVisit"
+                        value={item}
+                        checked={bookingDetails.reasonForVisit === item}
+                        onChange={() => handleReasonChange(item)}
+                      />
+                      <label className="ms-1">{item}</label>
+                    </div>
+                  ))}
+                </div>
+              </CCol>
+              {bookingDetails.reasonForVisit === "Others" && (
+                <CCol md={6} className="mt-3">
+                  <CFormLabel>
+                    Enter Reason <span className="text-danger">*</span>
+                  </CFormLabel>
+
+                  <CFormInput
+                    placeholder="Enter custom reason"
+                    value={otherReason}
+                    onChange={(e) => setOtherReason(e.target.value)}
+                  />
+                </CCol>
+              )}
+            </CRow>
+            <div className='mt-3'>
+              <h6 className="mb-3 border-bottom pb-2" >Activity Level</h6>
+
+              <div className="d-flex gap-3 align-items-center mt-1" style={{ color: 'var(--color-black)' }}>
+                {activityOptions.map((level) => (
+                  <div key={level} className="d-flex align-items-center">
+                    <input
+                      type="checkbox"
+                      value={level}
+                      checked={activityLevels.includes(level)}
+                      onChange={() => handleChange(level)}
+                    />
+                    <label className="ms-1">{level}</label>
+                  </div>
+                ))}
+              </div>
+
+              {/* <p>Selected: {activityLevels.join(", ")}</p> */}
+            </div>
+
+
+
+
+            <CRow className="mt-3">
+              <h6 className="mb-3 border-bottom pb-2" >Insurance Info</h6>
+              <CCol md={6} style={{ color: "var(--color-black)" }}>
+                <CFormLabel>Insurance Provider</CFormLabel>
+                <CFormInput
+                  name="insuranceProvider"
+                  value={bookingDetails.insuranceProvider}
+                  onChange={handleBookingChange}
+                />
+              </CCol>
+
+              <CCol md={6} style={{ color: "var(--color-black)" }}>
+                <CFormLabel>Policy Number</CFormLabel>
+                <CFormInput
+                  name="policyNumber"
+                  value={bookingDetails.policyNumber}
+                  onChange={handleBookingChange}
+                />
+              </CCol>
+            </CRow>
 
             {/* SECTION: Attachment */}
 
-            <CCol md={6}>
-              <CFormLabel style={{ color: 'var(--color-black)' }}>Attachments</CFormLabel>
+            <CCol md={6} className='mt-3'>
+              <h6 className='mb-3 border-bottom pb-2'>Attachments</h6>
+
               <CFormInput
                 type="file"
                 name="attachments"
@@ -2235,12 +2112,14 @@ const handlePartClick = async (data) => {
                   <option value="Cash">Cash</option>
                   <option value="Card">Card</option>
                   <option value="UPI">UPI</option>
+                  <option value="Not Paid">Not Paid</option>
+
                 </CFormSelect>
 
                 {/* ✅ Error message below */}
                 {errors.paymentType && <div className="text-danger mt-1">{errors.paymentType}</div>}
               </CCol>
-              <CCol md={5}>
+              {/* <CCol md={5}>
                 <CFormLabel style={{ color: 'var(--color-black)' }}>
                   Payment Mode <span className="text-danger">*</span>
                 </CFormLabel>
@@ -2270,7 +2149,7 @@ const handlePartClick = async (data) => {
                 </CFormSelect>
 
                 {errors.paymentMode && <div className="text-danger mt-1">{errors.paymentMode}</div>}
-              </CCol>
+              </CCol> */}
               {/* ✅ Show only when Partial selected */}
               {bookingDetails.paymentMode === 'Partial' && (
                 <CCol md={5}>
@@ -2302,47 +2181,112 @@ const handlePartClick = async (data) => {
               )}
               {/* Doctor Referral Code */}
               <CCol md={6}>
-                <h6>Referred By</h6>
+                <CFormLabel style={{ color: "var(--color-black)" }}>Referred By</CFormLabel>
 
                 <Select
                   name="doctorRefCode"
                   value={
-                    referDoctor.find((d) => d.referralId === bookingDetails.doctorRefCode) || null
+                    referDoctor.find((d) => d.referralId === bookingDetails.doctorRefCode) ||
+                    (bookingDetails.doctorRefCode === 'OTHER' ? { referralId: 'OTHER', fullName: 'Others' } : null)
                   }
                   getOptionLabel={(option) =>
-                    ` ${option.fullName}-(${option.address.street},${option.address.city})`
+                    option.referralId === 'OTHER'
+                      ? 'Others'
+                      : `${option.fullName}-(${option.address.street},${option.address.city})`
                   }
                   getOptionValue={(option) => option.referralId}
-                  onChange={(selected) =>
-                    handleBookingChange({
-                      target: {
-                        name: 'doctorRefCode',
-                        value: selected ? selected.referralId : '',
-                      },
-                    })
+                  onChange={(selected) => {
+                    const value = selected ? selected.referralId : ''
+
+                    setBookingDetails((prev) => ({
+                      ...prev,
+                      doctorRefCode: value,
+                      referredByType: value === 'OTHER' ? '' : prev.referredByType,
+                      referredByName: value === 'OTHER' ? '' : prev.referredByName,
+                    }))
+                  }}
+                  options={[
+                    ...referDoctor,
+                    { referralId: 'OTHER', fullName: 'Others' }, // ✅ add this
+                  ]}
+                  placeholder={
+                    bookingDetails.doctorRefCode === 'OTHER'
+                      ? 'Select referral type'
+                      : 'Select or search doctor...'
                   }
-                  options={referDoctor}
-                  placeholder="Select or search doctor..."
                   isSearchable
                 />
               </CCol>
+              {bookingDetails.doctorRefCode === 'OTHER' && (
+                <CRow className="mt-3">
+
+                  {/* Referral Type */}
+                  <CCol md={6}>
+                    <CFormLabel style={{ color: "var(--color-black)" }}>Referred By</CFormLabel>
+                    <CFormSelect
+                      value={bookingDetails.referredByType || ''}
+                      onChange={(e) =>
+                        setBookingDetails((prev) => ({
+                          ...prev,
+                          referredByType: e.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">Select Type</option>
+                      <option value="Friend">Friend</option>
+                      <option value="Family">Family</option>
+                      <option value="Facebook">Facebook</option>
+                      <option value="Instagram">Instagram</option>
+                      <option value="Google">Google</option>
+                      <option value="Advertisement">Advertisement</option>
+                      <option value="Other">Other</option>
+                    </CFormSelect>
+                  </CCol>
+
+                  {/* Name Input */}
+                  <CCol md={6}>
+                    <CFormLabel style={{ color: "var(--color-black)" }}>Referred Person Name</CFormLabel>
+                    <CFormInput
+                      type="text"
+                      placeholder="Enter name"
+                      value={bookingDetails.referredByName || ''}
+                      onChange={(e) =>
+                        setBookingDetails((prev) => ({
+                          ...prev,
+                          referredByName: e.target.value,
+                        }))
+                      }
+                    />
+                  </CCol>
+
+                </CRow>
+              )}
             </CRow>
           </>
         )}
         <div className="mb-4">
-          <h6>Pain Assessment</h6>
+          <h6 className='mb-3 border-bottom pb-2'>Pain Assessment</h6>
 
           <BodyAssessment onPartClick={handlePartClick} />
 
-         {markedImage && (
-  <img
-    src={`data:image/png;base64,${markedImage}`}
-    width={200}
-    alt="preview"
-  />
-)}
+          {/* ✅ Error for part selection */}
+          {errors.part && (
+            <p className="text-danger small">{errors.part}</p>
+          )}
 
-          {/* <h3>Selected: {part}</h3> */}
+          {/* Image Preview */}
+          {markedImage && (
+            <img
+              src={`data:image/png;base64,${markedImage}`}
+              width={200}
+              alt="preview"
+            />
+          )}
+
+          {/* ✅ Error for image */}
+          {errors.markedImage && (
+            <p className="text-danger small">{errors.markedImage}</p>
+          )}
         </div>
 
         {selectedBooking == null && (
@@ -2400,7 +2344,7 @@ const handlePartClick = async (data) => {
               style={{ backgroundColor: 'var(--color-bgcolor)', color: 'var(--color-black)' }}
               disabled={saveloading}
             >
-             {saveloading ? "Submiting ..." : "Submit"} 
+              {saveloading ? "Submiting ..." : "Submit"}
             </CButton>
           )}
         </div>
@@ -2410,16 +2354,7 @@ const handlePartClick = async (data) => {
     </COffcanvas>
   )
 
-  // return (
-  //   <CModal alignment="center" visible={visible} onClose={onClose} size="xl">
-  //     <CModalHeader>
-  //       <CModalTitle>Book Appointment</CModalTitle>
-  //     </CModalHeader>
-  //     <CModalBody>
 
-  //     </CModalBody>
-  //   </CModal>
-  // )
 }
 
 export default BookAppointmentModal

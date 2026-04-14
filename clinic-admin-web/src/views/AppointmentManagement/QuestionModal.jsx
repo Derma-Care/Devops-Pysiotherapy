@@ -12,7 +12,9 @@ import {
   CSpinner,
 } from "@coreui/react";
 import axios from "axios";
-import { getQuestionsByKey } from "../EmployeeManagement/Therapist/therapistApi";
+import { getQuestionsByKey } from "../EmployeeManagement/Therapist/TheraphyApi";
+ 
+ 
 
 // import { questionsByPart } from "./questions";
 
@@ -94,7 +96,9 @@ const handleSave = () => {
 
       return {
         questionId: q.questionId,
-        answer: answers[key] || "",
+    answer: Array.isArray(answers[key])
+  ? answers[key].join(", ")
+  : answers[key] || "",
       };
     });
 
@@ -123,6 +127,26 @@ useEffect(() => {
     fetchQuestions()         // ✅ then fetch
   }
 }, [partId])
+
+const handleMultiSelect = (key, value) => {
+  setAnswers((prev) => {
+    const existing = prev[key] || [];
+
+    if (existing.includes(value)) {
+      // remove
+      return {
+        ...prev,
+        [key]: existing.filter((v) => v !== value),
+      };
+    } else {
+      // add
+      return {
+        ...prev,
+        [key]: [...existing, value],
+      };
+    }
+  });
+};
   return (
     <CModal visible={visible} onClose={onClose} size="lg">
 
@@ -204,10 +228,28 @@ useEffect(() => {
                         }
                       />
                     )}
-
+              {q.type === "SELECT" && (
+  <div>
+    {q.options?.map((opt, index) => (
+      <CFormCheck
+        key={index}
+        type="checkbox"
+        label={opt}
+        value={opt}
+        checked={answers[key]?.includes(opt)}
+        onChange={() => handleMultiSelect(key, opt)}
+      />
+    ))}
+  </div>
+  
+)}
                   </div>
+                  
                 );
+                
               })}
+
+
 
             </div>
           );
