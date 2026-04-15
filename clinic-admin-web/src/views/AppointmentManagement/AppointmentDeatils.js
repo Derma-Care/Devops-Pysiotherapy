@@ -42,14 +42,37 @@ const AppointmentDetails = () => {
   const [vitals, setVitals] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [loading, setLoading] = useState(false)
+  const calculateBMI = (height, weight) => {
+    const h = Number(height) / 100;
+    const w = Number(weight);
+
+    if (!h || !w) return '';
+
+    return (w / (h * h)).toFixed(2);
+  };
+  ;
+
+
+
+
 
   const [formData, setFormData] = useState({
     height: '',
     weight: '',
     bloodPressure: '',
     temperature: '',
-    bmi: calculateBMI(formData.height, formData.weight),
-  })
+    bmi: '',
+  });
+  useEffect(() => {
+    if (formData.height && formData.weight) {
+      const bmi = calculateBMI(formData.height, formData.weight);
+
+      setFormData(prev => ({
+        ...prev,
+        bmi
+      }));
+    }
+  }, [formData.height, formData.weight]);
   const appointment = location.state?.appointment
   const { hospitalId, selectedHospital } = useHospital()
   if (!appointment) {
@@ -120,7 +143,7 @@ const AppointmentDetails = () => {
       if (Array.isArray(data) && data.length === 0) {
         setVitals(null)
       } else {
-        setVitals(data)
+        setVitals(data[0])
       }
     } catch (error) {
       console.error('Error fetching vitals:', error)
@@ -192,7 +215,7 @@ const AppointmentDetails = () => {
 
       console.log('Submitting vitals data:', payload)
 
-      await postVitalsData(payload)
+      await postVitalsData(payload, payload.bookingId)
 
       showCustomToast('Vitals added successfully!', 'success')
 
@@ -215,10 +238,7 @@ const AppointmentDetails = () => {
     }
   }
 
-  const calculateBMI = (height, weight) => {
-    const h = Number(height) / 100
-    return h > 0 ? (weight / (h * h)).toFixed(2) : ''
-  }
+
   const handleUpdateVitals = async () => {
     try {
       await updateVitalsData(formData, appointment.bookingId, appointment.patientId)
@@ -363,7 +383,8 @@ const AppointmentDetails = () => {
 
 
   const handlePaymentClick = () => {
-    if (showPayment && normalizedStatus === "active") {
+    // if (showPayment && normalizedStatus === "active") {
+    if (normalizedStatus !== "active") {
       console.log("Navigating to payment with appointment:", appointment)
       navigate("/program-payment" + `/${id}`, {
         state: {
@@ -399,13 +420,14 @@ const AppointmentDetails = () => {
             </CButton>
           )}
           {
-            showPayment && (<CButton
+            // showPayment && (<CButton
+            <CButton
               color="success"
               onClick={() => handlePaymentClick()}
-              disabled={!showPayment} // optional disable
+            // disabled={!showPayment} // optional disable
             >
               Payment
-            </CButton>)
+            </CButton>
           }
           {/* <CButton
             color="secondary"
@@ -417,11 +439,16 @@ const AppointmentDetails = () => {
           </CButton> */}
         </div>
       </div>
-      <CButton className='mt-2'
-        style={{ backgroundColor: 'var(--color-black)', color: 'white' }}
+      <CButton
+        className="mt-2"
+        style={{ backgroundColor: "var(--color-black)", color: "white" }}
         onClick={() =>
           navigate("/physio-consent-form", {
-            state: { bookingDetails: appointment },
+            state: {
+              bookingDetails: appointment,
+              vitals: vitals,
+              doctorsign: doctor?.doctorSignature
+            }
           })
         }
       >
@@ -610,8 +637,7 @@ const AppointmentDetails = () => {
           </div>
         </div>
 
-        {/* vitals */}
-        {/* Vitals Card */}
+
         {/* Vitals Card */}
         {showVitalsCard && (
           <div className="card shadow-sm p-3 mb-3 mt-4" style={{ color: 'var(--color-black)' }}>
