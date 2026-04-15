@@ -12,7 +12,7 @@ export const fetchDoctorSlots = async (doctorId, branchId, date, interval, start
     return res.data.data // returns [{slot, slotbooked, available, reason}, ...]
   } catch (err) {
     console.error('Error fetching slots:', err)
-    // showCustomToast('Failed to generate slots', 'error')
+    //showCustomToast('Failed to generate slots', 'error')
     return []
   }
 }
