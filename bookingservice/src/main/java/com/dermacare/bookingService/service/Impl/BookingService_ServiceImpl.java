@@ -52,12 +52,12 @@ import com.dermacare.bookingService.repository.BookingServiceRepository;
 import com.dermacare.bookingService.service.BookingService_Service;
 import com.dermacare.bookingService.util.Response;
 import com.dermacare.bookingService.util.ResponseStructure;
-import com.dermacare.bookingService.util.SequenceGeneratorService;
 import com.dermacare.bookingService.util.geneateIds;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.dermacare.bookingService.dto.ConsultationFeesDTO;
 
 @Service
 public class BookingService_ServiceImpl implements BookingService_Service {
@@ -333,7 +333,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 		    } else if("foc".equalsIgnoreCase(request.getFoc())&&"not paid".equalsIgnoreCase(request.getPaymentType()))  {
 		        entity.setStatus("confirmed");
 		    }else {
-		    	if("foc".equalsIgnoreCase(request.getFoc()) && !request.getPaymentType().isEmpty()){
+		    	if("paid".equalsIgnoreCase(request.getFoc()) && !request.getPaymentType().isEmpty()){
 			        entity.setStatus("confirmed");}}}
             	List<Status> status = new LinkedList<>();
             	Status s = new Status();
@@ -2540,11 +2540,13 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 			        if (dto.getConsultationFee()!=null) {
 			        	 ObjectMapper mapper = new ObjectMapper();
 			         mapper.registerModule(new JavaTimeModule());
-			         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);	        
-			    
-			            entity.setConsultationFee(mapper.convertValue(dto.getConsultationFee(),new TypeReference<List<ConsultationFees>>() {
-						}));
-			        }
+			         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+			         List<ConsultationFees> lst = entity.getConsultationFee();
+			         for(ConsultationFeesDTO c : dto.getConsultationFee()) {			         
+			         ConsultationFees fee = mapper.convertValue(c,ConsultationFees.class);
+			         lst.add(fee);}
+			         Collections.reverse(lst);
+			         entity.setConsultationFee(lst);}
 			        if (dto.getConsultationExpiration() != null && !dto.getConsultationExpiration().isEmpty())
 			            entity.setConsultationExpiration(dto.getConsultationExpiration());
 
@@ -2897,7 +2899,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 		}
 
 
-
+@Override
 public List<BookingResponse> getTodayBookings(String cId,String bId) {
     String today = LocalDate.now()
             .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
@@ -2908,7 +2910,84 @@ public List<BookingResponse> getTodayBookings(String cId,String bId) {
     }else {
     	return Collections.emptyList();
     }
-}}
+}
+
+
+private static final List<String> VALID_STATUS =
+        Arrays.asList("PENDING","pending","confirmed","CONFIRMED");
+
+private static final DateTimeFormatter FORMATTER =
+        DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+// ✅ API 1 → TODAY BOOKINGS
+@Override
+public ResponseEntity<Response> getTodayAllBookings(String clinicId, String branchId) {
+
+    try {
+        String today = LocalDate.now().format(FORMATTER);
+
+        List<Booking> bookings =
+                repository.findByClinicIdAndBranchIdAndServiceDateAndStatusIn(
+                        clinicId,
+                        branchId,
+                        today,
+                        VALID_STATUS
+                );
+        return ResponseEntity.ok(
+                new Response(true, toResponses(bookings), "Today bookings fetched", 200,null,null)
+        );
+
+    } catch (Exception e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new Response(false, null, "Error fetching today bookings", 500,null,null));
+    }
+}
+
+// ✅ API 2 → UPCOMING BOOKINGS (3 or 7 days)
+@Override
+public ResponseEntity<Response> getUpcomingBookings(String clinicId,
+                                                    String branchId,
+                                                    int option) {
+    try {
+        int days;
+
+        if (option == 1) {
+            days = 3;
+        } else if (option == 2) {
+            days = 7;
+        } else {
+            return ResponseEntity.badRequest()
+                    .body(new Response(false, null, "Invalid option", 400,null,null));
+        }
+
+        LocalDate startDate = LocalDate.now();
+        LocalDate endDate = startDate.plusDays(days+1);
+
+        List<Booking> bookings =
+                repository.findByClinicIdAndBranchIdAndServiceDateBetween(
+                        clinicId,
+                        branchId,
+                        startDate.format(FORMATTER),
+                        endDate.format(FORMATTER)
+                );
+
+        // ✅ Optional: filter status
+        bookings = bookings.stream()
+                .filter(b -> VALID_STATUS.contains(b.getStatus()))
+                .toList();
+
+        return ResponseEntity.ok(
+                new Response(true, toResponses(bookings), "Upcoming bookings fetched", 200,null,null)
+        );
+
+    } catch (Exception e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new Response(false, null, "Error fetching upcoming bookings", 500,null,null));
+    }
+}
+}
+
+
 
 
 
