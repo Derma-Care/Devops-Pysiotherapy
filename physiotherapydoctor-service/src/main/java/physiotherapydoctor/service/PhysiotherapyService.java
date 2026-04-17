@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 
 import physiotherapydoctor.dto.PhysiotherapyRecordDTO;
 import physiotherapydoctor.dto.Response;
+import physiotherapydoctor.dto.Session;
 import physiotherapydoctor.entity.PhysiotherapyRecord;
 
 public interface PhysiotherapyService {
@@ -37,6 +38,11 @@ public interface PhysiotherapyService {
 
 	Response getAssignedPatients(String clinicId, String branchId, String therapistId, Integer overallStatus);
 	public ResponseEntity<Response> getCalculations(String clinicId, String branchId, String patientId, String bookingId);
+
+	//public ResponseEntity< List<Session>> getSessionsByBookingIdAndDate(String bookingId, String date);
+
+	Response getByClinicBranchAndBooking(String clinicId, String branchId, String bookingId);
+
 
 
 //	Response getTherapistDashboard(String clinicId, String branchId, String therapistId);
