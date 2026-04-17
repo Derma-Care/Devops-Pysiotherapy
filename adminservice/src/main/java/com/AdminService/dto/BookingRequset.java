@@ -1,4 +1,4 @@
-package com.AdminService.dto;
+giffsfwwwwwwwwwfffdfpackage com.AdminService.dto;
 
 import java.util.List;
 import java.util.Map;
@@ -75,7 +75,7 @@ public class BookingRequset {
 	    isFollowupStatus = followupStatus;
 	}
 	
-	public boolean isFollowupStatus() {
+	public boolean getIsFollowupStatus() {
 	    return isFollowupStatus;
 	}
 	
