@@ -2496,24 +2496,27 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 			        if (dto.getFollowupDate() != null && !dto.getFollowupDate().isEmpty())
 			            entity.setFollowupDate(dto.getFollowupDate());
 
-			        if(dto.getFollowupStatus() != null && dto.getFollowupStatus().equalsIgnoreCase("no-followup")) {
-				        entity.setStatus("Completed");
-				    }else {
-				    	try {
-				    		//System.out.println(dto);
-				    		if(entity.getTreatments().getGeneratedData().containsKey(dto.getTreatmentName())) {
-				    		TreatmentDetailsDTO	treatmentDetailsDTO = entity.getTreatments().getGeneratedData().get(dto.getTreatmentName());
-				    		//System.out.println(treatmentDetailsDTO);
-				    		if(treatmentDetailsDTO != null) {
-				    			for(DatesDTO datesDTO : treatmentDetailsDTO.getDates()) {
-				    				//System.out.println(datesDTO);
-				    				if(datesDTO.getDate().equals(dto.getTreatmentDate())){
-				    					datesDTO.setFollowupStatus(dto.getFollowupStatus());}
-				    				TreatmentResponseDTO treatmentResponseDTO = entity.getTreatments();
-				    				//System.out.println(treatmentResponseDTO);
-				    					entity.setTreatments(treatmentResponseDTO);		
-				    			}}}}catch(Exception e) {System.out.println(e.getMessage());}}
-
+//			        if(dto.getFollowupStatus() != null && dto.getFollowupStatus().equalsIgnoreCase("no-followup")) {
+//				        entity.setStatus("Completed");
+//				        
+//				    }else {
+//				    	try {
+//				    		//System.out.println(dto);
+//				    		if(entity.getTreatments().getGeneratedData().containsKey(dto.getTreatmentName())) {
+//				    		TreatmentDetailsDTO	treatmentDetailsDTO = entity.getTreatments().getGeneratedData().get(dto.getTreatmentName());
+//				    		//System.out.println(treatmentDetailsDTO);
+//				    		if(treatmentDetailsDTO != null) {
+//				    			for(DatesDTO datesDTO : treatmentDetailsDTO.getDates()) {
+//				    				//System.out.println(datesDTO);
+//				    				if(datesDTO.getDate().equals(dto.getTreatmentDate())){
+//				    					datesDTO.setFollowupStatus(dto.getFollowupStatus());}
+//				    				TreatmentResponseDTO treatmentResponseDTO = entity.getTreatments();
+//				    				//System.out.println(treatmentResponseDTO);
+//				    					entity.setTreatments(treatmentResponseDTO);		
+//				    			}}}}catch(Exception e) {System.out.println(e.getMessage());}}
+			        if(dto.getFollowupStatus() != null ) {
+				        entity.setFollowupStatus(dto.getFollowupStatus());
+				        System.out.println(dto.getFollowupStatus()); }
 			        // -------- PROBLEM --------
 			        if (dto.getProblem() != null && !dto.getProblem().isEmpty())
 			            entity.setProblem(dto.getProblem());

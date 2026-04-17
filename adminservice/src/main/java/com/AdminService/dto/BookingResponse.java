@@ -90,7 +90,8 @@ public class BookingResponse {
 	    isFollowupStatus = followupStatus;
 	}
 	
-	public boolean isFollowupStatus() {
+
+	public boolean getIsFollowupStatus() {
 	    return isFollowupStatus;
 	}
 }
