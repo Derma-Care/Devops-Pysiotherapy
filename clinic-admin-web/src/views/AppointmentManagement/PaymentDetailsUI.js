@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect,useState } from "react";
 import {
     CCard,
     CCardBody,
@@ -36,12 +36,14 @@ const data = {
             paymentMode: "CASH",
             paymentType: "PARTIAL",
             paymentDate: "2026-04-14",
+            paymentleval: "Session"
         },
         {
             amount: 1500,
             paymentMode: "UPI",
             paymentType: "PARTIAL",
             paymentDate: "2026-04-15",
+            paymentleval: "Therapy"
         },
     ],
 
@@ -167,8 +169,8 @@ export default function PaymentDetailsUI() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // const paymentData = location.state.paymentData || {};
-    // const [data, setData] = useState(paymentData);
+    const paymentData = location.state.paymentData || {};
+    const [data, setData] = useState(paymentData);
 
     // alert(bookingId);
     return (
@@ -274,6 +276,7 @@ export default function PaymentDetailsUI() {
                                 <CTableHeaderCell>Amount</CTableHeaderCell>
                                 <CTableHeaderCell>Mode</CTableHeaderCell>
                                 <CTableHeaderCell>Type</CTableHeaderCell>
+                                <CTableHeaderCell>Payment Leval</CTableHeaderCell>
                             </CTableRow>
                         </CTableHead>
                         <CTableBody>
@@ -284,6 +287,9 @@ export default function PaymentDetailsUI() {
                                     <CTableDataCell>₹{item.amount}</CTableDataCell>
                                     <CTableDataCell>{item.paymentMode}</CTableDataCell>
                                     <CTableDataCell>{item.paymentType}</CTableDataCell>
+                                    <CTableDataCell>{item.paymentleval}</CTableDataCell>
+
+
                                 </CTableRow>
                             ))}
                         </CTableBody>
