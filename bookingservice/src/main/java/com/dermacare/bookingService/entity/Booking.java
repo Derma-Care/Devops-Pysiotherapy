@@ -50,7 +50,8 @@ public class Booking  {
     private String serviceDate;
     private String servicetime;
     private String consultationType;
-    private List<ConsultationFees> consultationFee;
+    private List<ConsultationFees> listOfConsultationFee;
+    private double consultationFee;
     private String reasonForCancel;
     private String notes;
     private List<Status> currentStatus;
@@ -93,6 +94,15 @@ public class Booking  {
 	private String policyNumber;
 	private List<String> activityLevels;
 	private String reasonforVisit;
+	private boolean isFollowupStatus;
+	
+	public void setIsFollowupStatus(boolean followupStatus) {
+	    isFollowupStatus = followupStatus;
+	}
+	
+	public boolean getIsFollowupStatus() {
+	    return isFollowupStatus;
+	}
    	
 
     public Booking(Booking booking) {

@@ -117,6 +117,41 @@ public class BookingServiceController {
 	        return bookingService.getTodayPhysioBookings(clinicId, branchId);
 	    }
 
+	   
+	   @GetMapping("/date/{clinicId}/{branchId}/{date}")
+	    public ResponseEntity<?> getBookingsByDate(
+	            @PathVariable String clinicId,
+	            @PathVariable String branchId,         
+	            @PathVariable String date) {
+
+	        return bookingService.getBookingsByDate(clinicId, branchId,date);
+	    }
+	   
+	   @GetMapping("/dateRange/{clinicId}/{branchId}/{start}/{end}")
+	    public ResponseEntity<?> getBookingsByDateRange(
+	            @PathVariable String clinicId,
+	            @PathVariable String branchId,
+	            @PathVariable String start,
+	            @PathVariable String end) {
+
+	        return bookingService.getBookingsByDateRange(clinicId, branchId, start, end);
+	    }
+	   
+	   
+	   @GetMapping("/getBookingById/{bookingId}")
+	    public ResponseEntity<?> getBookingById(
+	            @PathVariable String bookingId) {
+
+	        return bookingService.getBookingById(bookingId);
+	    }
+	   
+	   @GetMapping("/getTodayBookingsByClinicIdAndBranchId/{clinicId}/{branchId}")
+	    public ResponseEntity<?> getTodayBookingsByClinicIdAndBranchId(
+	            @PathVariable String clinicId, @PathVariable String branchId) {
+
+	        return bookingService.getTodayBookingsByClinicIdAndBranchId(clinicId, branchId);
+	    }
+	    
 	    /**
 	     * ✅ API 2: Get Upcoming Bookings
 	     * option:

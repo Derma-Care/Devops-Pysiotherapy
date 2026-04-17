@@ -54,6 +54,8 @@ public ResponseEntity<Response> getUpcomingBookings(String clinicId,
         String branchId,
         int option);
 
-	
-	
+public ResponseEntity<Response> getBookingByDate(String clinicId, String branchId,String date);
+public ResponseEntity<Response> getBookingByCustomRange(String clinicId, String branchId,String start,String end);
+public ResponseEntity<Response> getBookingById(String bookingId);
+	   	
 }

@@ -45,7 +45,8 @@ public class BookingRequset {
 	private String servicetime;
 	private String followupDate;
 	private String consultationType;
-	private List<ConsultationFeesDTO> consultationFee;	
+	private List<ConsultationFeesDTO> listOfConsultationFee;
+	private double consultationFee;	
 	private double totalFee;
 	private String paymentType;
 	private List<String> attachments;
@@ -71,4 +72,14 @@ public class BookingRequset {
 	private String policyNumber;
 	private List<String> activityLevels;
 	private String reasonforVisit;
+	private boolean isFollowupStatus;
+	
+	
+	public void setIsFollowupStatus(boolean followupStatus) {
+	    isFollowupStatus = followupStatus;
+	}
+	
+	public boolean getFollowupStatus() {
+	    return isFollowupStatus;
+	}
 }
