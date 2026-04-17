@@ -1,6 +1,7 @@
 package com.dermacare.doctorservice.dto;
 
 import java.util.List;
+import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
@@ -11,7 +12,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
-@JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class BookingResponse {
 	
 	private String bookingId;
@@ -27,6 +27,7 @@ public class BookingResponse {
 	private String age;
 	private String gender;
 	private String mobileNumber;
+	private String customerId;
 	private String consultationExpiration;
 	private String customerDeviceId;
 	private String problem;
@@ -34,6 +35,8 @@ public class BookingResponse {
 	private String clinicId;
 	private String clinicDeviceId;
 	private String clinicName;
+	private String branchId;
+	private String branchname;
 	private String doctorId;
 	private String doctorName;
 	private String doctorMobileDeviceId;
@@ -43,30 +46,67 @@ public class BookingResponse {
 	private String serviceDate;
 	private String servicetime;
 	private String consultationType;
+	private List<ConsultationFeesDTO> listOfConsultationFee;
 	private double consultationFee;
 	private Integer visitCount;
 	private String channelId;
 	private String reasonForCancel;
 	private String notes;
-///	private ReportsDtoList reports;
+	private List<ReportsDtoList> reports;
 	private String BookedAt;
+	private List<StatusDTO> currentStatus;
 	private String status;
 	private double totalFee;
 	private List<String> attachments;
 	private String consentFormPdf;
-	private String paymentType;
-
-	// ✅ Sitting summary fields
-    private Integer totalSittings;
-    private Integer takenSittings;
-    private Integer pendingSittings;
-    private Integer currentSitting;
-
-    // ✅ Treatments info
+	private List<String> prescriptionPdf;
+	private String doctorRefCode;
+	private String paymentType;	
+	private Integer totalSittings;
+	private Integer pendingSittings;
+	private Integer takenSittings;
+	private Integer currentSitting;
+	private String followupDate;
+	private String foc;
+	private String focReason;
+	private String followupStatus;
+	private String treatmentName;
+	private String treatmentDate;
+	// ✅ Add treatments info
     private TreatmentResponseDTO treatments;
     
-    private String branchId;
-    private String branchname;
-    private String customerId;
-    private String linkedBookingId;
+    // ✅ Add this new field
+    private String updatedTreatment;
+    private String bodyPartId;
+   	private String bodyPartName;
+   	private String partImage;
+   	private Map<String,List<TheraphyAnswersDTO>> theraphyAnswers;
+   	private List<String> parts;
+   	private double partAmount;
+   	private double dueAmount;
+   	private String referredByType;
+	private String referredByName;
+	private String paymentStatus;
+	private String previousInjuries;
+	private String currentMedications;
+	private String allergies;
+	private String occupation;
+	private String insuranceProvider;
+	private String policyNumber;
+	private List<String> activityLevels;
+	private String reasonforVisit;
+	private boolean isFollowupStatus;
+	private Session session;
+	
+	
+	public void setIsFollowupStatus(boolean followupStatus) {
+	    isFollowupStatus = followupStatus;
+	}
+	
+
+	public boolean getIsFollowupStatus() {
+	    return isFollowupStatus;
+	}
+	
+   	
 }

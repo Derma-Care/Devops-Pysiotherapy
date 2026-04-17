@@ -1,6 +1,7 @@
 package com.AdminService.dto;
 
 import java.util.List;
+import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -44,7 +45,8 @@ public class BookingRequset {
 	private String servicetime;
 	private String followupDate;
 	private String consultationType;
-	private double consultationFee;
+	private List<ConsultationFeesDTO> listOfConsultationFee;
+	private double consultationFee;	
 	private double totalFee;
 	private String paymentType;
 	private List<String> attachments;
@@ -52,5 +54,30 @@ public class BookingRequset {
 	private String doctorRefCode;
 	private String bookedAt;
 	private String followupStatus;
+	private String bodyPartId;
+	private String bodyPartName;
+	private String partImage;
+	private Map<String,List<TheraphyAnswersDTO>> theraphyAnswers;
+	private List<String> parts;
+	private double partAmount;
+	private double dueAmount;
+	private String paymentStatus;
+	private String previousInjuries;
+	private String currentMedications;
+	private String allergies;
+	private String occupation;
+	private String insuranceProvider;
+	private String policyNumber;
+	private List<String> activityLevels;
+	private String reasonforVisit;
+	private boolean isFollowupStatus;
+	public void setIsFollowupStatus(boolean followupStatus) {
+	    isFollowupStatus = followupStatus;
+	}
+	
+	public boolean getIsFollowupStatus() {
+	    return isFollowupStatus;
+	}
+	
 
 }

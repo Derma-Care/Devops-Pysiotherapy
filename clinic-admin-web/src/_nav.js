@@ -16,6 +16,13 @@ import {
   cilLightbulb,
   cilBell,
   cilPeople,
+  cilGroup,
+  cilUserFollow,
+  cilUserPlus,
+  cilContact,
+  cilMedicalCross,
+  cilRunning,
+  cilLayers,
 } from '@coreui/icons'
 import { CNavItem } from '@coreui/react'
 import { NavLink } from 'react-router-dom'
@@ -32,7 +39,8 @@ export const getNavigation = (permissions = {}) => {
     {
       component: CNavItem,
       name: 'Appointments',
-      to: '/Appointment-Management',
+      // to: '/Appointment-Management',
+      to: '/followupDashboard',
       as: NavLink,
       icon: <CIcon icon={cilCalendar} customClassName="nav-icon" />,
     },
@@ -41,14 +49,14 @@ export const getNavigation = (permissions = {}) => {
       to: '/Employee-management',
       name: 'Employee management',
       as: NavLink,
-      icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
+      icon: <CIcon icon={cilUserFollow} customClassName="nav-icon" />,
     },
     {
       component: CNavItem,
       name: 'Customer Management',
       to: '/customer-management',
       as: NavLink,
-      icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
+      icon: <CIcon icon={cilContact} customClassName="nav-icon" />,
     },
     {
       component: CNavItem,
@@ -73,10 +81,18 @@ export const getNavigation = (permissions = {}) => {
     },
     {
       component: CNavItem,
+      to: '/therapy-programs',
+      name: 'Therapy Programs',
+      as: NavLink,
+      icon: <CIcon icon={cilLayers} customClassName="nav-icon" />,
+    },
+
+    {
+      component: CNavItem,
       to: '/package-management',
       name: 'Package Management',
       as: NavLink,
-      icon: <CIcon icon={cilDescription} customClassName="nav-icon" />,
+      icon: <CIcon icon={cilLayers} customClassName="nav-icon" />,
     },
 
     // {
@@ -103,9 +119,18 @@ export const getNavigation = (permissions = {}) => {
     {
       component: CNavItem,
       to: '/Procedure-Management',
-      name: 'Procedure Management',
+      name: 'Therapy Management',
+
       as: NavLink,
-      icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
+      icon: <CIcon icon={cilMedicalCross} customClassName="nav-icon" />,
+    },
+    {
+      component: CNavItem,
+      to: '/exercises',
+      name: 'Exercises',
+
+      as: NavLink,
+      icon: <CIcon icon={cilRunning} customClassName="nav-icon" />,
     },
 
     {
@@ -145,11 +170,21 @@ export const getNavigation = (permissions = {}) => {
     },
     {
       component: CNavItem,
+      to: '/analytics',
+      name: 'Analytics',
+      as: NavLink,
+      icon: <CIcon icon={cilLightbulb} customClassName="nav-icon" />,
+    },
+    {
+      component: CNavItem,
       to: '/help',
       name: 'Help',
       as: NavLink,
       icon: <CIcon icon={cilLightbulb} customClassName="nav-icon" />,
     },
+
+
+
   ]
 
   // Only include items if permission exists

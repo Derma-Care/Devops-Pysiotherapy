@@ -2,7 +2,9 @@ package com.clinicadmin.service.impl;
 
 
 import java.security.SecureRandom;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,13 +17,14 @@ import com.clinicadmin.dto.Branch;
 import com.clinicadmin.dto.Response;
 import com.clinicadmin.dto.ResponseStructure;
 import com.clinicadmin.dto.TherapistDTO;
-
 import com.clinicadmin.entity.DoctorLoginCredentials;
 import com.clinicadmin.entity.Documents;
 import com.clinicadmin.entity.Therapist;
 import com.clinicadmin.feignclient.AdminServiceClient;
+import com.clinicadmin.feignclient.PhysiotherapyFeignClient;
 import com.clinicadmin.repository.DoctorLoginCredentialsRepository;
 import com.clinicadmin.repository.TherapistRepository;
+import com.clinicadmin.service.EmailService;
 import com.clinicadmin.service.TherapistService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -45,98 +48,134 @@ public class TherapistServiceImpl implements TherapistService {
     
     @Autowired
     ObjectMapper objectMapper;
+    
+	@Autowired
+	private EmailService emailService;
+	
+	@Autowired
+	private PhysiotherapyFeignClient physiotherapyFeignClient;
     @Override
+
     public Response therapistOnboarding(TherapistDTO dto) {
 
         log.info("Therapist onboarding started for contact number: {}", dto.getContactNumber());
 
         Response response = new Response();
 
-        
-        // ✅ 2. Validate contact number
-        if (dto.getContactNumber() == null || dto.getContactNumber().trim().isEmpty()) {
+        try {
+//            dto.trimAllFields();
+
+            // -------------------- Validate contact --------------------
+            if (dto.getContactNumber() == null || dto.getContactNumber().trim().isEmpty()) {
+                response.setSuccess(false);
+                response.setMessage("Contact number is required");
+                response.setStatus(HttpStatus.BAD_REQUEST.value());
+                return response;
+            }
+
+            String contact = dto.getContactNumber().trim();
+
+            // -------------------- Duplicate check --------------------
+            if (repository.existsByContactNumber(contact)) {
+                response.setSuccess(false);
+                response.setMessage("Therapist already exists with this mobile number");
+                response.setStatus(HttpStatus.BAD_REQUEST.value());
+                return response;
+            }
+
+            if (credentialsRepository.existsByUsername(contact)) {
+                response.setSuccess(false);
+                response.setMessage("Login credentials already exist for this mobile number");
+                response.setStatus(HttpStatus.BAD_REQUEST.value());
+                return response;
+            }
+
+            // -------------------- Fetch branch --------------------
+            ResponseEntity<Response> res = adminServiceClient.getBranchById(dto.getBranchId());
+            Branch br = objectMapper.convertValue(res.getBody().getData(), Branch.class);
+
+            // -------------------- Map DTO -> Entity --------------------
+            Therapist therapist = mapToEntity(dto);
+            therapist.setBranchName(br.getBranchName());
+
+            // -------------------- Generate Therapist ID --------------------
+            String therapistId = generateTherapistId();
+            therapist.setTherapistId(therapistId);
+
+            // -------------------- Save Therapist --------------------
+            Therapist savedTherapist = repository.save(therapist);
+
+            log.info("Therapist saved successfully with therapistId: {}", savedTherapist.getTherapistId());
+
+            // -------------------- Create Credentials --------------------
+            String username = savedTherapist.getTherapistId();
+            String rawPassword = generatePassword();
+            String encodedPassword = passwordEncoder.encode(rawPassword);
+
+            DoctorLoginCredentials credentials = DoctorLoginCredentials.builder()
+                    .staffId(savedTherapist.getTherapistId())
+                    .staffName(savedTherapist.getFullName())
+                    .hospitalId(savedTherapist.getClinicId())
+                    .hospitalName(savedTherapist.getClinicName())
+                    .branchId(savedTherapist.getBranchId())
+                    .branchName(savedTherapist.getBranchName())
+                    .emailId(savedTherapist.getEmailId())
+                    .username(username)
+                    .password(encodedPassword)
+                    .role(dto.getRole())
+                    .build();
+
+            credentialsRepository.save(credentials);
+
+            log.info("Login credentials created for therapistId: {}", savedTherapist.getTherapistId());
+
+            // -------------------- Send Email (SAME TEMPLATE) --------------------
+            try {
+                Map<String, String> mailData = new HashMap<>();
+                mailData.put("subject", "Therapist Onboarding Successful");
+                mailData.put("message",
+                        "Welcome to CCMS!\n\n" +
+                        "Your account has been created successfully.\n" +
+                        "Please use the below credentials to login.\n\n" +
+                        "Therapist ID: " + savedTherapist.getTherapistId()
+                );
+
+                mailData.put("username", username);
+                mailData.put("password", rawPassword);
+
+                emailService.sendEmail(savedTherapist.getEmailId(), mailData);
+
+                log.info("Therapist onboarding email sent to {}", savedTherapist.getEmailId());
+
+            } catch (Exception e) {
+                log.error("Failed to send therapist onboarding email: {}", e.getMessage());
+            }
+
+            // -------------------- Response --------------------
+            TherapistDTO savedDTO = mapToDTO(savedTherapist);
+            savedDTO.setUserName(username);
+            savedDTO.setPassword(rawPassword);
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("therapist", savedDTO);
+            data.put("username", username);
+            data.put("temporaryPassword", rawPassword);
+            data.put("generatedTherapistId", therapistId);
+
+            response.setSuccess(true);
+            response.setData(data);
+            response.setMessage("Therapist added successfully with login credentials");
+            response.setStatus(HttpStatus.CREATED.value());
+
+        } catch (Exception e) {
+            log.error("Error occurred while onboarding therapist: {}", e.getMessage());
             response.setSuccess(false);
-            response.setMessage("Contact number is required");
-            response.setStatus(HttpStatus.BAD_REQUEST.value());
-            return response;
+            response.setMessage("Error occurred while adding therapist: " + e.getMessage());
+            response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
         }
-
-        String contact = dto.getContactNumber().trim();
-
-        // ✅ 3. Duplicate check (same as nurse existsBy)
-        if (repository.existsByContactNumber(contact)) {
-            log.warn("Therapist already exists with contact number: {}", contact);
-            response.setSuccess(false);
-            response.setMessage("Therapist already exists with this mobile number");
-            response.setStatus(HttpStatus.BAD_REQUEST.value());
-            return response;
-        }
-
-        // ✅ 4. Check credentials already exist
-        if (credentialsRepository.existsByUsername(contact)) {
-            log.warn("Credentials already exist for username: {}", contact);
-            response.setSuccess(false);
-            response.setMessage("Login credentials already exist for this mobile number");
-            response.setStatus(HttpStatus.BAD_REQUEST.value());
-            return response;
-        }
-
-        // ✅ 5. Get Branch Details (same as nurse)
-        log.debug("Fetching branch details for branchId: {}", dto.getBranchId());
-
-        ResponseEntity<Response> res = adminServiceClient.getBranchById(dto.getBranchId());
-        Branch br = objectMapper.convertValue(res.getBody().getData(), Branch.class);
-
-        // ✅ 6. Map DTO → Entity
-        Therapist therapist = mapToEntity(dto);
-        therapist.setBranchName(br.getBranchName());
-
-        // ✅ 7. Generate Therapist ID
-        String therapistId = generateTherapistId();
-        therapist.setTherapistId(therapistId);
-
-        // ✅ 8. Username & Password
-        String username = therapistId;
-        String rawPassword = generatePassword();
-        String encodedPassword = passwordEncoder.encode(rawPassword);
-
-        // ✅ 9. Save Therapist
-        Therapist savedTherapist = repository.save(therapist);
-
-        log.info("Therapist saved successfully with therapistId: {}", savedTherapist.getTherapistId());
-
-        // ✅ 10. Save Credentials (IMPORTANT - same as nurse)
-        DoctorLoginCredentials credentials = DoctorLoginCredentials.builder()
-                .staffId(savedTherapist.getTherapistId())
-                .staffName(savedTherapist.getFullName())
-                .hospitalId(savedTherapist.getClinicId())
-                .hospitalName(savedTherapist.getClinicName())
-                .branchId(savedTherapist.getBranchId())
-                .branchName(savedTherapist.getBranchName())
-                .username(username)
-                .password(encodedPassword)
-                .role(dto.getRole())
-//                .permissions(savedTherapist.())
-                .build();
-
-        credentialsRepository.save(credentials);
-
-        log.info("Login credentials created for therapistId: {}", savedTherapist.getTherapistId());
-
-        // ✅ 11. Map to DTO response
-        TherapistDTO savedDTO = mapToDTO(savedTherapist);
-        savedDTO.setUserName(username);
-        savedDTO.setPassword(rawPassword);
-
-        // ✅ 12. Final response
-        response.setSuccess(true);
-        response.setData(savedDTO);
-        response.setMessage("Therapist added successfully");
-        response.setStatus(HttpStatus.CREATED.value());
-
-        log.info("Therapist onboarding completed successfully for therapistId: {}", savedTherapist.getTherapistId());
 
         return response;
+    
     }    // ================= LOGIN =================
 //    @Override
 //    public ResponseStructure<TherapistLoginResponseDTO> login(TherapistLoginDTO dto) {
@@ -402,6 +441,7 @@ public class TherapistServiceImpl implements TherapistService {
         entity.setBranchId(dto.getBranchId());
         entity.setFullName(dto.getFullName());
         entity.setContactNumber(dto.getContactNumber());
+        entity.setEmailId(dto.getEmailId());
         entity.setGender(dto.getGender());
         entity.setDateOfBirth(dto.getDateOfBirth());
         entity.setQualification(dto.getQualification());
@@ -462,6 +502,7 @@ public class TherapistServiceImpl implements TherapistService {
         dto.setBranchId(entity.getBranchId());
         dto.setFullName(entity.getFullName());
         dto.setContactNumber(entity.getContactNumber());
+        dto.setEmailId(entity.getEmailId());
         dto.setGender(entity.getGender());
         dto.setDateOfBirth(entity.getDateOfBirth());
         dto.setQualification(entity.getQualification());
@@ -528,5 +569,100 @@ public class TherapistServiceImpl implements TherapistService {
             sb.append(chars.charAt(random.nextInt(chars.length())));
         }
         return sb.toString();
+    }
+    @Override
+    public Response getPaidSessions(String clinicId,String branchId,String bookingId,String therapistRecordId) {
+
+        Response response = new Response();
+
+        try {
+
+            Response paymentResponse =
+                    physiotherapyFeignClient.getPayment(bookingId);
+
+            Map<String, Object> data =
+                    (Map<String, Object>) paymentResponse.getData();
+
+            if (data == null) {
+                throw new RuntimeException("Payment data not found");
+            }
+
+            // Validate fields
+            if (!clinicId.equals(String.valueOf(data.get("clinicId")))
+                    || !branchId.equals(String.valueOf(data.get("branchId")))
+                    || !bookingId.equals(String.valueOf(data.get("bookingId")))
+                    || !therapistRecordId.equals(String.valueOf(data.get("therapistRecordId")))) {
+
+                throw new RuntimeException("Record mismatch");
+            }
+
+            List<Map<String, Object>> therapyWithSessions =
+                    (List<Map<String, Object>>) data.get("therapyWithSessions");
+
+            if (therapyWithSessions != null) {
+
+                for (Map<String, Object> pkg : therapyWithSessions) {
+
+                    List<Map<String, Object>> programs =
+                            (List<Map<String, Object>>) pkg.get("programs");
+
+                    if (programs == null) continue;
+
+                    for (Map<String, Object> program : programs) {
+
+                        List<Map<String, Object>> therapyData =
+                                (List<Map<String, Object>>) program.get("therapyData");
+
+                        if (therapyData == null) continue;
+
+                        for (Map<String, Object> therapy : therapyData) {
+
+                            List<Map<String, Object>> exercises =
+                                    (List<Map<String, Object>>) therapy.get("exercises");
+
+                            if (exercises == null) continue;
+
+                            for (Map<String, Object> exercise : exercises) {
+
+                                List<Map<String, Object>> sessions =
+                                        (List<Map<String, Object>>) exercise.get("sessions");
+
+                                if (sessions == null) {
+                                    exercise.put("sessions", List.of());
+                                    continue;
+                                }
+
+                                List<Map<String, Object>> paidSessions =
+                                        sessions.stream()
+                                                .filter(session ->
+                                                        "Paid".equalsIgnoreCase(
+                                                                String.valueOf(
+                                                                        session.get("paymentStatus")
+                                                                )
+                                                        )
+                                                )
+                                                .toList();
+
+                                exercise.put("sessions", paidSessions);
+                            }
+                        }
+                    }
+                }
+            }
+
+            response.setSuccess(true);
+            response.setData(data);
+            response.setMessage("Paid sessions fetched successfully");
+            response.setStatus(200);
+
+        } catch (Exception e) {
+
+            response.setSuccess(false);
+            response.setData(null);
+            response.setMessage(e.getMessage());
+            response.setStatus(500);
+        }
+
+        return response;
     }
 }

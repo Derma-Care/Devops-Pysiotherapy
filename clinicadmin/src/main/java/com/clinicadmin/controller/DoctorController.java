@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.clinicadmin.dto.ChangeDoctorPasswordDTO;
@@ -107,6 +107,35 @@ public class DoctorController {
 		response = doctorService.addDoctor(dto);
 		return ResponseEntity.status(response.getStatus()).body(response);
 	}
+	
+//	 // ================= START VERIFICATION =================
+//    @PutMapping("/start-verificationForDoctor/{doctorId}")
+//    public ResponseEntity<Response> startVerification(@PathVariable String doctorId) {
+//
+//        Response response = doctorService.startVerificationProcess(doctorId);
+//
+//        return ResponseEntity.status(response.getStatus()).body(response);
+//    }
+//
+//    // ================= VERIFY DOCTOR =================
+//    @PutMapping("/verifyDoctor/{doctorId}")
+//    public ResponseEntity<Response> verifyDoctor(@PathVariable String doctorId) {
+//
+//        Response response = doctorService.verifyDoctor(doctorId);
+//
+//        return ResponseEntity.status(response.getStatus()).body(response);
+//    }
+//
+//    // ================= REJECT DOCTOR =================
+//    @PutMapping("/rejectDoctor/{doctorId}")
+//    public ResponseEntity<Response> rejectDoctor(
+//            @PathVariable String doctorId,
+//            @RequestParam String reason) {
+//
+//        Response response = doctorService.rejectDoctor(doctorId, reason);
+//
+//        return ResponseEntity.status(response.getStatus()).body(response);
+//    }
 
 	/**
 	 * Get all doctors.

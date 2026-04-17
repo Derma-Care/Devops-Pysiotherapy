@@ -65,7 +65,7 @@ public class BranchServiceImpl implements BranchService {
         }
     }
 
- // ---------------------- CREATE BRANCH (PENDING) ----------------------
+ // ---------------------- CREATE BRANCH  ----------------------
     @Override
     @Transactional
     public Response createBranch(BranchDTO dto) {
@@ -90,7 +90,7 @@ public class BranchServiceImpl implements BranchService {
                 return res;
             }
 
-            // Generate branch ID
+            // ---------------- Generate branch ID ----------------
             BranchCounter counter = mongoOperations.findAndModify(
                     Query.query(Criteria.where("_id").is(clinicId)),
                     new Update().inc("seq", 1),
@@ -104,23 +104,66 @@ public class BranchServiceImpl implements BranchService {
                     counter.getSeq()
             );
 
+            // ---------------- Create Branch ----------------
             Branch branch = convertDtoToEntity(dto, branchId);
             branch.setRole("ADMIN");
             branch.setPermissions(PermissionsUtil.getAdminPermissions());
-            branch.setStatus("PENDING");
+
+            // 👉 If you don’t want verification
+            branch.setStatus("ACTIVE");
+            
+            // 🔥 IMPORTANT FIX → ensure email always present
+            if (branch.getEmail() == null || branch.getEmail().isBlank()) {
+                branch.setEmail(clinic.getEmailAddress());
+            }
 
             Branch savedBranch = branchRepository.save(branch);
 
-            // attach to clinic
+            // ---------------- 🔐 Generate Password ----------------
+            String tempPassword = PasswordGenerator.generatePassword(10);
+
+            // ---------------- Save Credentials ----------------
+            BranchCredentials credentials = new BranchCredentials();
+            credentials.setBranchId(branchId);
+            credentials.setUserName(branchId);
+            credentials.setPassword(tempPassword);
+            credentials.setBranchName(savedBranch.getBranchName());
+            credentials.setRole(savedBranch.getRole());
+            credentials.setPermissions(savedBranch.getPermissions());
+
+            branchCredentialsRepository.save(credentials);
+
+            // ----------------  Send Email ----------------
+            if (savedBranch.getEmail() != null && !savedBranch.getEmail().isBlank()) {
+
+             
+
+                //  IMPORTANT FIX → include credentials in message
+                Map<String, String> mailData = new HashMap<>();
+                mailData.put("subject", "Branch Login Credentials");
+
+                mailData.put("message",
+                        "Your branch has been created successfully.\n\n" +
+                        "Please use the below credentials to login."
+                );
+
+                mailData.put("username", branchId);
+                mailData.put("password", tempPassword);
+
+                emailService.sendEmail(savedBranch.getEmail(), mailData);
+            }
+
+            // ---------------- Attach to clinic ----------------
             List<Branch> branches = clinic.getBranches();
             if (branches == null) branches = new ArrayList<>();
             branches.add(savedBranch);
             clinic.setBranches(branches);
             clinicRep.save(clinic);
 
+            // ---------------- Response ----------------
             res.setSuccess(true);
             res.setStatus(200);
-            res.setMessage("Branch created successfully. Verification pending.");
+            res.setMessage("Branch created successfully and credentials sent to email");
             res.setHospitalId(clinicId);
             res.setBranchId(branchId);
 
@@ -133,181 +176,181 @@ public class BranchServiceImpl implements BranchService {
             return res;
         }
     }
- // ---------------------- START BRANCH VERIFICATION ----------------------
-    @Override
-    public Response startBranchVerification(String branchId) {
+// // ---------------------- START BRANCH VERIFICATION ----------------------
+//    @Override
+//    public Response startBranchVerification(String branchId) {
+//
+//        Response res = new Response();
+//
+//        Optional<Branch> optionalBranch = branchRepository.findByBranchId(branchId);
+//
+//        if (optionalBranch.isEmpty()) {
+//            res.setSuccess(false);
+//            res.setStatus(404);
+//            res.setMessage("Branch not found");
+//            return res;
+//        }
+//
+//        Branch branch = optionalBranch.get();
+//
+//        // ✅ Null-safe + strict state check
+//        if (branch.getStatus() == null || !"PENDING".equals(branch.getStatus())) {
+//            res.setSuccess(false);
+//            res.setStatus(400);
+//            res.setMessage("Branch is not in pending state");
+//            return res;
+//        }
+//
+//        // ✅ Update status
+//        branch.setStatus("VERIFICATION_IN_PROGRESS");
+//        branchRepository.save(branch);
+//
+//        // 📧 Optional: email notification
+//        Map<String, String> mailData = new HashMap<>();
+//        mailData.put("subject", "Branch Verification Started");
+//        mailData.put(
+//                "message",
+//                "Your branch verification has started. Our team is reviewing your details."
+//        );
+//
+//        if (branch.getEmail() != null) {
+//            emailService.sendEmail(branch.getEmail(), mailData);
+//        }
+//
+//        // ✅ Response
+//        res.setSuccess(true);
+//        res.setStatus(200);
+//        res.setMessage("Branch verification started");
+//        res.setBranchId(branchId);
+//
+//        return res;
+//    }
 
-        Response res = new Response();
-
-        Optional<Branch> optionalBranch = branchRepository.findByBranchId(branchId);
-
-        if (optionalBranch.isEmpty()) {
-            res.setSuccess(false);
-            res.setStatus(404);
-            res.setMessage("Branch not found");
-            return res;
-        }
-
-        Branch branch = optionalBranch.get();
-
-        // ✅ Null-safe + strict state check
-        if (branch.getStatus() == null || !"PENDING".equals(branch.getStatus())) {
-            res.setSuccess(false);
-            res.setStatus(400);
-            res.setMessage("Branch is not in pending state");
-            return res;
-        }
-
-        // ✅ Update status
-        branch.setStatus("VERIFICATION_IN_PROGRESS");
-        branchRepository.save(branch);
-
-        // 📧 Optional: email notification
-        Map<String, String> mailData = new HashMap<>();
-        mailData.put("subject", "Branch Verification Started");
-        mailData.put(
-                "message",
-                "Your branch verification has started. Our team is reviewing your details."
-        );
-
-        if (branch.getEmail() != null) {
-            emailService.sendEmail(branch.getEmail(), mailData);
-        }
-
-        // ✅ Response
-        res.setSuccess(true);
-        res.setStatus(200);
-        res.setMessage("Branch verification started");
-        res.setBranchId(branchId);
-
-        return res;
-    }
-
- // ---------------------- VERIFY BRANCH (GENERATE CREDENTIALS) ----------------------
-    @Override
-    public Response verifyBranch(String branchId) {
-
-        Response res = new Response();
-
-        try {
-            Optional<Branch> optionalBranch = branchRepository.findByBranchId(branchId);
-
-            if (optionalBranch.isEmpty()) {
-                res.setSuccess(false);
-                res.setStatus(404);
-                res.setMessage("Branch not found");
-                return res;
-            }
-
-            Branch branch = optionalBranch.get();
-
-            if (!"VERIFICATION_IN_PROGRESS".equals(branch.getStatus())) {
-                res.setSuccess(false);
-                res.setStatus(400);
-                res.setMessage("Branch is not under verification");
-                return res;
-            }
-
-            // 🔐 Generate branch credentials
-            String tempPassword = PasswordGenerator.generatePassword(10);
-
-            BranchCredentials credentials = new BranchCredentials();
-            credentials.setBranchId(branchId);
-            credentials.setUserName(branchId);
-            credentials.setPassword(tempPassword);
-            credentials.setBranchName(branch.getBranchName());
-            credentials.setRole(branch.getRole());
-            credentials.setPermissions(branch.getPermissions());
-
-            branchCredentialsRepository.save(credentials);
-
-            // ✅ Update branch status
-            branch.setStatus("VERIFIED");
-            branchRepository.save(branch);
-
-            // 📧 SEND EMAIL WITH CREDENTIALS
-            Map<String, String> mailData = new HashMap<>();
-            mailData.put("subject", "Branch Verified Successfully");
-            mailData.put(
-                    "message",
-                    "Your branch has been verified successfully.\n" +
-                    "Please use the credentials below to log in."
-            );
-            mailData.put("username", credentials.getUserName());
-            mailData.put("password", tempPassword);
-
-            if (branch.getEmail() != null && !branch.getEmail().isBlank()) {
-                emailService.sendEmail(branch.getEmail(), mailData);
-            }
-
-            // ✅ Response
-            res.setSuccess(true);
-            res.setStatus(200);
-            res.setMessage("Branch verified successfully");
-            res.setBranchId(branchId);
-
-            return res;
-
-        } catch (Exception e) {
-            res.setSuccess(false);
-            res.setStatus(500);
-            res.setMessage("Failed to verify branch: " + e.getMessage());
-            return res;
-        }
-    }
-
-    @Override
-    public Response rejectBranch(String branchId, String reason) {
-
-        Response res = new Response();
-
-        try {
-            Optional<Branch> optionalBranch = branchRepository.findByBranchId(branchId);
-
-            if (optionalBranch.isEmpty()) {
-                res.setSuccess(false);
-                res.setStatus(404);
-                res.setMessage("Branch not found");
-                return res;
-            }
-
-            Branch branch = optionalBranch.get();
-
-            if ("VERIFIED".equals(branch.getStatus())) {
-                res.setSuccess(false);
-                res.setStatus(400);
-                res.setMessage("Verified branch cannot be rejected");
-                return res;
-            }
-
-            // ❌ Reject branch
-            branch.setStatus("REJECTED");
-            branchRepository.save(branch);
-
-            // 📧 (Optional) Email notification
-            Map<String, String> mailData = new HashMap<>();
-            mailData.put("subject", "Branch Registration Rejected");
-            mailData.put(
-                    "message",
-                    "Your branch registration has been rejected.\nReason: " + reason
-            );
-
-            emailService.sendEmail(branch.getEmail(), mailData);
-
-            res.setSuccess(true);
-            res.setStatus(200);
-            res.setMessage("Branch rejected successfully");
-            res.setBranchId(branchId);
-
-            return res;
-
-        } catch (Exception e) {
-            res.setSuccess(false);
-            res.setStatus(500);
-            res.setMessage("Failed to reject branch: " + e.getMessage());
-            return res;
-        }
-    }
+// // ---------------------- VERIFY BRANCH (GENERATE CREDENTIALS) ----------------------
+//    @Override
+//    public Response verifyBranch(String branchId) {
+//
+//        Response res = new Response();
+//
+//        try {
+//            Optional<Branch> optionalBranch = branchRepository.findByBranchId(branchId);
+//
+//            if (optionalBranch.isEmpty()) {
+//                res.setSuccess(false);
+//                res.setStatus(404);
+//                res.setMessage("Branch not found");
+//                return res;
+//            }
+//
+//            Branch branch = optionalBranch.get();
+//
+//            if (!"VERIFICATION_IN_PROGRESS".equals(branch.getStatus())) {
+//                res.setSuccess(false);
+//                res.setStatus(400);
+//                res.setMessage("Branch is not under verification");
+//                return res;
+//            }
+//
+//            // 🔐 Generate branch credentials
+//            String tempPassword = PasswordGenerator.generatePassword(10);
+//
+//            BranchCredentials credentials = new BranchCredentials();
+//            credentials.setBranchId(branchId);
+//            credentials.setUserName(branchId);
+//            credentials.setPassword(tempPassword);
+//            credentials.setBranchName(branch.getBranchName());
+//            credentials.setRole(branch.getRole());
+//            credentials.setPermissions(branch.getPermissions());
+//
+//            branchCredentialsRepository.save(credentials);
+//
+//            // ✅ Update branch status
+//            branch.setStatus("VERIFIED");
+//            branchRepository.save(branch);
+//
+//            // 📧 SEND EMAIL WITH CREDENTIALS
+//            Map<String, String> mailData = new HashMap<>();
+//            mailData.put("subject", "Branch Verified Successfully");
+//            mailData.put(
+//                    "message",
+//                    "Your branch has been verified successfully.\n" +
+//                    "Please use the credentials below to log in."
+//            );
+//            mailData.put("username", credentials.getUserName());
+//            mailData.put("password", tempPassword);
+//
+//            if (branch.getEmail() != null && !branch.getEmail().isBlank()) {
+//                emailService.sendEmail(branch.getEmail(), mailData);
+//            }
+//
+//            // ✅ Response
+//            res.setSuccess(true);
+//            res.setStatus(200);
+//            res.setMessage("Branch verified successfully");
+//            res.setBranchId(branchId);
+//
+//            return res;
+//
+//        } catch (Exception e) {
+//            res.setSuccess(false);
+//            res.setStatus(500);
+//            res.setMessage("Failed to verify branch: " + e.getMessage());
+//            return res;
+//        }
+//    }
+//
+//    @Override
+//    public Response rejectBranch(String branchId, String reason) {
+//
+//        Response res = new Response();
+//
+//        try {
+//            Optional<Branch> optionalBranch = branchRepository.findByBranchId(branchId);
+//
+//            if (optionalBranch.isEmpty()) {
+//                res.setSuccess(false);
+//                res.setStatus(404);
+//                res.setMessage("Branch not found");
+//                return res;
+//            }
+//
+//            Branch branch = optionalBranch.get();
+//
+//            if ("VERIFIED".equals(branch.getStatus())) {
+//                res.setSuccess(false);
+//                res.setStatus(400);
+//                res.setMessage("Verified branch cannot be rejected");
+//                return res;
+//            }
+//
+//            // ❌ Reject branch
+//            branch.setStatus("REJECTED");
+//            branchRepository.save(branch);
+//
+//            // 📧 (Optional) Email notification
+//            Map<String, String> mailData = new HashMap<>();
+//            mailData.put("subject", "Branch Registration Rejected");
+//            mailData.put(
+//                    "message",
+//                    "Your branch registration has been rejected.\nReason: " + reason
+//            );
+//
+//            emailService.sendEmail(branch.getEmail(), mailData);
+//
+//            res.setSuccess(true);
+//            res.setStatus(200);
+//            res.setMessage("Branch rejected successfully");
+//            res.setBranchId(branchId);
+//
+//            return res;
+//
+//        } catch (Exception e) {
+//            res.setSuccess(false);
+//            res.setStatus(500);
+//            res.setMessage("Failed to reject branch: " + e.getMessage());
+//            return res;
+//        }
+//    }
 
 
 
@@ -590,5 +633,6 @@ public class BranchServiceImpl implements BranchService {
         }
         return ResponseEntity.status(response.getStatus()).body(response);
     }
+	
 
 }

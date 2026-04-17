@@ -17,187 +17,7 @@ import { Edit2, Eye, Trash2 } from 'lucide-react'
 
 import PhysioForm from './NurseForm'
 import { getAllPhysios, addPhysio, updatePhysio, deletePhysio } from './NurseAPI'
-// const dummyPhysios = [
-//   {
-//     id: 1,
-//     fullName: 'Dr. Priya Sharma',
-//     contactNumber: '9876543210',
-//     gender: 'female',
-//     dateOfBirth: '1995-06-10',
 
-//     qualification: 'BPT',
-//     yearsOfExperience: 2,
-
-//     services: ['home', 'clinic'],
-
-//     specializations: ['orthopedic'],
-//     expertiseAreas: ['knee', 'shoulder'],
-//     treatmentTypes: ['exercise_therapy', 'manual_therapy'],
-
-//     availability: {
-//       startDay: 'monday',
-//       endDay: 'friday',
-//       startTime: '09:00',
-//       endTime: '18:00',
-//     },
-
-//     bio: 'Physiotherapist specializing in knee rehabilitation.',
-
-//     documents: {
-//       licenseCertificate: '',
-//       degreeCertificate: '',
-//       profilePhoto: '',
-//     },
-
-//     languages: ['english', 'telugu'],
-//     role: 'physiotherapist',
-//     physioType: 'therapist',
-//   },
-
-//   {
-//     id: 2,
-//     fullName: 'Dr. Rahul Verma',
-//     contactNumber: '9123456780',
-//     gender: 'male',
-//     dateOfBirth: '1990-03-15',
-
-//     qualification: 'MPT',
-//     yearsOfExperience: 5,
-
-//     services: ['clinic'],
-
-//     specializations: ['neurological'],
-//     expertiseAreas: ['back'],
-//     treatmentTypes: ['manual_therapy'],
-
-//     availability: {
-//       startDay: 'tuesday',
-//       endDay: 'saturday',
-//       startTime: '10:00',
-//       endTime: '19:00',
-//     },
-
-//     bio: 'Expert in neurological physiotherapy.',
-
-//     documents: {
-//       licenseCertificate: '',
-//       degreeCertificate: '',
-//       profilePhoto: '',
-//     },
-
-//     languages: ['english', 'hindi'],
-//     role: 'physiotherapist',
-//     physioType: 'consultant',
-//   },
-
-//   {
-//     id: 3,
-//     fullName: 'Dr. Sneha Reddy',
-//     contactNumber: '9988776655',
-//     gender: 'female',
-//     dateOfBirth: '1993-11-22',
-
-//     qualification: 'BPT',
-//     yearsOfExperience: 3,
-
-//     services: ['home'],
-
-//     specializations: ['sports'],
-//     expertiseAreas: ['shoulder', 'back'],
-//     treatmentTypes: ['exercise_therapy'],
-
-//     availability: {
-//       startDay: 'monday',
-//       endDay: 'thursday',
-//       startTime: '08:00',
-//       endTime: '16:00',
-//     },
-
-//     bio: 'Sports physiotherapist with focus on recovery.',
-
-//     documents: {
-//       licenseCertificate: '',
-//       degreeCertificate: '',
-//       profilePhoto: '',
-//     },
-
-//     languages: ['english', 'telugu'],
-//     role: 'physiotherapist',
-//     physioType: 'therapist',
-//   },
-
-//   {
-//     id: 4,
-//     fullName: 'Dr. Arjun Kumar',
-//     contactNumber: '9001122334',
-//     gender: 'male',
-//     dateOfBirth: '1988-07-05',
-
-//     qualification: 'MPT',
-//     yearsOfExperience: 7,
-
-//     services: ['clinic', 'home'],
-
-//     specializations: ['orthopedic'],
-//     expertiseAreas: ['knee', 'back'],
-//     treatmentTypes: ['manual_therapy', 'electrotherapy'],
-
-//     availability: {
-//       startDay: 'wednesday',
-//       endDay: 'sunday',
-//       startTime: '11:00',
-//       endTime: '20:00',
-//     },
-
-//     bio: 'Senior physiotherapist with 7+ years experience.',
-
-//     documents: {
-//       licenseCertificate: '',
-//       degreeCertificate: '',
-//       profilePhoto: '',
-//     },
-
-//     languages: ['english', 'hindi'],
-//     role: 'physiotherapist',
-//     physioType: 'consultant',
-//   },
-
-//   {
-//     id: 5,
-//     fullName: 'Dr. Kavya Nair',
-//     contactNumber: '9012345678',
-//     gender: 'female',
-//     dateOfBirth: '1996-02-18',
-
-//     qualification: 'BPT',
-//     yearsOfExperience: 1,
-
-//     services: ['home'],
-
-//     specializations: ['neurological'],
-//     expertiseAreas: ['shoulder'],
-//     treatmentTypes: ['exercise_therapy'],
-
-//     availability: {
-//       startDay: 'monday',
-//       endDay: 'friday',
-//       startTime: '09:30',
-//       endTime: '17:30',
-//     },
-
-//     bio: 'Junior physiotherapist passionate about care.',
-
-//     documents: {
-//       licenseCertificate: '',
-//       degreeCertificate: '',
-//       profilePhoto: '',
-//     },
-
-//     languages: ['english'],
-//     role: 'physiotherapist',
-//     physioType: 'therapist',
-//   },
-// ]
 
 const PhysioManagement = () => {
   const [physios, setPhysios] = useState([])
@@ -238,6 +58,7 @@ const [physioToDelete, setPhysioToDelete] = useState(null)
       await fetchPhysios()
     } else {
       const res = await addPhysio(data)
+      fetchPhysios() // refresh list after adding
       setPhysios(prev => [...prev, res.data.data])
     }
 
@@ -276,6 +97,10 @@ const [physioToDelete, setPhysioToDelete] = useState(null)
       <CTable striped className='pink-table'>
         <CTableHead>
           <CTableRow>
+            <CTableHeaderCell>#</CTableHeaderCell>
+
+            <CTableHeaderCell>Photo</CTableHeaderCell>
+
             <CTableHeaderCell>Name</CTableHeaderCell>
             <CTableHeaderCell>Contact</CTableHeaderCell>
             <CTableHeaderCell>Qualification</CTableHeaderCell>
@@ -285,8 +110,32 @@ const [physioToDelete, setPhysioToDelete] = useState(null)
         </CTableHead>
 
         <CTableBody>
-          {physios.map((p) => (
+          {physios.map((p,index) => (
             <CTableRow key={p.id}>
+               <CTableDataCell>
+        {index + 1}
+      </CTableDataCell>
+              
+              <CTableDataCell>
+  <div className="d-flex align-items-center gap-2">
+    <img
+      src={
+        p.documents?.profilePhoto
+          ? `data:image/jpeg;base64,${p.documents.profilePhoto}`
+          : '/assets/images/default-avatar.png'
+      }
+      alt={p.fullName}
+      width="40"
+      height="40"
+      style={{
+        borderRadius: '50%',
+        objectFit: 'cover',
+        border: '1px solid #ccc',
+      }}
+    />
+  </div>
+</CTableDataCell>
+              
               <CTableDataCell>{p.fullName}</CTableDataCell>
               <CTableDataCell>{p.contactNumber}</CTableDataCell>
               <CTableDataCell>{p.qualification}</CTableDataCell>
