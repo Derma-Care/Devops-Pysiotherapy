@@ -79,7 +79,7 @@ public class BookingRequset {
 	    isFollowupStatus = followupStatus;
 	}
 	
-	public boolean getFollowupStatus() {
+	public boolean getIsFollowupStatus() {
 	    return isFollowupStatus;
 	}
 }
