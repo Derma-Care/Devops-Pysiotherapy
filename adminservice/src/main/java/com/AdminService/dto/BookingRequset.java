@@ -1,4 +1,4 @@
-giffsfwwwwwwwwwfffdfpackage com.AdminService.dto;
+package com.AdminService.dto;
 
 import java.util.List;
 import java.util.Map;
