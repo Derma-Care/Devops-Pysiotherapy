@@ -95,7 +95,8 @@ public class BookingResponse {
 	private String policyNumber;
 	private List<String> activityLevels;
 	private String reasonforVisit;
-	private boolean isFollowupStatus;	
+	private boolean isFollowupStatus;
+	private Session session;
 	
 	
 	public void setIsFollowupStatus(boolean followupStatus) {
