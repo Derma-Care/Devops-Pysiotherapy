@@ -95,6 +95,8 @@ const PackagesManagement = React.lazy(() => import('./views/Package/PackagesMana
 const ProgramPayment = React.lazy(() => import('./views/AppointmentManagement/PaymentProgram'))
 
 const PhysioConsentForm = React.lazy(() => import('./views/AppointmentManagement/PhysioConsentForm'))
+const FollowupDashboard = React.lazy(() => import('./views/AppointmentManagement/FollowUpDashboard'))
+const PaymentDetailsUI = React.lazy(() => import('./views/AppointmentManagement/PaymentDetailsUI'))
 
 const routes = [
   { path: '/dashboard', name: 'Dashboard', element: Dashboard },
@@ -205,6 +207,11 @@ const routes = [
   { path: "/expenses", element: ExpenseForm },
   { path: "/program-payment/:id", element: ProgramPayment },
   { path: "/physio-consent-form", element: PhysioConsentForm },
+
+
+  { path: "/followupDashboard", element: FollowupDashboard },
+  { path: "/paymentDetails", element: PaymentDetailsUI }
+
 
   // { path: "/attendance", element: AttendanceMenu },
 

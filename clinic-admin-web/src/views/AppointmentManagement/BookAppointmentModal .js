@@ -45,7 +45,7 @@ import { useHospital } from '../Usecontext/HospitalContext'
 import { toast } from 'react-toastify'
 import BookingSearch from '../widgets/BookingSearch '
 import LoadingIndicator from '../../Utils/loader'
-import { postBooking } from '../../APIs/BookServiceAPi'
+import { followUPBooking, postBooking } from '../../APIs/BookServiceAPi'
 
 
 import { addCustomer } from '../customerManagement/CustomerManagementAPI'
@@ -156,7 +156,7 @@ const BookAppointmentModal = ({ visible, onClose }) => {
     doctorRefCode: '',
 
     consultationType: 'Services & Treatments',
-    consultationFee: '',
+    consultationFee: [],
     consultationExpiration: selectedHospital.data.consultationExpiration,
     paymentType: '',
     partAmount: '',
@@ -871,6 +871,8 @@ const BookAppointmentModal = ({ visible, onClose }) => {
         bookingDetails.reasonForVisit === "Others"
           ? otherReason
           : bookingDetails.reasonForVisit;
+
+
       const payloadToSend = {
         ...rest,
         name: combinedName,
@@ -888,6 +890,11 @@ const BookAppointmentModal = ({ visible, onClose }) => {
         reasonForVisit: finalReason,
         insuranceProvider: bookingDetails.insuranceProvider,
         policyNumber: bookingDetails.policyNumber,
+        listOfConsultationFee: [  //TODO:listOfConsultationFee
+          {
+            consulationFee: Number(bookingDetails.consultationFee || 0),
+          },
+        ],
       }
 
       console.log('Payload without slot:', payloadToSend)
@@ -1018,7 +1025,7 @@ const BookAppointmentModal = ({ visible, onClose }) => {
     console.log('📦 Follow-up Payload:', payload)
 
     try {
-      const res = await postBooking(payload)
+      const res = await followUPBooking(payload)
       console.log('✅ Follow-up Response:', res)
       showCustomToast('Follow-up booking submitted successfully!', 'success')
       setTimeout(() => {
@@ -1556,7 +1563,10 @@ const BookAppointmentModal = ({ visible, onClose }) => {
                         bookingDetails.consultationType?.toLowerCase().includes('service') &&
                         bookingDetails.subServiceId
                       ) {
-                        fee = bookingDetails.consultationFee || 0
+                        const fee =
+                          bookingDetails.consultationFee[0]?.consulationFee ||
+                          bookingDetails.consultationFee ||
+                          0;
                       } else {
                         fee =
                           appointmentType?.toLowerCase() === 'inclinic'
