@@ -10,7 +10,7 @@ export const SPLR_URL = `${splrUrl}`
 export const MainAdmin_URL = `${wifiUrl}/admin`
 export const subService_URL = `${BASE_URL}/api/v1`
  
-// END POINTS
+// END POINTS  tooo
 export const endPoint = '/clinicLogin'
  
  
