@@ -70,6 +70,7 @@ const BookAppointmentModal = ({ visible, onClose }) => {
   const navigate = useNavigate()
   const [slots, setSlots] = useState([])
   const [referDoctor, setReferDoctor] = useState([])
+  // const [onboardToCustomer, setOnboardToCustomer] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const [selectedBooking, setSelectedBooking] = useState(null)
@@ -197,6 +198,8 @@ const BookAppointmentModal = ({ visible, onClose }) => {
     },
   }
   const [bookingDetails, setBookingDetails] = useState(initialBookingDetails)
+
+  console.log('bookingDetails', selectedBooking)
   const handleChange = (level) => {
     if (activityLevels.includes(level)) {
       // remove if already selected
@@ -227,6 +230,15 @@ const BookAppointmentModal = ({ visible, onClose }) => {
     if (isNaN(d)) return null
     return d.toISOString().split('T')[0] // 'yyyy-mm-dd'
   }
+  useEffect(() => {
+    if (!selectedBooking || !selectedBooking.customerId) {
+      // New booking / no customer
+      setOnboardToCustomer(true)
+    } else {
+      // Existing customer
+      setOnboardToCustomer(false)
+    }
+  }, [selectedBooking])
 
   // ✅ Fetch Categories
   useEffect(() => {
@@ -1086,7 +1098,7 @@ const BookAppointmentModal = ({ visible, onClose }) => {
     setBookingDetails(prev => ({
       ...prev,
       activityLevels: activityLevels,
-      reasonForVisit: reasonForVisit
+
     }))
   }, [activityLevels, reasonForVisit])
   // const [part, setPart] = useState("");
@@ -1172,6 +1184,7 @@ const BookAppointmentModal = ({ visible, onClose }) => {
   //   setMarkedImage(data.image);
   //   setTheraphyQuestions(actualData.answerData || {});
   // };
+  console.log(`part ${selectedBooking}`)
   return (
     <COffcanvas
       placement="end"
@@ -1908,9 +1921,9 @@ const BookAppointmentModal = ({ visible, onClose }) => {
               </CCol>
 
               <CCol md={6}>
-                <CFormLabel>Reason for Visit</CFormLabel>
+                <h6 >Reason for Visit</h6>
 
-                <div className="d-flex gap-3 mt-1">
+                <div className="d-flex gap-3 mt-1" >
                   {reasonforVisitOption.map((item) => (
                     <div key={item} className="d-flex align-items-center">
                       <input
@@ -1920,7 +1933,7 @@ const BookAppointmentModal = ({ visible, onClose }) => {
                         checked={bookingDetails.reasonForVisit === item}
                         onChange={() => handleReasonChange(item)}
                       />
-                      <label className="ms-1">{item}</label>
+                      <label className="ms-1" style={{ color: "var(--color-black" }}>{item}</label>
                     </div>
                   ))}
                 </div>
@@ -2298,26 +2311,23 @@ const BookAppointmentModal = ({ visible, onClose }) => {
             <p className="text-danger small">{errors.markedImage}</p>
           )}
         </div>
-
-        {selectedBooking == null && (
-          <>
-            <div className="form-check mt-3">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                id="onboardCheckbox"
-                checked={onboardToCustomer}
-                onChange={(e) => setOnboardToCustomer(e.target.checked)}
-              />
-              <label
-                className="form-check-label"
-                htmlFor="onboardCheckbox"
-                style={{ color: 'var(--color-black)', cursor: 'pointer' }}
-              >
-                Customer Registration
-              </label>
-            </div>
-          </>
+        {(!selectedBooking || !selectedBooking.customerId) && (
+          <div className="form-check mt-3">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              id="onboardCheckbox"
+              checked={onboardToCustomer}
+              onChange={(e) => setOnboardToCustomer(e.target.checked)}
+            />
+            <label
+              className="form-check-label"
+              htmlFor="onboardCheckbox"
+              style={{ color: 'var(--color-black)', cursor: 'pointer' }}
+            >
+              Customer Registration
+            </label>
+          </div>
         )}
 
         {/* Buttons */}

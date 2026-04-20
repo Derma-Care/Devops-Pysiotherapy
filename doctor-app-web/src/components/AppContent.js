@@ -46,9 +46,11 @@ const AppContent = () => {
                   'Complaints',
                   'Assessment',
                   'Diagnosis',
-                  'TreatmentPlan',
-                  'TherapySessions',
-                  'ExercisePlan',
+                  'Investigation',
+                  'Plan',
+              
+                  
+                  'HomePlan',
                   'Prescription',
                 ]}
               />
