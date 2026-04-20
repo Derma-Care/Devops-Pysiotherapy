@@ -1,546 +1,1644 @@
-// src/components/PrescriptionPDF.jsx
+// src/utils/PdfGenerator.jsx  — PREMIUM REDESIGN v3
 import React from "react";
-import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, Text, View, Image, StyleSheet, Svg, Path, Rect, Circle, Line } from "@react-pdf/renderer";
 import { capitalizeEachWord } from "./CaptalZeWord";
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  ALL CALL STYLES ARE SUPPORTED:
-//
-//  A) <PrescriptionPDF bookingData={fullJson} clicniData={c} doctorData={d} />
-//  B) <PrescriptionPDF formData={fullJson}    clicniData={c} doctorData={d} />
-//  C) <PrescriptionPDF formData={{complaints,assessment,...}} patientData={p} ... />
+//  PALETTE  — Refined monochromatic slate + surgical green accent
 // ─────────────────────────────────────────────────────────────────────────────
-
-// ── Colors ────────────────────────────────────────────────────────────────────
 const C = {
-  primary: "#1a56db", primaryLight: "#e8f0fe",
-  accent:  "#0e9f6e", accentLight:  "#e8f5f0",
-  warning: "#e3a008", warningLight: "#fef3c7",
-  danger:  "#e02424", dangerLight:  "#fde8e8",
-  dark: "#111827", mid: "#374151", muted: "#6b7280",
-  border: "#e5e7eb", bgLight: "#f9fafb", white: "#ffffff",
+  // Pure tones
+  white:     "#ffffff",
+  paper:     "#fafafa",
+  ink:       "#0a0f1a",
+
+  // Slate scale (cool, neutral)
+  slate50:   "#f8fafc",
+  slate100:  "#f1f5f9",
+  slate150:  "#e9eef5",
+  slate200:  "#e2e8f0",
+  slate300:  "#cbd5e1",
+  slate400:  "#94a3b8",
+  slate500:  "#64748b",
+  slate600:  "#475569",
+  slate700:  "#334155",
+  slate800:  "#1e293b",
+  slate850:  "#172032",
+  slate900:  "#0f172a",
+  slate950:  "#080d18",
+
+  // Primary accent — Surgical Green / Emerald
+  em50:      "#ecfdf5",
+  em100:     "#d1fae5",
+  em200:     "#a7f3d0",
+  em300:     "#6ee7b7",
+  em400:     "#34d399",
+  em500:     "#10b981",
+  em600:     "#059669",
+  em700:     "#047857",
+  em800:     "#065f46",
+  em900:     "#064e3b",
+
+  // Secondary accent — Warm gold (for highlights)
+  gold400:   "#fbbf24",
+  gold500:   "#f59e0b",
+  gold600:   "#d97706",
+  gold100:   "#fef3c7",
+  gold50:    "#fffbeb",
+
+  // Semantic
+  red50:     "#fef2f2",
+  red100:    "#fee2e2",
+  red500:    "#ef4444",
+  red600:    "#dc2626",
+  red700:    "#b91c1c",
+
+  amber50:   "#fffbeb",
+  amber100:  "#fef3c7",
+  amber600:  "#d97706",
+  amber700:  "#b45309",
+
+  blue50:    "#eff6ff",
+  blue100:   "#dbeafe",
+  blue600:   "#2563eb",
+  blue700:   "#1d4ed8",
+
+  purple50:  "#faf5ff",
+  purple100: "#ede9fe",
+  purple600: "#7c3aed",
+  purple700: "#6d28d9",
+
+  sky50:     "#f0f9ff",
+  sky100:    "#e0f2fe",
+  sky600:    "#0284c7",
+  sky700:    "#0369a1",
 };
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+//  TYPOGRAPHY SCALE
+// ─────────────────────────────────────────────────────────────────────────────
+const T = {
+  // Display
+  display:    { fontSize: 18, fontFamily: "Helvetica-Bold", letterSpacing: -0.3 },
+  // Headings
+  h1:         { fontSize: 11, fontFamily: "Helvetica-Bold", letterSpacing: 0.2 },
+  h2:         { fontSize: 9,  fontFamily: "Helvetica-Bold", letterSpacing: 0.5 },
+  h3:         { fontSize: 8,  fontFamily: "Helvetica-Bold", letterSpacing: 0.3 },
+  // Body
+  body:       { fontSize: 8,  fontFamily: "Helvetica",      lineHeight: 1.6 },
+  bodyBold:   { fontSize: 8,  fontFamily: "Helvetica-Bold", lineHeight: 1.6 },
+  bodyLg:     { fontSize: 9,  fontFamily: "Helvetica",      lineHeight: 1.7 },
+  // Labels
+  label:      { fontSize: 6.5, fontFamily: "Helvetica-Bold", letterSpacing: 0.8, textTransform: "uppercase" },
+  labelSm:    { fontSize: 6,   fontFamily: "Helvetica-Bold", letterSpacing: 0.6, textTransform: "uppercase" },
+  // Caption
+  caption:    { fontSize: 7,   fontFamily: "Helvetica",      lineHeight: 1.5 },
+  captionBold:{ fontSize: 7,   fontFamily: "Helvetica-Bold" },
+  // Micro
+  micro:      { fontSize: 6,   fontFamily: "Helvetica" },
+  microBold:  { fontSize: 6,   fontFamily: "Helvetica-Bold" },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LAYOUT CONSTANTS
+// ─────────────────────────────────────────────────────────────────────────────
+const L = {
+  pageH: 28,   // header height approx
+  pageP: 32,   // horizontal page padding
+  colGap: 10,
+  sectionGap: 16,
+  cardR: 4,    // card border radius
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  STYLES
+// ─────────────────────────────────────────────────────────────────────────────
 const S = StyleSheet.create({
-  page:    { padding: 0, fontSize: 10, fontFamily: "Helvetica", backgroundColor: C.white },
-  header:  { backgroundColor: C.primary, padding: "20 32 16 32", flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  hLeft:   { flexDirection: "column" },
-  hClinic: { fontSize: 20, fontFamily: "Helvetica-Bold", color: C.white, marginBottom: 3 },
-  hMeta:   { fontSize: 9, color: "rgba(255,255,255,0.75)", marginTop: 2 },
-  hRight:  { alignItems: "flex-end" },
-  hBadge:  { backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 4, padding: "4 10", marginBottom: 4 },
-  hBadgeTx:{ color: C.white, fontSize: 9, fontFamily: "Helvetica-Bold" },
-  hMeta2:  { fontSize: 8, color: "rgba(255,255,255,0.6)" },
+  // ── PAGE ──
+  page: {
+    fontSize: 8,
+    fontFamily: "Helvetica",
+    backgroundColor: C.white,
+    padding: 0,
+  },
 
-  body: { padding: "16 32 24 32" },
+  // ── HEADER ──
+  header: {
+    backgroundColor: C.slate900,
+    paddingTop: 0,
+    paddingBottom: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    flexDirection: "column",
+  },
+  // The top accent strip
+  headerAccentBar: {
+    height: 3,
+    flexDirection: "row",
+  },
+  headerAccentSeg1: { flex: 3, backgroundColor: C.em500 },
+  headerAccentSeg2: { flex: 1, backgroundColor: C.em700 },
+  headerAccentSeg3: { flex: 5, backgroundColor: C.slate700 },
 
-  sec:     { marginBottom: 14 },
-  secHead: { flexDirection: "row", alignItems: "center", marginBottom: 8, borderBottomWidth: 1.5, borderBottomColor: C.primary, paddingBottom: 4 },
-  secDot:  { width: 8, height: 8, borderRadius: 4, backgroundColor: C.primary, marginRight: 6 },
-  secTx:   { fontSize: 11, fontFamily: "Helvetica-Bold", color: C.primary, textTransform: "uppercase", letterSpacing: 0.5 },
+  headerInner: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingTop: 16,
+    paddingBottom: 16,
+    paddingLeft: L.pageP,
+    paddingRight: L.pageP,
+  },
+  hLeft: { flex: 1 },
+  hClinicName: {
+    fontSize: 15,
+    fontFamily: "Helvetica-Bold",
+    color: C.white,
+    letterSpacing: -0.2,
+    marginBottom: 3,
+  },
+  hMeta: { fontSize: 7, color: C.slate400, lineHeight: 1.7 },
+  hRight: { alignItems: "flex-end" },
+  hDocType: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    color: C.em400,
+    letterSpacing: 3,
+    textTransform: "uppercase",
+    marginBottom: 5,
+  },
+  hDate:      { fontSize: 7.5, color: C.slate300, textAlign: "right", marginBottom: 2 },
+  hRef:       { fontSize: 7,   color: C.slate500, textAlign: "right", marginBottom: 2 },
+  hStatusWrap:{ flexDirection: "row", justifyContent: "flex-end", marginTop: 4 },
+  hStatusPill:{
+    borderRadius: 2,
+    paddingTop: 2, paddingBottom: 2,
+    paddingLeft: 8, paddingRight: 8,
+  },
+  hStatusTx:  { fontSize: 6.5, fontFamily: "Helvetica-Bold", letterSpacing: 1.2 },
 
-  row2:  { flexDirection: "row" },
-  col2:  { flex: 1, marginBottom: 6, paddingRight: 8 },
-  grid:  { flexDirection: "row", flexWrap: "wrap" },
-  cell2: { width: "50%", marginBottom: 6, paddingRight: 8 },
+  // ── HEADER BOTTOM RULE ──
+  headerRule: {
+    height: 1,
+    backgroundColor: C.slate800,
+    marginLeft: L.pageP,
+    marginRight: L.pageP,
+  },
 
-  lbl: { fontSize: 8, color: C.muted, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 2 },
-  val: { fontSize: 10, color: C.dark },
-  valB:{ fontSize: 10, color: C.dark, fontFamily: "Helvetica-Bold" },
+  // ── PATIENT BANNER ──
+  patientBanner: {
+    backgroundColor: C.slate900,
+    paddingTop: 10,
+    paddingBottom: 12,
+    paddingLeft: L.pageP,
+    paddingRight: L.pageP,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 3,
+    borderBottomColor: C.em600,
+  },
+  pbLeft: { flexDirection: "row", alignItems: "center" },
+  pbAvatar: {
+    width: 40, height: 40,
+    borderRadius: 4,
+    backgroundColor: C.em800,
+    alignItems: "center", justifyContent: "center",
+    marginRight: 14, flexShrink: 0,
+    borderTopWidth: 1, borderRightWidth: 1,
+    borderBottomWidth: 1, borderLeftWidth: 1,
+    borderTopColor: C.em600, borderRightColor: C.em600,
+    borderBottomColor: C.em600, borderLeftColor: C.em600,
+  },
+  pbAvatarTx: { fontSize: 13, fontFamily: "Helvetica-Bold", color: C.em300 },
+  pbName:     { fontSize: 15, fontFamily: "Helvetica-Bold", color: C.white, letterSpacing: -0.1 },
+  pbMeta:     { fontSize: 7.5, color: C.slate400, marginTop: 3, letterSpacing: 0.2 },
+  pbRight:    { alignItems: "flex-end" },
+  pbIdWrap: {
+    backgroundColor: C.slate800,
+    borderRadius: 3,
+    paddingTop: 5, paddingBottom: 5,
+    paddingLeft: 10, paddingRight: 10,
+    borderTopWidth: 1, borderRightWidth: 1,
+    borderBottomWidth: 1, borderLeftWidth: 1,
+    borderTopColor: C.slate700, borderRightColor: C.slate700,
+    borderBottomColor: C.slate700, borderLeftColor: C.slate700,
+  },
+  pbIdLbl:    { fontSize: 6, color: C.slate500, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 2, fontFamily: "Helvetica-Bold" },
+  pbIdVal:    { fontSize: 9, fontFamily: "Helvetica-Bold", color: C.em400, letterSpacing: 0.5 },
 
-  card:  { backgroundColor: C.bgLight, borderRadius: 6, padding: "10 12", marginBottom: 8, borderLeftWidth: 3, borderLeftColor: C.primary },
-  cAcc:  { borderLeftColor: C.accent  },
-  cWarn: { borderLeftColor: C.warning },
-  cDang: { borderLeftColor: C.danger  },
+  // ── BODY ──
+  bodyWrap: {
+    flexDirection: "column",
+    flex: 1,
+    paddingTop: 22,
+    paddingBottom: 32,
+    paddingLeft: L.pageP,
+    paddingRight: L.pageP,
+    backgroundColor: C.white,
+  },
 
-  bRow:  { flexDirection: "row", flexWrap: "wrap", marginTop: 4 },
-  badge: { backgroundColor: C.primaryLight, borderRadius: 10, padding: "2 8", marginRight: 4, marginBottom: 4 },
-  bTx:   { fontSize: 9, color: C.primary, fontFamily: "Helvetica-Bold" },
-  bGreen:{ backgroundColor: C.accentLight  }, bGreenTx: { color: C.accent  },
-  bYell: { backgroundColor: C.warningLight }, bYellTx:  { color: C.warning },
-  bRed:  { backgroundColor: C.dangerLight  }, bRedTx:   { color: C.danger  },
+  // ── SECTION ──
+  sec: { marginBottom: L.sectionGap },
 
-  tbl:    { borderWidth: 1, borderColor: C.border, borderRadius: 6, overflow: "hidden" },
-  tHead:  { flexDirection: "row", backgroundColor: C.primary, padding: "6 10" },
-  tHCell: { flex: 1, fontSize: 9, color: C.white, fontFamily: "Helvetica-Bold" },
-  tRow:   { flexDirection: "row", borderTopWidth: 1, borderTopColor: C.border, padding: "6 10" },
-  tRowAlt:{ backgroundColor: C.bgLight },
-  tCell:  { flex: 1, fontSize: 9, color: C.mid },
+  secHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  secNumBox: {
+    width: 18, height: 18,
+    backgroundColor: C.slate900,
+    borderRadius: 2,
+    alignItems: "center", justifyContent: "center",
+    marginRight: 8,
+    flexShrink: 0,
+  },
+  secNum: { fontSize: 7, fontFamily: "Helvetica-Bold", color: C.em400 },
+  secTitleWrap: { flex: 1, flexDirection: "row", alignItems: "center" },
+  secTitle: {
+    fontSize: 8.5, fontFamily: "Helvetica-Bold", color: C.slate800,
+    textTransform: "uppercase", letterSpacing: 1.5,
+  },
+  secRule: {
+    flex: 1, height: 1,
+    backgroundColor: C.slate200,
+    marginLeft: 10,
+  },
+  secBadge: {
+    backgroundColor: C.em50,
+    borderRadius: 12,
+    paddingTop: 2, paddingBottom: 2,
+    paddingLeft: 8, paddingRight: 8,
+    marginLeft: 8,
+    borderTopWidth: 1, borderRightWidth: 1,
+    borderBottomWidth: 1, borderLeftWidth: 1,
+    borderTopColor: C.em200, borderRightColor: C.em200,
+    borderBottomColor: C.em200, borderLeftColor: C.em200,
+  },
+  secBadgeTx: { fontSize: 6, color: C.em700, fontFamily: "Helvetica-Bold", letterSpacing: 0.3 },
 
-  qaHead: { fontSize: 10, fontFamily: "Helvetica-Bold", color: C.primary, marginBottom: 5, marginTop: 4 },
-  qaRow:  { flexDirection: "row", marginBottom: 4, paddingLeft: 8 },
-  qaBul:  { fontSize: 9, color: C.muted, marginRight: 4, marginTop: 1 },
-  qaQ:    { fontSize: 9, color: C.muted, flex: 1 },
-  qaA:    { fontSize: 9, color: C.dark, fontFamily: "Helvetica-Bold" },
+  subSecTitle: {
+    fontSize: 7, fontFamily: "Helvetica-Bold", color: C.slate500,
+    textTransform: "uppercase", letterSpacing: 1,
+    marginBottom: 9, marginTop: 4,
+    paddingBottom: 5,
+    borderBottomWidth: 1, borderBottomColor: C.slate100,
+  },
 
-  exCard: { borderWidth: 1, borderColor: C.border, borderRadius: 6, padding: "10 12", marginBottom: 8, flexDirection: "row" },
-  exThumb:{ width: 60, height: 45, borderRadius: 4, marginRight: 12 },
-  exDet:  { flex: 1 },
-  exName: { fontSize: 10, fontFamily: "Helvetica-Bold", color: C.dark, marginBottom: 4 },
-  exMeta: { flexDirection: "row", flexWrap: "wrap", marginBottom: 4 },
-  exMetaI:{ backgroundColor: C.accentLight, borderRadius: 4, padding: "2 6", marginRight: 6, marginBottom: 2 },
-  exMetaTx:{ fontSize: 8, color: C.accent },
-  exInstr:{ fontSize: 8, color: C.muted, lineHeight: 1.4 },
-  exUrl:  { fontSize: 8, color: C.primary, marginTop: 3 },
+  // ── CARDS ──
+  card: {
+    backgroundColor: C.slate50,
+    borderRadius: L.cardR,
+    borderTopWidth: 1, borderRightWidth: 1,
+    borderBottomWidth: 1, borderLeftWidth: 1,
+    borderTopColor: C.slate200, borderRightColor: C.slate200,
+    borderBottomColor: C.slate200, borderLeftColor: C.slate200,
+    padding: 14, marginBottom: 8,
+  },
+  cardAccent: {
+    backgroundColor: C.white,
+    borderRadius: L.cardR,
+    borderTopWidth: 1, borderRightWidth: 1,
+    borderBottomWidth: 1, borderLeftWidth: 2,
+    borderTopColor: C.slate150, borderRightColor: C.slate150,
+    borderBottomColor: C.slate150, borderLeftColor: C.slate200,
+    padding: 12, marginBottom: 8,
+  },
+  // Left-border accent colors
+  cEm:     { borderLeftColor: C.em500,     borderLeftWidth: 3 },
+  cGold:   { borderLeftColor: C.gold500,   borderLeftWidth: 3 },
+  cRed:    { borderLeftColor: C.red500,    borderLeftWidth: 3 },
+  cAmber:  { borderLeftColor: C.amber600,  borderLeftWidth: 3 },
+  cBlue:   { borderLeftColor: C.blue600,   borderLeftWidth: 3 },
+  cPurple: { borderLeftColor: C.purple600, borderLeftWidth: 3 },
+  cSky:    { borderLeftColor: C.sky600,    borderLeftWidth: 3 },
+  cSlate:  { borderLeftColor: C.slate400,  borderLeftWidth: 3 },
 
-  pbBg:   { height: 8, backgroundColor: C.border, borderRadius: 4, marginTop: 4, width: "100%" },
-  pbFill: { height: 8, borderRadius: 4 },
+  // ── COMPLAINT BOX ──
+  complaintBox: {
+    backgroundColor: C.red50,
+    borderRadius: L.cardR,
+    borderTopWidth: 1, borderRightWidth: 1,
+    borderBottomWidth: 1, borderLeftWidth: 3,
+    borderTopColor: C.red100, borderRightColor: C.red100,
+    borderBottomColor: C.red100, borderLeftColor: C.red600,
+    padding: 12, marginBottom: 8,
+  },
 
-  img:    { width: 90, height: 90, borderRadius: 6, marginRight: 10, marginTop: 4 },
-  imgRow: { flexDirection: "row", flexWrap: "wrap" },
+  // ── INFO GRID ──
+  grid: { flexDirection: "row", flexWrap: "wrap" },
+  c2:  { width: "50%",    marginBottom: 10, paddingRight: 14 },
+  c3:  { width: "33.33%", marginBottom: 10, paddingRight: 10 },
+  c4:  { width: "25%",    marginBottom: 10, paddingRight: 8  },
 
-  footer: { backgroundColor: C.bgLight, borderTopWidth: 1, borderTopColor: C.border, padding: "10 32", flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  ftTx:   { fontSize: 8, color: C.muted },
-  note:   { fontSize: 9, color: C.mid, lineHeight: 1.5 },
+  // ── FIELD ──
+  fieldBox: {
+    marginBottom: 5,
+  },
+  lbl: {
+    fontSize: 6,
+    color: C.slate400,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 2.5,
+    fontFamily: "Helvetica-Bold",
+  },
+  val:   { fontSize: 8, color: C.slate700, lineHeight: 1.5 },
+  valB:  { fontSize: 8, color: C.slate900, fontFamily: "Helvetica-Bold", lineHeight: 1.5 },
+  valXL: { fontSize: 12, color: C.slate900, fontFamily: "Helvetica-Bold" },
+
+  // ── CHIPS ──
+  chipRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 3 },
+  chip: {
+    borderRadius: 3,
+    paddingTop: 2, paddingBottom: 2,
+    paddingLeft: 7, paddingRight: 7,
+    marginRight: 4, marginBottom: 4,
+    borderTopWidth: 1, borderRightWidth: 1,
+    borderBottomWidth: 1, borderLeftWidth: 1,
+  },
+  chipTx: { fontSize: 6.5, fontFamily: "Helvetica-Bold" },
+  // chip variants
+  chipEm:     { backgroundColor: C.em50,     borderTopColor: C.em200,    borderRightColor: C.em200,    borderBottomColor: C.em200,    borderLeftColor: C.em200    },
+  chipEmTx:   { color: C.em700 },
+  chipGold:   { backgroundColor: C.gold50,   borderTopColor: C.gold100,  borderRightColor: C.gold100,  borderBottomColor: C.gold100,  borderLeftColor: C.gold100  },
+  chipGoldTx: { color: C.gold600 },
+  chipRed:    { backgroundColor: C.red50,    borderTopColor: C.red100,   borderRightColor: C.red100,   borderBottomColor: C.red100,   borderLeftColor: C.red100   },
+  chipRedTx:  { color: C.red700 },
+  chipAmb:    { backgroundColor: C.amber50,  borderTopColor: C.amber100, borderRightColor: C.amber100, borderBottomColor: C.amber100, borderLeftColor: C.amber100 },
+  chipAmbTx:  { color: C.amber700 },
+  chipBlue:   { backgroundColor: C.blue50,   borderTopColor: C.blue100,  borderRightColor: C.blue100,  borderBottomColor: C.blue100,  borderLeftColor: C.blue100  },
+  chipBlueTx: { color: C.blue700 },
+  chipPur:    { backgroundColor: C.purple50, borderTopColor: C.purple100,borderRightColor: C.purple100,borderBottomColor: C.purple100,borderLeftColor: C.purple100},
+  chipPurTx:  { color: C.purple700 },
+  chipSky:    { backgroundColor: C.sky50,    borderTopColor: C.sky100,   borderRightColor: C.sky100,   borderBottomColor: C.sky100,   borderLeftColor: C.sky100   },
+  chipSkyTx:  { color: C.sky700 },
+  chipSlate:  { backgroundColor: C.slate100, borderTopColor: C.slate200, borderRightColor: C.slate200, borderBottomColor: C.slate200, borderLeftColor: C.slate200 },
+  chipSlateTx:{ color: C.slate600 },
+
+  // ── DIVIDER ──
+  divider: { borderBottomWidth: 1, borderBottomColor: C.slate100, marginTop: 8, marginBottom: 10 },
+  dividerDashed: { borderBottomWidth: 1, borderBottomColor: C.slate200, borderStyle: "dashed", marginTop: 6, marginBottom: 8 },
+
+  // ── PAIN BAR ──
+  pbTrack:  { height: 7, backgroundColor: C.slate100, borderRadius: 3.5, marginTop: 4, marginBottom: 3, overflow: "hidden" },
+  pbFill:   { height: 7, borderRadius: 3.5 },
+  pbLabels: { flexDirection: "row", justifyContent: "space-between" },
+  pbLblTx:  { fontSize: 6, color: C.slate400 },
+
+  // ── CHECK ROW ──
+  checkRow: {
+    flexDirection: "row", alignItems: "flex-start",
+    marginBottom: 6, paddingBottom: 6,
+    borderBottomWidth: 1, borderBottomColor: C.slate50,
+  },
+  checkLabel: { fontSize: 7.5, color: C.slate600, fontFamily: "Helvetica-Bold", width: 120, marginTop: 2, flexShrink: 0 },
+  checkPills: { flexDirection: "row", flexWrap: "wrap", flex: 1 },
+  checkOn: {
+    backgroundColor: C.em50, borderRadius: 3,
+    paddingTop: 2, paddingBottom: 2, paddingLeft: 7, paddingRight: 7,
+    marginRight: 4, marginBottom: 3,
+    borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
+    borderTopColor: C.em200, borderRightColor: C.em200, borderBottomColor: C.em200, borderLeftColor: C.em200,
+  },
+  checkOff: {
+    backgroundColor: C.slate50, borderRadius: 3,
+    paddingTop: 2, paddingBottom: 2, paddingLeft: 7, paddingRight: 7,
+    marginRight: 4, marginBottom: 3,
+    borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
+    borderTopColor: C.slate150, borderRightColor: C.slate150, borderBottomColor: C.slate150, borderLeftColor: C.slate150,
+  },
+  checkOnTx:  { fontSize: 7, color: C.em700, fontFamily: "Helvetica-Bold" },
+  checkOffTx: { fontSize: 7, color: C.slate400 },
+  checkNote:  { fontSize: 6, color: C.slate500, fontStyle: "italic", marginTop: 3, flex: 1 },
+
+  // ── Q&A ──
+  qaWrap: {
+    borderRadius: L.cardR, overflow: "hidden", marginBottom: 7,
+    borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
+    borderTopColor: C.slate200, borderRightColor: C.slate200, borderBottomColor: C.slate200, borderLeftColor: C.slate200,
+  },
+  qaHead: {
+    backgroundColor: C.slate800,
+    paddingTop: 7, paddingBottom: 7, paddingLeft: 12, paddingRight: 12,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+  },
+  qaHeadTx:    { fontSize: 8, fontFamily: "Helvetica-Bold", color: C.white },
+  qaHeadCount: { fontSize: 6.5, color: C.em400 },
+  qaRow: {
+    flexDirection: "row", alignItems: "center",
+    paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 12,
+    borderTopWidth: 1, borderTopColor: C.slate100,
+  },
+  qaRowAlt: { backgroundColor: C.slate50 },
+  qaNum: {
+    width: 15, height: 15, borderRadius: 2,
+    backgroundColor: C.em100, alignItems: "center", justifyContent: "center",
+    marginRight: 8, flexShrink: 0,
+  },
+  qaNumTx: { fontSize: 6, color: C.em700, fontFamily: "Helvetica-Bold" },
+  qaQ:     { fontSize: 7.5, color: C.slate600, flex: 1, paddingRight: 12, lineHeight: 1.5 },
+
+  // ── TABLES ──
+  tbl: {
+    borderRadius: L.cardR, overflow: "hidden", marginBottom: 8,
+    borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
+    borderTopColor: C.slate200, borderRightColor: C.slate200, borderBottomColor: C.slate200, borderLeftColor: C.slate200,
+  },
+  tHead: {
+    flexDirection: "row",
+    backgroundColor: C.slate800,
+    paddingTop: 7, paddingBottom: 7, paddingLeft: 12, paddingRight: 12,
+  },
+  tHCell:  { fontSize: 6.5, color: C.slate300, fontFamily: "Helvetica-Bold", paddingRight: 6, letterSpacing: 0.5, textTransform: "uppercase" },
+  tRow: {
+    flexDirection: "row",
+    borderTopWidth: 1, borderTopColor: C.slate100,
+    paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 12,
+  },
+  tRowAlt: { backgroundColor: C.slate50 },
+  tCell:   { fontSize: 7.5, color: C.slate500, paddingRight: 6, lineHeight: 1.4 },
+  tCellB:  { fontSize: 7.5, color: C.slate800, fontFamily: "Helvetica-Bold", paddingRight: 6 },
+  tCellEm: { fontSize: 7.5, color: C.em600,    fontFamily: "Helvetica-Bold", paddingRight: 6 },
+  tCellNum:{ fontSize: 7,   color: C.slate400, paddingRight: 6 },
+
+  // ── SEVERITY / STAGE BADGES ──
+  sevMild:        { backgroundColor: C.em50,     borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
+  sevModerate:    { backgroundColor: C.amber50,  borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
+  sevSevere:      { backgroundColor: C.red50,    borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
+  sevMildTx:      { fontSize: 6.5, color: C.em700,    fontFamily: "Helvetica-Bold" },
+  sevModerateTx:  { fontSize: 6.5, color: C.amber700, fontFamily: "Helvetica-Bold" },
+  sevSevereTx:    { fontSize: 6.5, color: C.red700,   fontFamily: "Helvetica-Bold" },
+
+  stageAcute:     { backgroundColor: C.red50,    borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
+  stageSub:       { backgroundColor: C.amber50,  borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
+  stageChronic:   { backgroundColor: C.purple50, borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
+  stageAcuteTx:   { fontSize: 6.5, color: C.red700,    fontFamily: "Helvetica-Bold" },
+  stageSubTx:     { fontSize: 6.5, color: C.amber700,  fontFamily: "Helvetica-Bold" },
+  stageChronicTx: { fontSize: 6.5, color: C.purple700, fontFamily: "Helvetica-Bold" },
+
+  // ── THERAPY / PACKAGE NESTING ──
+  pkgWrap:   { marginBottom: 10 },
+  pkgHeader: {
+    backgroundColor: C.slate800,
+    paddingTop: 9, paddingBottom: 9, paddingLeft: 14, paddingRight: 14,
+    borderTopLeftRadius: L.cardR, borderTopRightRadius: L.cardR,
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+  },
+  pkgTitle: { fontSize: 9, fontFamily: "Helvetica-Bold", color: C.white },
+  pkgPrice: { fontSize: 7.5, color: C.em400 },
+  pkgBody: {
+    borderTopWidth: 0,
+    borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
+    borderRightColor: C.slate200, borderBottomColor: C.slate200, borderLeftColor: C.slate200,
+    borderBottomLeftRadius: L.cardR, borderBottomRightRadius: L.cardR,
+    padding: 12, backgroundColor: C.slate50,
+  },
+  progHeader: {
+    backgroundColor: C.em700,
+    paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 12,
+    borderTopLeftRadius: 3, borderTopRightRadius: 3,
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+  },
+  progTitle: { fontSize: 8, fontFamily: "Helvetica-Bold", color: C.white },
+  progBody: {
+    borderTopWidth: 0,
+    borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
+    borderRightColor: C.em200, borderBottomColor: C.em200, borderLeftColor: C.em200,
+    borderBottomLeftRadius: 3, borderBottomRightRadius: 3,
+    padding: 9, marginBottom: 8, backgroundColor: C.white,
+  },
+  therapyHeader: {
+    backgroundColor: C.em50,
+    paddingTop: 6, paddingBottom: 6, paddingLeft: 10, paddingRight: 10,
+    borderTopLeftRadius: 3, borderTopRightRadius: 3,
+    flexDirection: "row", justifyContent: "space-between",
+    borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 0, borderLeftWidth: 1,
+    borderTopColor: C.em200, borderRightColor: C.em200, borderLeftColor: C.em200,
+  },
+  therapyTitle: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: C.em700 },
+  therapyBody: {
+    borderTopWidth: 0,
+    borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
+    borderRightColor: C.em200, borderBottomColor: C.em200, borderLeftColor: C.em200,
+    borderBottomLeftRadius: 3, borderBottomRightRadius: 3,
+    overflow: "hidden", marginBottom: 6,
+  },
+
+  // ── META BAR ──
+  metaBar: {
+    flexDirection: "row", flexWrap: "wrap", marginBottom: 8,
+    paddingTop: 5, paddingBottom: 5, paddingLeft: 8, paddingRight: 8,
+    backgroundColor: C.white, borderRadius: 3,
+    borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
+    borderTopColor: C.slate150, borderRightColor: C.slate150,
+    borderBottomColor: C.slate150, borderLeftColor: C.slate150,
+  },
+
+  // ── IMAGES ──
+  imgContainer: { flexDirection: "row", flexWrap: "wrap", marginTop: 6 },
+  img: { width: 75, height: 75, borderRadius: 4, marginRight: 8, marginBottom: 6 },
+
+  // ── STAT CARD ROW ──
+  statRow: { flexDirection: "row", marginBottom: 10 },
+  statCard: {
+    flex: 1,
+    backgroundColor: C.slate50,
+    borderRadius: L.cardR,
+    borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
+    borderTopColor: C.slate150, borderRightColor: C.slate150,
+    borderBottomColor: C.slate150, borderLeftColor: C.slate150,
+    paddingTop: 9, paddingBottom: 9, paddingLeft: 12, paddingRight: 12,
+    marginRight: 8,
+  },
+  statCardLast: { marginRight: 0 },
+  statCardLabel:{ fontSize: 6, color: C.slate400, textTransform: "uppercase", letterSpacing: 0.8, fontFamily: "Helvetica-Bold", marginBottom: 3 },
+  statCardValue:{ fontSize: 12, color: C.slate900, fontFamily: "Helvetica-Bold" },
+  statCardSub:  { fontSize: 6.5, color: C.slate500, marginTop: 2 },
+
+  // ── SIGNATURE ──
+  sigSection: { marginTop: 24, flexDirection: "row", justifyContent: "flex-end" },
+  sigBox:     { alignItems: "center", width: 140, marginLeft: 32 },
+  sigLine: {
+    borderTopWidth: 1, borderTopColor: C.slate300,
+    width: "100%", marginBottom: 6, marginTop: 28,
+  },
+  sigRole: { fontSize: 6, color: C.slate400, textAlign: "center", textTransform: "uppercase", letterSpacing: 0.8 },
+  sigName: { fontSize: 9, fontFamily: "Helvetica-Bold", color: C.slate800, textAlign: "center", marginTop: 2 },
+  sigSub:  { fontSize: 6.5, color: C.slate500, textAlign: "center", marginTop: 1 },
+
+  // ── FOOTER ──
+  footer: {
+    backgroundColor: C.slate900,
+    paddingTop: 7, paddingBottom: 7,
+    paddingLeft: L.pageP, paddingRight: L.pageP,
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    borderTopWidth: 1, borderTopColor: C.slate800,
+  },
+  footerAccentLine: { height: 2, backgroundColor: C.em600 },
+  ftLeft:  { fontSize: 7,   color: C.em500 },
+  ftMid:   { fontSize: 6,   color: C.slate600, textAlign: "center", letterSpacing: 0.3 },
+  ftRight: { fontSize: 6.5, color: C.slate500 },
+
+  // ── 2-COL LAYOUT FOR LARGE SECTIONS ──
+  twoCol: { flexDirection: "row" },
+  colLeft:  { flex: 1, paddingRight: 8 },
+  colRight: { flex: 1, paddingLeft: 4 },
 });
 
-// ── Data resolver — the single source of truth ────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+//  SIDEBAR NAV ITEMS  (not used as sidebar, repurposed as header nav chips)
+// ─────────────────────────────────────────────────────────────────────────────
+const NAV_ITEMS = [
+  { num: "01", label: "Patient Info" },
+  { num: "02", label: "Complaint" },
+  { num: "03", label: "History" },
+  { num: "04", label: "Assessment" },
+  { num: "05", label: "Diagnosis" },
+  { num: "06", label: "Treatment" },
+  { num: "07", label: "Therapy" },
+  { num: "08", label: "Exercises" },
+  { num: "09", label: "Follow Up" },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  DATA RESOLVER  (identical logic, preserved exactly)
+// ─────────────────────────────────────────────────────────────────────────────
 function resolve(props) {
   const { bookingData, formData, patientData } = props;
-
-  // Detect whether an object IS the full booking JSON
   const isFull = (o) =>
     o != null && typeof o === "object" &&
-    (o.patientInfo != null || o.assessment != null ||
-     o.followUp    != null || o.treatmentPlan != null ||
-     o.therapySessions != null || o.exercisePlan != null);
-
-  // Pick the root: bookingData wins, then formData if it looks full
+    (o.patientInfo != null || o.assessment != null || o.followUp != null ||
+      o.treatmentPlan != null || o.therapySessions != null || o.exercisePlan != null);
   const root = bookingData ?? (isFull(formData) ? formData : null);
-
-  // Helper: root.key → formData.key → explicit prop → fallback
   const pick = (key, explicitProp, fb = {}) =>
-    root?.[key]     != null ? root[key]      :
-    explicitProp    != null ? explicitProp    :
-    formData?.[key] != null ? formData[key]  :
-    fb;
+    root?.[key] != null ? root[key]
+    : explicitProp != null ? explicitProp
+    : formData?.[key] != null ? formData[key]
+    : fb;
 
-  const patient         = pick("patientInfo",      patientData,            {});
-  const complaints      = pick("complaints",        props.complaintsData,   {});
-  const assessment      = pick("assessment",        props.assessmentData,   {});
-  const diagnosis       = pick("diagnosis",         props.diagnosisData,    {});
-  const treatmentPlan   = pick("treatmentPlan",     props.treatmentData,    {});
-  const therapySessions = pick("therapySessions",   props.sessionsData,     []);
-  const exercisePlan    = pick("exercisePlan",      props.exerciseData,     {});
-  const followUp        = pick("followUp",          props.followUpData,     {});
+  const patient         = pick("patientInfo",     patientData,             {});
+  const complaintsRaw   = pick("complaints",      props.complaintsData,    {});
+  const assessment      = pick("assessment",      props.assessmentData,    {});
+  const diagnosisRaw    = pick("diagnosis",       props.diagnosisData,     {});
+  const treatmentPlan   = pick("treatmentPlan",   props.treatmentData,     {});
+  const therapySessions = pick("therapySessions", props.sessionsData,      []);
+  const exercisePlan    = pick("exercisePlan",    props.exerciseData,      {});
+  const followUp        = pick("followUp",        props.followUpData,      {});
+  const investigationRaw= pick("investigation",   props.investigationData, {});
 
+  const investigation = {
+    tests: (() => {
+      const t = investigationRaw.selectedTests ?? investigationRaw.tests ?? [];
+      return Array.isArray(t) ? t : t ? [t] : [];
+    })(),
+    reason: investigationRaw.notes ?? investigationRaw.reason ?? "",
+  };
+
+  const background = {
+    previousInjuries:   root?.previousInjuries   ?? formData?.previousInjuries   ?? patientData?.previousInjuries   ?? "",
+    currentMedications: root?.currentMedications ?? formData?.currentMedications ?? patientData?.currentMedications ?? "",
+    allergies:          root?.allergies           ?? formData?.allergies           ?? patientData?.allergies           ?? "",
+    occupation:         root?.occupation          ?? formData?.occupation          ?? patientData?.occupation          ?? "",
+    insuranceProvider:  root?.insuranceProvider   ?? formData?.insuranceProvider   ?? patientData?.insuranceProvider   ?? "",
+    activityLevels: (() => {
+      const v = root?.activityLevels ?? formData?.activityLevels ?? patientData?.activityLevels ?? [];
+      return Array.isArray(v) ? v : [];
+    })(),
+    patientPain: root?.patientPain ?? formData?.patientPain ?? formData?.assessment?.patientPain ?? patientData?.patientPain ?? "",
+  };
+
+  let therapyAnswersObj = {};
+  const rawAnswers = complaintsRaw?.therapyAnswers ?? complaintsRaw?.theraphyAnswers ?? {};
+  if (Array.isArray(rawAnswers)) therapyAnswersObj = { General: rawAnswers };
+  else if (typeof rawAnswers === "object") therapyAnswersObj = rawAnswers;
+
+  const complaints = {
+    complaintDetails:    complaintsRaw?.complaintDetails ?? "",
+    duration:            complaintsRaw?.duration ?? "",
+    selectedTherapy:     complaintsRaw?.selectedTherapy ?? "",
+    painAssessmentImage: complaintsRaw?.painAssessmentImage ?? "",
+    reportImages: Array.isArray(complaintsRaw?.reportImages) ? complaintsRaw.reportImages : [],
+    therapyAnswersObj,
+  };
+
+  const diagnosisRows = Array.isArray(diagnosisRaw?.diagnosisRows)
+    ? diagnosisRaw.diagnosisRows
+    : diagnosisRaw?.physioDiagnosis ? [diagnosisRaw] : [];
+
+  let sessionsList = [];
+  if (Array.isArray(therapySessions)) sessionsList = therapySessions;
+  else if (Array.isArray(therapySessions?.sessions)) sessionsList = therapySessions.sessions;
+  if (sessionsList.length === 1 && Array.isArray(sessionsList[0])) sessionsList = sessionsList[0];
+
+  const overallStatus    = (!Array.isArray(therapySessions) && therapySessions?.overallStatus) ? therapySessions.overallStatus : "";
+  const topTherapistId   = therapySessions?.therapistId   ?? "";
+  const topTherapistName = therapySessions?.therapistName ?? "";
+
+  const homeExercises = Array.isArray(exercisePlan?.homeExercises)
+    ? exercisePlan.homeExercises
+    : Array.isArray(exercisePlan?.exercises) ? exercisePlan.exercises : [];
+  const homeAdvice = exercisePlan?.homeAdvice ?? "";
+
+  const followUpEntry =
+    Array.isArray(followUp) ? (followUp[0] ?? {}) : typeof followUp === "object" ? followUp : {};
+
+  const parts = formData?.parts ?? root?.symptoms?.parts ?? patientData?.parts ?? [];
+  const treatmentTemplates = Array.isArray(root?.treatmentTemplates) ? root.treatmentTemplates : [];
   const bookingId = root?.bookingId ?? formData?.bookingId ?? null;
   const clinicId  = root?.clinicId  ?? formData?.clinicId  ?? null;
   const branchId  = root?.branchId  ?? formData?.branchId  ?? null;
 
-  const therapyAnswers =
-    complaints?.therapyAnswers  ||
-    complaints?.theraphyAnswers || {};
-
   return {
-    patient, complaints, assessment, diagnosis,
-    treatmentPlan, therapySessions, exercisePlan, followUp,
-    therapyAnswers, bookingId, clinicId, branchId,
-    doctorData:  props.doctorData  ?? {},
-    clicniData:  props.clicniData  ?? {},
+    patient, complaints, investigation, background,
+    assessment, diagnosisRows, treatmentPlan,
+    sessionsList, overallStatus, topTherapistId, topTherapistName,
+    homeExercises, homeAdvice, followUpEntry, parts, treatmentTemplates,
+    bookingId, clinicId, branchId,
+    doctorData: props.doctorData ?? {},
+    clicniData: props.clicniData ?? {},
   };
 }
 
-// ── Primitive helpers ─────────────────────────────────────────────────────────
-const hasAny = (obj) =>
-  obj != null && typeof obj === "object" &&
-  Object.values(obj).some((v) => v != null && v !== "");
+// ─────────────────────────────────────────────────────────────────────────────
+//  HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+const dv = (v) =>
+  v != null && String(v).trim() !== "" && String(v) !== "NA" ? String(v) : "—";
+const hv = (v) =>
+  v != null && v !== "" && v !== "NA" &&
+  String(v).trim() !== "" && String(v).toLowerCase() !== "undefined";
 
-const SH = ({ title, color }) => (
-  <View style={S.secHead}>
-    <View style={[S.secDot, color ? { backgroundColor: color } : {}]} />
-    <Text style={[S.secTx, color ? { color } : {}]}>{title}</Text>
+const PAIN_LABEL = {
+  chronicPain:      "Chronic Pain",
+  sportsRehab:      "Sports Rehab",
+  neuroRehab:       "Neuro Rehab",
+  acutePain:        "Acute Pain",
+  neuropathicPain:  "Neuropathic Pain",
+  referredPain:     "Referred Pain",
+  inflammatoryPain: "Inflammatory Pain",
+};
+
+const getInitials = (name) => {
+  if (!name) return "PT";
+  const parts = String(name).trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PRIMITIVES
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Section Header with ruled line
+const SH = ({ title, badge, num }) => (
+  <View style={S.secHeader}>
+    {num && (
+      <View style={S.secNumBox}>
+        <Text style={S.secNum}>{num}</Text>
+      </View>
+    )}
+    <View style={S.secTitleWrap}>
+      <Text style={S.secTitle}>{title}</Text>
+      <View style={S.secRule} />
+      {badge && (
+        <View style={S.secBadge}>
+          <Text style={S.secBadgeTx}>{badge}</Text>
+        </View>
+      )}
+    </View>
   </View>
 );
 
-const LV = ({ label, value }) => (
-  <View>
-    <Text style={S.lbl}>{label}</Text>
-    <Text style={S.val}>{value || "—"}</Text>
-  </View>
-);
-
-const LVB = ({ label, value }) => (
-  <View>
-    <Text style={S.lbl}>{label}</Text>
-    <Text style={S.valB}>{value || "—"}</Text>
-  </View>
-);
-
-const Bdg = ({ text, variant }) => {
-  const bg = variant === "green" ? S.bGreen : variant === "yellow" ? S.bYell : variant === "red" ? S.bRed : S.badge;
-  const tx = variant === "green" ? S.bGreenTx : variant === "yellow" ? S.bYellTx : variant === "red" ? S.bRedTx : S.bTx;
+// Inline label + value (no box)
+const LV = ({ label, value, bold = false, xl = false, color }) => {
+  if (!hv(value)) return null;
+  const valStyle = xl ? S.valXL : bold ? S.valB : S.val;
   return (
-    <View style={[S.badge, bg]}>
-      <Text style={[S.bTx, tx]}>{text}</Text>
+    <View>
+      <Text style={S.lbl}>{label}</Text>
+      <Text style={[valStyle, color ? { color } : {}]}>{dv(value)}</Text>
     </View>
   );
+};
+
+// Boxed field (used in grid)
+const FV = ({ label, value, bold = false }) => {
+  if (!hv(value)) return null;
+  return (
+    <View style={S.fieldBox}>
+      <Text style={S.lbl}>{label}</Text>
+      <Text style={bold ? S.valB : S.val}>{dv(value)}</Text>
+    </View>
+  );
+};
+
+// Chip component
+const Chip = ({ text, variant = "em" }) => {
+  const map = {
+    em:    [S.chipEm,    S.chipEmTx],
+    gold:  [S.chipGold,  S.chipGoldTx],
+    red:   [S.chipRed,   S.chipRedTx],
+    amber: [S.chipAmb,   S.chipAmbTx],
+    blue:  [S.chipBlue,  S.chipBlueTx],
+    purple:[S.chipPur,   S.chipPurTx],
+    sky:   [S.chipSky,   S.chipSkyTx],
+    slate: [S.chipSlate, S.chipSlateTx],
+  };
+  const [bg, tx] = map[variant] || map.em;
+  return <View style={[S.chip, bg]}><Text style={[S.chipTx, tx]}>{text}</Text></View>;
+};
+
+const AnswerBadge = ({ answer }) => {
+  const display = String(answer ?? "").trim();
+  if (!display || display.toLowerCase() === "undefined" || display.toLowerCase() === "na")
+    return <Chip text="Not answered" variant="slate" />;
+  const up = display.toUpperCase();
+  if (up === "YES") return <Chip text="YES" variant="em" />;
+  if (up === "NO")  return <Chip text="NO"  variant="red" />;
+  return <Chip text={display} variant="sky" />;
 };
 
 const PainBar = ({ scaleText }) => {
-  const m = scaleText?.match(/(\d+)\s*\/\s*(\d+)/);
-  const pct = m ? (parseInt(m[1]) / parseInt(m[2])) * 100 : 0;
-  const color = pct >= 70 ? C.danger : pct >= 40 ? C.warning : C.accent;
+  const m   = String(scaleText ?? "").match(/(\d+)\s*\/\s*(\d+)/);
+  const num = m ? parseInt(m[1]) : parseInt(String(scaleText ?? "0")) || 0;
+  const max = m ? parseInt(m[2]) : 10;
+  const pct = Math.min((num / max) * 100, 100);
+  const color = pct >= 70 ? C.red600 : pct >= 40 ? C.amber600 : C.em500;
+  const bgColor = pct >= 70 ? C.red50 : pct >= 40 ? C.amber50 : C.em50;
+  const labelText = pct >= 70 ? "SEVERE" : pct >= 40 ? "MODERATE" : "MILD";
+  const labelColor = pct >= 70 ? C.red700 : pct >= 40 ? C.amber700 : C.em700;
   return (
-    <View>
-      <View style={S.pbBg}>
+    <View style={{ marginBottom: 12 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+        <Text style={S.lbl}>Pain Scale</Text>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color }}>{num}</Text>
+          <Text style={{ fontSize: 8, color: C.slate400 }}> / {max}  </Text>
+          <View style={{ backgroundColor: bgColor, borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 }}>
+            <Text style={{ fontSize: 6.5, color: labelColor, fontFamily: "Helvetica-Bold", letterSpacing: 0.8 }}>{labelText}</Text>
+          </View>
+        </View>
+      </View>
+      <View style={S.pbTrack}>
         <View style={[S.pbFill, { width: `${pct}%`, backgroundColor: color }]} />
       </View>
-      <Text style={{ fontSize: 8, color: C.muted, marginTop: 2 }}>{scaleText} pain scale</Text>
+      <View style={S.pbLabels}>
+        <Text style={S.pbLblTx}>0 · No Pain</Text>
+        <Text style={S.pbLblTx}>5 · Moderate</Text>
+        <Text style={S.pbLblTx}>10 · Worst</Text>
+      </View>
     </View>
   );
 };
 
-const sevV = (s) => {
-  const sl = (s || "").toLowerCase();
-  return sl === "mild" ? "green" : sl === "moderate" ? "yellow" : sl === "severe" ? "red" : "default";
+const CheckRow = ({ label, options, selected, note, last = false }) => (
+  <View style={[S.checkRow, last ? { borderBottomWidth: 0, marginBottom: 0, paddingBottom: 0 } : {}]}>
+    <Text style={S.checkLabel}>{label}</Text>
+    <View style={S.checkPills}>
+      {options.map((opt) => {
+        const on = Array.isArray(selected) && selected.includes(opt);
+        return (
+          <View key={opt} style={on ? S.checkOn : S.checkOff}>
+            <Text style={on ? S.checkOnTx : S.checkOffTx}>{opt}</Text>
+          </View>
+        );
+      })}
+      {hv(note) && <Text style={S.checkNote}>· {note}</Text>}
+    </View>
+  </View>
+);
+
+const SevBadge = ({ sev }) => {
+  if (!hv(sev)) return <Text style={S.tCell}>—</Text>;
+  const map = {
+    Mild:     [S.sevMild,     S.sevMildTx],
+    Moderate: [S.sevModerate, S.sevModerateTx],
+    Severe:   [S.sevSevere,   S.sevSevereTx],
+  };
+  const [bg, tx] = map[sev] || map.Mild;
+  return <View style={bg}><Text style={tx}>{sev}</Text></View>;
 };
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+const StageBadge = ({ stage }) => {
+  if (!hv(stage)) return <Text style={S.tCell}>—</Text>;
+  const map = {
+    Acute:      [S.stageAcute,   S.stageAcuteTx],
+    "Sub-acute":[S.stageSub,     S.stageSubTx],
+    Chronic:    [S.stageChronic, S.stageChronicTx],
+  };
+  const [bg, tx] = map[stage] || map["Sub-acute"];
+  return <View style={bg}><Text style={tx}>{stage}</Text></View>;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  EXERCISE TABLE
+// ─────────────────────────────────────────────────────────────────────────────
+const ExerciseTable = ({ exercises }) => {
+  if (!exercises || exercises.length === 0)
+    return (
+      <View style={{ paddingTop: 8, paddingBottom: 8, paddingLeft: 12 }}>
+        <Text style={{ fontSize: 7, color: C.slate400, fontStyle: "italic" }}>No exercises recorded.</Text>
+      </View>
+    );
+  return (
+    <View style={S.tbl}>
+      <View style={S.tHead}>
+        <Text style={[S.tHCell, { flex: 0.25 }]}>#</Text>
+        <Text style={[S.tHCell, { flex: 2.2  }]}>Exercise</Text>
+        <Text style={[S.tHCell, { flex: 0.65 }]}>Sessions</Text>
+        <Text style={[S.tHCell, { flex: 0.55 }]}>Sets</Text>
+        <Text style={[S.tHCell, { flex: 0.55 }]}>Reps</Text>
+        <Text style={[S.tHCell, { flex: 1.2  }]}>Frequency</Text>
+        <Text style={[S.tHCell, { flex: 2    }]}>Notes</Text>
+      </View>
+      {exercises.map((ex, i) => (
+        <View key={i} style={[S.tRow, i % 2 === 1 ? S.tRowAlt : {}]}>
+          <Text style={[S.tCellNum, { flex: 0.25 }]}>{i + 1}</Text>
+          <Text style={[S.tCellB,   { flex: 2.2  }]}>{dv(ex.name || ex.exerciseName)}</Text>
+          <Text style={[S.tCell,    { flex: 0.65 }]}>{dv(ex.noOfSessions ?? ex.session ?? ex.sessions)}</Text>
+          <Text style={[S.tCell,    { flex: 0.55 }]}>{dv(ex.sets)}</Text>
+          <Text style={[S.tCell,    { flex: 0.55 }]}>{dv(ex.repetitions ?? ex.reps)}</Text>
+          <Text style={[S.tCell,    { flex: 1.2  }]}>{dv(ex.frequency)}</Text>
+          <Text style={[S.tCell,    { flex: 2,   lineHeight: 1.4 }]}>{dv(ex.notes)}</Text>
+        </View>
+      ))}
+    </View>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  THERAPY BLOCK
+// ─────────────────────────────────────────────────────────────────────────────
+const TherapyBlock = ({ therapy }) => (
+  <View style={{ marginBottom: 8 }}>
+    <View style={S.therapyHeader}>
+      <Text style={S.therapyTitle}>{therapy.therapyName || "Therapy"}</Text>
+      {therapy.totalPrice > 0 && (
+        <Text style={{ fontSize: 7, color: C.em600 }}>Rs. {therapy.totalPrice}</Text>
+      )}
+    </View>
+    <View style={S.therapyBody}>
+      <ExerciseTable exercises={therapy.exercises || []} />
+    </View>
+  </View>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  META BAR
+// ─────────────────────────────────────────────────────────────────────────────
+const MetaBar = ({ sess, therapistId, therapistName }) => {
+  const tName = sess.therapistName || therapistName || "";
+  const tId   = sess.therapistId   || therapistId   || "";
+  if (!tName && !tId && !sess.serviceType) return null;
+  return (
+    <View style={S.metaBar}>
+      {sess.serviceType && <Chip text={`Type: ${sess.serviceType}`} variant="slate" />}
+      {tName && <Chip text={`Therapist: ${tName}`} variant="em" />}
+      {tId   && <Chip text={`ID: ${tId}`}           variant="sky" />}
+    </View>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SESSION BLOCK
+// ─────────────────────────────────────────────────────────────────────────────
+const SessionBlock = ({ sess, isLast, therapistId, therapistName }) => {
+  const sType = (sess.serviceType || "").toLowerCase();
+
+  if (sType === "package") {
+    return (
+      <View style={[S.pkgWrap, { marginBottom: isLast ? 0 : 16 }]}>
+        <View style={S.pkgHeader}>
+          <Text style={S.pkgTitle}>{sess.packageName || "Package"}</Text>
+          {sess.totalPrice > 0 && <Text style={S.pkgPrice}>Rs. {sess.totalPrice}</Text>}
+        </View>
+        <View style={S.pkgBody}>
+          <MetaBar sess={sess} therapistId={therapistId} therapistName={therapistName} />
+          {Array.isArray(sess.programs) && sess.programs.length > 0
+            ? sess.programs.map((prog, pi) => (
+                <View key={pi} style={{ marginBottom: pi < sess.programs.length - 1 ? 12 : 0 }}>
+                  <View style={S.progHeader}>
+                    <Text style={S.progTitle}>{prog.programName || `Program ${pi + 1}`}</Text>
+                    {prog.totalPrice > 0 && <Text style={{ fontSize: 7, color: "rgba(255,255,255,0.75)" }}>Rs. {prog.totalPrice}</Text>}
+                  </View>
+                  <View style={S.progBody}>
+                    {Array.isArray(prog.therapyData ?? prog.therophyData)
+                      ? (prog.therapyData ?? prog.therophyData).map((t, ti) => <TherapyBlock key={ti} therapy={t} />)
+                      : <Text style={{ fontSize: 7, color: C.slate400, fontStyle: "italic" }}>No therapy data.</Text>}
+                  </View>
+                </View>
+              ))
+            : Array.isArray(sess.therapyData ?? sess.therophyData)
+            ? (sess.therapyData ?? sess.therophyData).map((t, ti) => <TherapyBlock key={ti} therapy={t} />)
+            : <Text style={{ fontSize: 7, color: C.slate400, fontStyle: "italic" }}>No data.</Text>}
+        </View>
+      </View>
+    );
+  }
+
+  if (sType === "program") {
+    const therapies = sess.therapyData ?? sess.therophyData ?? [];
+    return (
+      <View style={{ marginBottom: isLast ? 0 : 16 }}>
+        <View style={S.progHeader}>
+          <Text style={S.progTitle}>{sess.programName || "Program"}</Text>
+          {(sess.totalPrice || sess.totalTherapyPrice) > 0 && (
+            <Text style={{ fontSize: 7, color: "rgba(255,255,255,0.75)" }}>
+              Rs. {sess.totalPrice || sess.totalTherapyPrice}
+            </Text>
+          )}
+        </View>
+        <View style={S.progBody}>
+          <MetaBar sess={sess} therapistId={therapistId} therapistName={therapistName} />
+          {Array.isArray(therapies) && therapies.length > 0
+            ? therapies.map((t, ti) => <TherapyBlock key={ti} therapy={t} />)
+            : <Text style={{ fontSize: 7, color: C.slate400, fontStyle: "italic" }}>No therapies.</Text>}
+        </View>
+      </View>
+    );
+  }
+
+  if (sType === "therapy") {
+    return (
+      <View style={{ marginBottom: isLast ? 0 : 16 }}>
+        <View style={[S.progHeader, { backgroundColor: C.purple700 }]}>
+          <Text style={S.progTitle}>{sess.therapyName || "Therapy Session"}</Text>
+          {sess.totalPrice > 0 && <Text style={{ fontSize: 7, color: "rgba(255,255,255,0.75)" }}>Rs. {sess.totalPrice}</Text>}
+        </View>
+        <View style={[S.progBody, { borderRightColor: C.purple100, borderBottomColor: C.purple100, borderLeftColor: C.purple100 }]}>
+          <MetaBar sess={sess} therapistId={therapistId} therapistName={therapistName} />
+          {Array.isArray(sess.exercises) && sess.exercises.length > 0
+            ? <ExerciseTable exercises={sess.exercises} />
+            : <Text style={{ fontSize: 7, color: C.slate400, fontStyle: "italic" }}>No exercises.</Text>}
+        </View>
+      </View>
+    );
+  }
+
+  if (sType === "exercise") {
+    return (
+      <View style={{ marginBottom: isLast ? 0 : 16 }}>
+        <View style={[S.progHeader, { backgroundColor: C.em600 }]}>
+          <Text style={S.progTitle}>Exercise Session</Text>
+          {sess.totalPrice > 0 && <Text style={{ fontSize: 7, color: "rgba(255,255,255,0.75)" }}>Rs. {sess.totalPrice}</Text>}
+        </View>
+        <View style={[S.progBody, { borderRightColor: C.em200, borderBottomColor: C.em200, borderLeftColor: C.em200 }]}>
+          <MetaBar sess={sess} therapistId={therapistId} therapistName={therapistName} />
+          <ExerciseTable exercises={sess.exercises || []} />
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ marginBottom: isLast ? 0 : 16 }}>
+      <MetaBar sess={sess} therapistId={therapistId} therapistName={therapistName} />
+      {Array.isArray(sess.therapyData) && sess.therapyData.map((t, ti) => <TherapyBlock key={ti} therapy={t} />)}
+      {Array.isArray(sess.exercises) && sess.exercises.length > 0 && <ExerciseTable exercises={sess.exercises} />}
+    </View>
+  );
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  MAIN PDF COMPONENT
+// ═════════════════════════════════════════════════════════════════════════════
 const PrescriptionPDF = (props) => {
   const {
-    patient, complaints, assessment, diagnosis,
-    treatmentPlan, therapySessions, exercisePlan, followUp,
-    therapyAnswers, bookingId, clinicId, branchId,
-    doctorData, clicniData,
+    patient, complaints, investigation, background,
+    assessment, diagnosisRows, treatmentPlan,
+    sessionsList, overallStatus, topTherapistId, topTherapistName,
+    homeExercises, homeAdvice, followUpEntry, parts, treatmentTemplates,
+    bookingId, clinicId, branchId, doctorData, clicniData,
   } = resolve(props);
 
   const today = new Date().toLocaleDateString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric",
+    day: "2-digit", month: "long", year: "numeric",
   });
+
+  const subj  = assessment.subjectiveAssessment ?? assessment ?? {};
+  const func_ = assessment.functionalAssessment ?? {};
+  const phys  = assessment.physicalExamination  ?? {};
+  const chron = assessment.chronicPainPatients  ?? {};
+  const sport = assessment.sportsRehabPatients  ?? {};
+  const neuro = assessment.neuroRehabPatients   ?? {};
+
+  const painScale          = subj.painScale         ?? assessment.painScale          ?? "";
+  const chiefComplaint     = subj.chiefComplaint     ?? assessment.chiefComplaint     ?? "";
+  const painType           = subj.painType           ?? assessment.painType           ?? "";
+  const dur                = subj.duration           ?? assessment.duration           ?? "";
+  const onset              = subj.onset              ?? assessment.onset              ?? "";
+  const aggravatingFactors = subj.aggravatingFactors ?? assessment.aggravatingFactors ?? "";
+  const relievingFactors   = subj.relievingFactors   ?? assessment.relievingFactors   ?? "";
+  const observations       = subj.observations       ?? assessment.observations       ?? "";
+
+  const difficultiesIn      = Array.isArray(func_.difficultiesIn) ? func_.difficultiesIn : Array.isArray(assessment.difficultiesIn) ? assessment.difficultiesIn : [];
+  const otherDifficulty     = func_.otherDifficulty     ?? assessment.otherDifficulty     ?? "";
+  const dailyLivingAffected = func_.dailyLivingAffected ?? assessment.dailyLivingAffected ?? "";
+
+  const postureAssessment = Array.isArray(phys.postureAssessment) ? phys.postureAssessment : Array.isArray(assessment.postureAssessment) ? assessment.postureAssessment : [];
+  const postureDeviations = phys.postureDeviations ?? assessment.postureDeviations ?? "";
+  const romStatus         = Array.isArray(phys.rangeOfMotion) ? phys.rangeOfMotion : Array.isArray(assessment.romStatus) ? assessment.romStatus : [];
+  const romRestricted     = phys.romRestricted ?? assessment.romRestricted ?? "";
+  const romJoints         = phys.romJoints     ?? assessment.romJoints     ?? "";
+  const muscleStrength    = Array.isArray(phys.muscleStrength) ? phys.muscleStrength : Array.isArray(assessment.muscleStrength) ? assessment.muscleStrength : [];
+  const muscleWeakness    = phys.muscleWeakness    ?? assessment.muscleWeakness    ?? "";
+  const neurologicalSigns = Array.isArray(phys.neurologicalSigns) ? phys.neurologicalSigns : Array.isArray(assessment.neurologicalSigns) ? assessment.neurologicalSigns : [];
+
+  const patientPain        = background.patientPain;
+  const painTriggers       = chron.painTriggers       ?? assessment.painTriggers       ?? "";
+  const chronicRelieving   = chron.relievingFactors   ?? assessment.chronicRelieving   ?? "";
+  const typeOfSport        = sport.typeOfSport        ?? assessment.typeOfSport        ?? "";
+  const recurringInjuries  = sport.recurringInjuries  ?? assessment.recurringInjuries  ?? "";
+  const returnToSportGoals = sport.returnToSportGoals ?? assessment.returnToSportGoals ?? "";
+  const neuroDiagnosis     = neuro.neuroDiagnosis     ?? assessment.neuroDiagnosis     ?? "";
+  const neuroOnset         = neuro.neuroOnset         ?? assessment.neuroOnset         ?? "";
+  const mobilityStatus     = neuro.mobilityStatus     ?? assessment.mobilityStatus     ?? "";
+  const cognitiveStatus    = neuro.cognitiveStatus    ?? assessment.cognitiveStatus    ?? "";
+
+  const hasAssessment =
+    chiefComplaint || painScale || painType ||
+    difficultiesIn.length > 0 || postureAssessment.length > 0 ||
+    romStatus.length > 0 || muscleStrength.length > 0;
+
+  const hasBackground =
+    background.previousInjuries || background.currentMedications ||
+    background.allergies || background.occupation ||
+    background.insuranceProvider || background.patientPain ||
+    background.activityLevels.length > 0;
+
+  const hasQuestionnaire =
+    Object.keys(complaints.therapyAnswersObj).length > 0 &&
+    Object.values(complaints.therapyAnswersObj).some(
+      (qs) => Array.isArray(qs) && qs.some((q) => hv(q.question))
+    );
+
+  const patientName   = patient?.patientName || patient?.name || patient?.fullName || "";
+  const doctorName    = doctorData?.name || doctorData?.fullName || doctorData?.doctorName || treatmentPlan?.doctorName || "";
+  const therapistName = treatmentPlan?.therapistName || topTherapistName || "";
+  const initials      = getInitials(patientName);
+
+  const statusColor =
+    overallStatus === "Completed"   ? C.em600    :
+    overallStatus === "Cancelled"   ? C.red600   :
+    overallStatus === "In Progress" ? C.sky600   : C.amber600;
+  const statusBg =
+    overallStatus === "Completed"   ? C.em50     :
+    overallStatus === "Cancelled"   ? C.red50    :
+    overallStatus === "In Progress" ? C.sky50    : C.amber50;
 
   return (
     <Document>
-      <Page size="A4" style={S.page}>
+      <Page size="A4" style={S.page} wrap>
 
-        {/* ── HEADER ────────────────────────────────────────────────────── */}
-        <View style={S.header}>
-          <View style={S.hLeft}>
-            <Text style={S.hClinic}>{clicniData?.name || "PhysioCare Clinic"}</Text>
-            {clicniData?.address ? <Text style={S.hMeta}>{clicniData.address}</Text> : null}
-            {clicniData?.phone   ? <Text style={S.hMeta}>{clicniData.phone}</Text>   : null}
+        {/* ══ HEADER ══ */}
+        <View style={S.header} fixed>
+          {/* Three-segment accent bar */}
+          <View style={S.headerAccentBar}>
+            <View style={S.headerAccentSeg1} />
+            <View style={S.headerAccentSeg2} />
+            <View style={S.headerAccentSeg3} />
           </View>
-          <View style={S.hRight}>
-            <View style={S.hBadge}>
-              <Text style={S.hBadgeTx}>PHYSIOTHERAPY REPORT</Text>
+
+          <View style={S.headerInner}>
+            <View style={S.hLeft}>
+              <Text style={S.hClinicName}>{clicniData?.name || "PhysioCare Clinic"}</Text>
+              {hv(clicniData?.address) && <Text style={S.hMeta}>{clicniData.address}</Text>}
+              <View style={{ flexDirection: "row", marginTop: 2 }}>
+                {hv(clicniData?.phone) && <Text style={[S.hMeta, { marginRight: 14 }]}>T: {clicniData.phone}</Text>}
+                {hv(clicniData?.email) && <Text style={S.hMeta}>E: {clicniData.email}</Text>}
+              </View>
             </View>
-            <Text style={S.hMeta2}>Date: {today}</Text>
-            {bookingId
-              ? <Text style={S.hMeta2}>Booking: #{String(bookingId).slice(-8).toUpperCase()}</Text>
-              : null}
+            <View style={S.hRight}>
+              <Text style={S.hDocType}>Physiotherapy Report</Text>
+              <Text style={S.hDate}>{today}</Text>
+              {bookingId && (
+                <Text style={S.hRef}>REF #{String(bookingId).slice(-8).toUpperCase()}</Text>
+              )}
+              {hv(overallStatus) && (
+                <View style={[S.hStatusWrap]}>
+                  <View style={[S.hStatusPill, { backgroundColor: statusColor + "25" }]}>
+                    <Text style={[S.hStatusTx, { color: statusColor }]}>
+                      {overallStatus.toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
           </View>
         </View>
 
-        <View style={S.body}>
+        {/* ══ PATIENT BANNER ══ */}
+        {hv(patientName) && (
+          <View style={S.patientBanner}>
+            <View style={S.pbLeft}>
+              <View style={S.pbAvatar}>
+                <Text style={S.pbAvatarTx}>{initials}</Text>
+              </View>
+              <View>
+                <Text style={S.pbName}>{capitalizeEachWord(patientName)}</Text>
+                <Text style={S.pbMeta}>
+                  {[
+                    patient?.age ? `${patient.age} yrs` : null,
+                    patient?.sex || patient?.gender,
+                    patient?.mobileNumber,
+                  ].filter(Boolean).join("   ·   ")}
+                </Text>
+              </View>
+            </View>
+            {hv(patient?.patientId) && (
+              <View style={S.pbRight}>
+                <View style={S.pbIdWrap}>
+                  <Text style={S.pbIdLbl}>Patient ID</Text>
+                  <Text style={S.pbIdVal}>{patient.patientId}</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
 
-          {/* ── PATIENT ───────────────────────────────────────────────────── */}
+        {/* ══ BODY ══ */}
+        <View style={S.bodyWrap}>
+
+          {/* 1 · PATIENT INFO */}
           <View style={S.sec}>
-            <SH title="Patient Information" />
-            <View style={[S.card, { borderLeftColor: C.primary }]}>
+            <SH num="01" title="Patient & Booking Information" />
+            <View style={S.card}>
               <View style={S.grid}>
-                <View style={S.cell2}><LVB label="Full Name" value={capitalizeEachWord(patient?.name || patient?.patientName || "—")} /></View>
-                <View style={S.cell2}><LV  label="Patient ID"  value={patient?.patientId} /></View>
-                <View style={S.cell2}><LV  label="Age"         value={patient?.age} /></View>
-                <View style={S.cell2}><LV  label="Gender"      value={patient?.sex || patient?.gender} /></View>
-                <View style={S.cell2}><LV  label="Mobile"      value={patient?.mobileNumber} /></View>
-                {(clinicId || branchId)
-                  ? <View style={S.cell2}><LV label="Clinic / Branch" value={`${clinicId || ""}${branchId ? " · " + branchId : ""}`} /></View>
-                  : null}
+                {hv(patientName)                     && <View style={S.c3}><FV label="Full Name"  value={capitalizeEachWord(patientName)} bold /></View>}
+                {hv(patient?.age)                    && <View style={S.c3}><FV label="Age"        value={`${patient.age} years`} /></View>}
+                {hv(patient?.sex || patient?.gender) && <View style={S.c3}><FV label="Gender"     value={patient?.sex || patient?.gender} /></View>}
+                {hv(patient?.mobileNumber)           && <View style={S.c3}><FV label="Mobile"     value={patient.mobileNumber} /></View>}
+                {hv(bookingId)                       && <View style={S.c3}><FV label="Booking ID" value={bookingId} /></View>}
+                {hv(clinicId)                        && <View style={S.c3}><FV label="Clinic ID"  value={clinicId} /></View>}
+                {hv(branchId)                        && <View style={S.c3}><FV label="Branch ID"  value={branchId} /></View>}
+                {hv(clicniData?.name)                && <View style={S.c3}><FV label="Clinic"     value={clicniData.name} /></View>}
+                {hv(doctorName)                      && <View style={S.c3}><FV label="Doctor"     value={doctorName} bold /></View>}
+                {hv(doctorData?.doctorId)            && <View style={S.c3}><FV label="Doctor ID"  value={doctorData.doctorId} /></View>}
+                {hv(overallStatus)                   && <View style={S.c3}><FV label="Status"     value={overallStatus} bold /></View>}
               </View>
             </View>
           </View>
 
-          {/* ── CHIEF COMPLAINTS ──────────────────────────────────────────── */}
-          <View style={S.sec}>
-            <SH title="Chief Complaints" color={C.danger} />
-            <View style={[S.card, S.cDang]}>
-              <View style={S.row2}>
-                <View style={S.col2}><LVB label="Complaint"      value={complaints?.complaintDetails} /></View>
-                <View style={S.col2}><LV  label="Duration"       value={complaints?.duration} /></View>
-              </View>
-              <View style={{ marginBottom: 6 }}>
-                <LV label="Selected Therapy" value={complaints?.selectedTherapy} />
-              </View>
-              {complaints?.painAssessmentImage
-                ? <View style={{ marginTop: 6 }}>
-                    <Text style={S.lbl}>Pain Assessment Diagram</Text>
+          {/* 2 · COMPLAINTS */}
+          {(hv(complaints.complaintDetails) || parts.length > 0 || complaints.reportImages.length > 0) && (
+            <View style={S.sec}>
+              <SH num="02" title="Chief Complaint & Symptoms" />
+              {hv(complaints.complaintDetails) && (
+                <View style={S.complaintBox}>
+                  <Text style={S.lbl}>Chief Complaint</Text>
+                  <Text style={[S.val, { fontSize: 9, lineHeight: 1.7, marginTop: 3, color: C.slate700 }]}>
+                    {complaints.complaintDetails}
+                  </Text>
+                </View>
+              )}
+              <View style={S.card}>
+                <View style={S.grid}>
+                  {hv(complaints.duration)        && <View style={S.c3}><FV label="Duration"         value={complaints.duration} bold /></View>}
+                  {hv(complaints.selectedTherapy) && <View style={S.c3}><FV label="Selected Therapy" value={complaints.selectedTherapy} /></View>}
+                  {complaints.reportImages.length > 0 && <View style={S.c3}><FV label="Attached Reports" value={`${complaints.reportImages.length} image(s)`} /></View>}
+                </View>
+                {parts.length > 0 && (
+                  <View style={{ marginTop: 4 }}>
+                    <Text style={S.lbl}>Affected Body Parts</Text>
+                    <View style={S.chipRow}>{parts.map((p, i) => <Chip key={i} text={p} variant="red" />)}</View>
+                  </View>
+                )}
+                {hv(complaints.painAssessmentImage) && (
+                  <View style={{ marginTop: 8 }}>
+                    <Text style={S.lbl}>Body Diagram</Text>
                     <Image
                       src={String(complaints.painAssessmentImage).startsWith("data:")
                         ? complaints.painAssessmentImage
-                        : `data:image/png;base64,${complaints.painAssessmentImage}`}
+                        : `data:image/jpeg;base64,${complaints.painAssessmentImage}`}
                       style={S.img}
                     />
                   </View>
-                : null}
-              {Array.isArray(complaints?.reportImages) && complaints.reportImages.length > 0
-                ? <View style={{ marginTop: 6 }}>
+                )}
+                {complaints.reportImages.length > 0 && (
+                  <View style={{ marginTop: 8 }}>
                     <Text style={S.lbl}>Report Images</Text>
-                    <View style={S.imgRow}>
-                      {complaints.reportImages.map((img, i) => <Image key={i} src={img} style={S.img} />)}
-                    </View>
-                  </View>
-                : null}
-            </View>
-          </View>
-
-          {/* ── THERAPY QUESTIONNAIRE ─────────────────────────────────────── */}
-          {Object.keys(therapyAnswers).length > 0
-            ? <View style={S.sec}>
-                <SH title="Therapy Questionnaire" />
-                <View style={S.card}>
-                  {Object.entries(therapyAnswers).map(([cat, qs]) => (
-                    <View key={cat} style={{ marginBottom: 8 }}>
-                      <Text style={S.qaHead}>{capitalizeEachWord(cat)}</Text>
-                      {Array.isArray(qs) && qs.map((q, i) => (
-                        <View key={i} style={S.qaRow}>
-                          <Text style={S.qaBul}>•</Text>
-                          <Text style={S.qaQ}>{q.question}</Text>
-                          <Text style={S.qaA}>{q.answer}</Text>
-                        </View>
+                    <View style={S.imgContainer}>
+                      {complaints.reportImages.slice(0, 4).map((img, i) => (
+                        <Image key={i} src={img} style={S.img} />
                       ))}
                     </View>
-                  ))}
-                </View>
+                  </View>
+                )}
               </View>
-            : null}
+            </View>
+          )}
 
-          {/* ── CLINICAL ASSESSMENT ───────────────────────────────────────── */}
-          {hasAny(assessment)
-            ? <View style={S.sec}>
-                <SH title="Clinical Assessment" color={C.warning} />
-                <View style={[S.card, S.cWarn]}>
-                  {assessment.painScale
-                    ? <View style={{ marginBottom: 8 }}>
-                        <Text style={S.lbl}>Pain Scale</Text>
-                        <PainBar scaleText={assessment.painScale} />
+          {/* 3 · BACKGROUND */}
+          {hasBackground && (
+            <View style={S.sec}>
+              <SH num="03" title="Patient Background & History" />
+              <View style={S.card}>
+                <View style={S.grid}>
+                  {hv(background.previousInjuries)   && <View style={S.c2}><FV label="Previous Injuries"   value={background.previousInjuries} /></View>}
+                  {hv(background.currentMedications) && <View style={S.c2}><FV label="Current Medications" value={background.currentMedications} /></View>}
+                  {hv(background.allergies)           && <View style={S.c2}><FV label="Allergies"           value={background.allergies} /></View>}
+                  {hv(background.occupation)          && <View style={S.c2}><FV label="Occupation"          value={background.occupation} /></View>}
+                  {hv(background.insuranceProvider)   && <View style={S.c2}><FV label="Insurance Provider"  value={background.insuranceProvider} /></View>}
+                  {hv(background.patientPain) && (
+                    <View style={S.c2}>
+                      <FV label="Pain Category" value={PAIN_LABEL[background.patientPain] || background.patientPain} bold />
+                    </View>
+                  )}
+                </View>
+                {background.activityLevels.length > 0 && (
+                  <View style={{ marginTop: 4 }}>
+                    <Text style={S.lbl}>Activity Level</Text>
+                    <View style={S.chipRow}>{background.activityLevels.map((lvl, i) => <Chip key={i} text={lvl} variant="em" />)}</View>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* 4 · QUESTIONNAIRE */}
+          {hasQuestionnaire && (
+            <View style={S.sec}>
+              <SH num="04" title="Therapy Questionnaire" badge={`${Object.keys(complaints.therapyAnswersObj).length} categories`} />
+              {Object.entries(complaints.therapyAnswersObj).map(([cat, qs], ci) => {
+                const validQs = Array.isArray(qs) ? qs.filter((q) => hv(q.question)) : [];
+                if (validQs.length === 0) return null;
+                const answered = validQs.filter((q) => hv(q.answer) && q.answer.toLowerCase() !== "undefined").length;
+                return (
+                  <View key={ci} style={[S.qaWrap, { marginBottom: ci < Object.keys(complaints.therapyAnswersObj).length - 1 ? 8 : 0 }]}>
+                    <View style={S.qaHead}>
+                      <Text style={S.qaHeadTx}>{capitalizeEachWord(cat)}</Text>
+                      <Text style={S.qaHeadCount}>{answered} / {validQs.length} answered</Text>
+                    </View>
+                    {validQs.map((q, qi) => (
+                      <View key={qi} style={[S.qaRow, qi % 2 === 1 ? S.qaRowAlt : {}]}>
+                        <View style={S.qaNum}><Text style={S.qaNumTx}>{qi + 1}</Text></View>
+                        <Text style={S.qaQ}>{q.question || `Question ${q.questionId}`}</Text>
+                        <AnswerBadge answer={q.answer} />
                       </View>
-                    : null}
+                    ))}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* 5 · INVESTIGATION */}
+          {(investigation.tests.length > 0 || hv(investigation.reason)) && (
+            <View style={S.sec}>
+              <SH num="05" title="Investigation & Tests" />
+              <View style={[S.cardAccent, S.cEm]}>
+                {investigation.tests.length > 0 && (
+                  <View style={{ marginBottom: hv(investigation.reason) ? 9 : 0 }}>
+                    <Text style={S.lbl}>Recommended Tests</Text>
+                    <View style={S.chipRow}>{investigation.tests.map((t, i) => <Chip key={i} text={t} variant="em" />)}</View>
+                  </View>
+                )}
+                {hv(investigation.reason) && <LV label="Clinical Notes / Reason" value={investigation.reason} />}
+              </View>
+            </View>
+          )}
+
+          {/* 6 · ASSESSMENT */}
+          {hasAssessment && (
+            <View style={S.sec}>
+              <SH num="06" title="Clinical Assessment" />
+
+              {/* Subjective */}
+              <View style={[S.cardAccent, S.cGold]}>
+                <Text style={S.subSecTitle}>Subjective Assessment</Text>
+                {hv(painScale) && <PainBar scaleText={painScale} />}
+                <View style={S.grid}>
+                  {hv(chiefComplaint)     && <View style={S.c2}><FV label="Chief Complaint"    value={chiefComplaint} bold /></View>}
+                  {hv(painType)           && <View style={S.c2}><FV label="Pain Type"           value={painType} /></View>}
+                  {hv(dur)               && <View style={S.c2}><FV label="Duration"            value={dur} /></View>}
+                  {hv(onset)             && <View style={S.c2}><FV label="Onset"               value={onset} /></View>}
+                  {hv(aggravatingFactors)&& <View style={S.c2}><FV label="Aggravating Factors" value={aggravatingFactors} /></View>}
+                  {hv(relievingFactors)  && <View style={S.c2}><FV label="Relieving Factors"   value={relievingFactors} /></View>}
+                </View>
+                {hv(observations) && <FV label="Clinical Observations" value={observations} />}
+              </View>
+
+              {/* Functional */}
+              {(difficultiesIn.length > 0 || hv(dailyLivingAffected)) && (
+                <View style={[S.cardAccent, S.cSky]}>
+                  <Text style={S.subSecTitle}>Functional Assessment</Text>
+                  {difficultiesIn.length > 0 && (
+                    <View style={{ marginBottom: 8 }}>
+                      <Text style={S.lbl}>Difficulties In</Text>
+                      <View style={S.chipRow}>
+                        {difficultiesIn.map((item, i) => <Chip key={i} text={item} variant="blue" />)}
+                        {hv(otherDifficulty) && <Chip text={`Other: ${otherDifficulty}`} variant="slate" />}
+                      </View>
+                    </View>
+                  )}
+                  {hv(dailyLivingAffected) && <FV label="Impact on Daily Living" value={dailyLivingAffected} />}
+                </View>
+              )}
+
+              {/* Physical */}
+              {(postureAssessment.length > 0 || romStatus.length > 0 || muscleStrength.length > 0 || neurologicalSigns.length > 0) && (
+                <View style={[S.cardAccent, S.cSlate]}>
+                  <Text style={S.subSecTitle}>Physical Examination</Text>
+                  {postureAssessment.length > 0 && <CheckRow label="Posture Assessment" options={["Normal", "Deviations"]}      selected={postureAssessment} note={postureDeviations} />}
+                  {romStatus.length > 0         && <CheckRow label="Range of Motion"    options={["Normal", "Restricted"]}      selected={romStatus}         note={romRestricted ? `${romRestricted}${romJoints ? " · " + romJoints : ""}` : romJoints} />}
+                  {muscleStrength.length > 0    && <CheckRow label="Muscle Strength"    options={["Normal", "Weakness in"]}     selected={muscleStrength}    note={muscleWeakness} />}
+                  {neurologicalSigns.length > 0 && <CheckRow label="Neurological Signs" options={["Normal", "Balance", "Coordination", "Sensation issues"]} selected={neurologicalSigns} last />}
+                </View>
+              )}
+
+              {/* Chronic */}
+              {patientPain === "chronicPain" && (hv(painTriggers) || hv(chronicRelieving)) && (
+                <View style={[S.cardAccent, S.cRed]}>
+                  <Text style={S.subSecTitle}>Chronic Pain Assessment</Text>
                   <View style={S.grid}>
-                    {[
-                      ["chiefComplaint",     "Chief Complaint"],
-                      ["painType",           "Pain Type"],
-                      ["duration",           "Duration"],
-                      ["onset",              "Onset"],
-                      ["aggravatingFactors", "Aggravating Factors"],
-                      ["relievingFactors",   "Relieving Factors"],
-                      ["posture",            "Posture"],
-                      ["rangeOfMotion",      "Range of Motion"],
-                      ["specialTests",       "Special Tests"],
-                    ].map(([k, lbl]) =>
-                      assessment[k]
-                        ? <View key={k} style={S.cell2}><LV label={lbl} value={assessment[k]} /></View>
-                        : null
-                    )}
-                    {assessment.observations
-                      ? <View style={{ width: "100%" }}><LV label="Observations" value={assessment.observations} /></View>
-                      : null}
+                    {hv(painTriggers)     && <View style={S.c2}><FV label="Pain Triggers"     value={painTriggers} /></View>}
+                    {hv(chronicRelieving) && <View style={S.c2}><FV label="Relieving Factors" value={chronicRelieving} /></View>}
                   </View>
                 </View>
-              </View>
-            : null}
+              )}
 
-          {/* ── DIAGNOSIS ─────────────────────────────────────────────────── */}
-          {hasAny(diagnosis)
-            ? <View style={S.sec}>
-                <SH title="Diagnosis" color={C.accent} />
-                <View style={[S.card, S.cAcc]}>
-                  {diagnosis.physioDiagnosis
-                    ? <View style={{ width: "100%", marginBottom: 6 }}>
-                        <LVB label="Physio Diagnosis" value={diagnosis.physioDiagnosis} />
-                      </View>
-                    : null}
-                  <View style={S.row2}>
-                    <View style={S.col2}><LV label="Affected Area" value={diagnosis.affectedArea} /></View>
-                    <View style={S.col2}>
-                      <Text style={S.lbl}>Severity</Text>
-                      {diagnosis.severity
-                        ? <View style={S.bRow}><Bdg text={diagnosis.severity} variant={sevV(diagnosis.severity)} /></View>
-                        : <Text style={S.val}>—</Text>}
-                    </View>
+              {/* Sports */}
+              {patientPain === "sportsRehab" && (hv(typeOfSport) || hv(recurringInjuries) || hv(returnToSportGoals)) && (
+                <View style={[S.cardAccent, S.cEm]}>
+                  <Text style={S.subSecTitle}>Sports Rehabilitation Assessment</Text>
+                  <View style={S.grid}>
+                    {hv(typeOfSport)        && <View style={S.c2}><FV label="Type of Sport"       value={typeOfSport} /></View>}
+                    {hv(recurringInjuries)  && <View style={S.c2}><FV label="Recurring Injuries"  value={recurringInjuries} /></View>}
+                    {hv(returnToSportGoals) && <View style={{ width: "100%" }}><FV label="Return-to-Sport Goals" value={returnToSportGoals} /></View>}
                   </View>
-                  <View style={S.row2}>
-                    <View style={S.col2}>
-                      <Text style={S.lbl}>Stage</Text>
-                      {diagnosis.stage
-                        ? <View style={S.bRow}><Bdg text={diagnosis.stage} variant="yellow" /></View>
-                        : <Text style={S.val}>—</Text>}
-                    </View>
-                    <View style={S.col2} />
-                  </View>
-                  {diagnosis.notes
-                    ? <View style={{ marginTop: 4 }}><LV label="Notes" value={diagnosis.notes} /></View>
-                    : null}
                 </View>
-              </View>
-            : null}
+              )}
 
-          {/* ── TREATMENT PLAN ────────────────────────────────────────────── */}
-          {hasAny(treatmentPlan)
-            ? <View style={S.sec}>
-                <SH title="Treatment Plan" />
-                <View style={S.card}>
-                  <View style={S.row2}>
-                    <View style={S.col2}>
-                      <LVB label="Assigned Therapist / Doctor"
-                           value={treatmentPlan.therapistName || treatmentPlan.doctorName} />
-                    </View>
-                    <View style={S.col2}>
-                      <LV label="Session Duration"
-                          value={treatmentPlan.sessionDuration ? `${treatmentPlan.sessionDuration} min` : null} />
-                    </View>
+              {/* Neuro */}
+              {patientPain === "neuroRehab" && (hv(neuroDiagnosis) || hv(neuroOnset) || hv(mobilityStatus) || hv(cognitiveStatus)) && (
+                <View style={[S.cardAccent, S.cPurple]}>
+                  <Text style={S.subSecTitle}>Neuro Rehabilitation Assessment</Text>
+                  <View style={S.grid}>
+                    {hv(neuroDiagnosis)  && <View style={S.c2}><FV label="Diagnosis"       value={neuroDiagnosis} bold /></View>}
+                    {hv(neuroOnset)      && <View style={S.c2}><FV label="Onset"            value={neuroOnset} /></View>}
+                    {hv(mobilityStatus)  && <View style={S.c2}><FV label="Mobility Status"  value={mobilityStatus} /></View>}
+                    {hv(cognitiveStatus) && <View style={S.c2}><FV label="Cognitive Status" value={cognitiveStatus} /></View>}
                   </View>
-                  <View style={S.row2}>
-                    <View style={S.col2}>
-                      <LV label="Frequency"
-                          value={treatmentPlan.frequency ? `${treatmentPlan.frequency} sessions/week` : null} />
-                    </View>
-                    <View style={S.col2}>
-                      <LV label="Total Sessions" value={treatmentPlan.totalSessions} />
-                    </View>
-                  </View>
-                  {treatmentPlan.manualTherapy
-                    ? <View style={{ marginBottom: 6 }}><LV label="Manual Therapy" value={treatmentPlan.manualTherapy} /></View>
-                    : null}
-                  {treatmentPlan.precautions
-                    ? <View style={{ marginBottom: 6 }}><LV label="Precautions" value={treatmentPlan.precautions} /></View>
-                    : null}
-                  {Array.isArray(treatmentPlan.modalities) && treatmentPlan.modalities.length > 0
-                    ? <View style={{ marginTop: 4 }}>
-                        <Text style={S.lbl}>Modalities</Text>
-                        <View style={S.bRow}>
-                          {treatmentPlan.modalities.map((m, i) => <Bdg key={i} text={m} />)}
-                        </View>
-                      </View>
-                    : null}
                 </View>
-              </View>
-            : null}
+              )}
+            </View>
+          )}
 
-          {/* ── THERAPY SESSIONS ──────────────────────────────────────────── */}
-          {Array.isArray(therapySessions) && therapySessions.length > 0
-            ? <View style={S.sec}>
-                <SH title="Therapy Sessions" />
-                <View style={S.tbl}>
-                  <View style={S.tHead}>
-                    <Text style={[S.tHCell, { flex: 1.2 }]}>Date</Text>
-                    <Text style={[S.tHCell, { flex: 0.8 }]}>Status</Text>
-                    <Text style={[S.tHCell, { flex: 1.5 }]}>Modalities</Text>
-                    <Text style={[S.tHCell, { flex: 2   }]}>Exercises</Text>
-                    <Text style={[S.tHCell, { flex: 2   }]}>Response</Text>
-                  </View>
-                  {therapySessions.map((s, i) => (
-                    <View key={i} style={[S.tRow, i % 2 === 1 ? S.tRowAlt : {}]}>
-                      <Text style={[S.tCell, { flex: 1.2 }]}>{s.sessionDate || "—"}</Text>
-                      <Text style={[S.tCell, { flex: 0.8 },
-                        s.status === "Completed" ? { color: C.accent  } :
-                        s.status === "Cancelled" ? { color: C.danger  } :
-                                                   { color: C.warning }]}>
-                        {s.status || "—"}
-                      </Text>
-                      <Text style={[S.tCell, { flex: 1.5 }]}>
-                        {Array.isArray(s.modalitiesUsed) ? s.modalitiesUsed.join(", ") : "—"}
-                      </Text>
-                      <Text style={[S.tCell, { flex: 2 }]}>{s.exercisesDone   || "—"}</Text>
-                      <Text style={[S.tCell, { flex: 2 }]}>{s.patientResponse || "—"}</Text>
-                    </View>
-                  ))}
+          {/* 7 · DIAGNOSIS */}
+          {diagnosisRows.length > 0 && (
+            <View style={S.sec}>
+              <SH num="07" title="Diagnosis" badge={`${diagnosisRows.length} entr${diagnosisRows.length > 1 ? "ies" : "y"}`} />
+              <View style={S.tbl}>
+                <View style={S.tHead}>
+                  <Text style={[S.tHCell, { flex: 0.25 }]}>#</Text>
+                  <Text style={[S.tHCell, { flex: 2.2  }]}>Diagnosis</Text>
+                  <Text style={[S.tHCell, { flex: 1.5  }]}>Affected Area</Text>
+                  <Text style={[S.tHCell, { flex: 0.9  }]}>Severity</Text>
+                  <Text style={[S.tHCell, { flex: 1    }]}>Stage</Text>
+                  <Text style={[S.tHCell, { flex: 2.2  }]}>Clinical Notes</Text>
                 </View>
-              </View>
-            : null}
-
-          {/* ── EXERCISE PLAN ─────────────────────────────────────────────── */}
-          {Array.isArray(exercisePlan?.exercises) && exercisePlan.exercises.length > 0
-            ? <View style={S.sec}>
-                <SH title="Exercise Plan" color={C.accent} />
-                {exercisePlan.exercises.map((ex, i) => (
-                  <View key={i} style={S.exCard}>
-                    {ex.thumbnail ? <Image src={ex.thumbnail} style={S.exThumb} /> : null}
-                    <View style={S.exDet}>
-                      <Text style={S.exName}>{ex.name || "Exercise"}</Text>
-                      <View style={S.exMeta}>
-                        {ex.sets     ? <View style={S.exMetaI}><Text style={S.exMetaTx}>Sets: {ex.sets}</Text></View>              : null}
-                        {ex.reps     ? <View style={S.exMetaI}><Text style={S.exMetaTx}>Reps: {ex.reps}</Text></View>              : null}
-                        {ex.duration ? <View style={S.exMetaI}><Text style={S.exMetaTx}>Duration: {ex.duration} min</Text></View>  : null}
-                      </View>
-                      {ex.instructions ? <Text style={S.exInstr}>{ex.instructions}</Text> : null}
-                      {ex.videoUrl     ? <Text style={S.exUrl}>{ex.videoUrl}</Text>        : null}
-                    </View>
+                {diagnosisRows.map((diag, i) => (
+                  <View key={i} style={[S.tRow, i % 2 === 1 ? S.tRowAlt : {}]}>
+                    <Text style={[S.tCellNum, { flex: 0.25 }]}>{i + 1}</Text>
+                    <Text style={[S.tCellB,   { flex: 2.2  }]}>{diag.physioDiagnosis || "—"}</Text>
+                    <Text style={[S.tCell,    { flex: 1.5  }]}>{diag.affectedArea    || "—"}</Text>
+                    <View style={{ flex: 0.9, justifyContent: "center" }}><SevBadge sev={diag.severity} /></View>
+                    <View style={{ flex: 1,   justifyContent: "center" }}><StageBadge stage={diag.stage} /></View>
+                    <Text style={[S.tCell,    { flex: 2.2, lineHeight: 1.5 }]}>{diag.notes || "—"}</Text>
                   </View>
                 ))}
-                {exercisePlan.homeAdvice
-                  ? <View style={[S.card, S.cAcc]}>
-                      <Text style={S.lbl}>Home Advice</Text>
-                      <Text style={S.note}>{exercisePlan.homeAdvice}</Text>
-                    </View>
-                  : null}
               </View>
-            : null}
+            </View>
+          )}
 
-          {/* ── FOLLOW-UP PLAN ────────────────────────────────────────────── */}
-          {hasAny(followUp)
-            ? <View style={S.sec}>
-                <SH title="Follow-Up Plan" />
-                <View style={S.card}>
-                  <View style={S.row2}>
-                    <View style={S.col2}>
-                      <Text style={S.lbl}>Next Visit Date</Text>
-                      <Text style={S.valB}>{followUp.nextVisitDate || "—"}</Text>
-                    </View>
-                    <View style={S.col2}>
-                      <Text style={S.lbl}>Continue Treatment</Text>
-                      {followUp.continueTreatment
-                        ? <View style={S.bRow}>
-                            <Bdg text={followUp.continueTreatment}
-                                 variant={followUp.continueTreatment === "Yes" ? "green" : "red"} />
-                          </View>
-                        : <Text style={S.val}>—</Text>}
-                    </View>
+          {/* 8 · TREATMENT PLAN */}
+          {(hv(therapistName) || hv(treatmentPlan?.manualTherapy) || hv(treatmentPlan?.precautions)) && (
+            <View style={S.sec}>
+              <SH num="08" title="Treatment Plan" />
+              <View style={[S.cardAccent, S.cEm]}>
+                <View style={S.grid}>
+                  {hv(doctorName)               && <View style={S.c2}><FV label="Assigned Doctor"   value={doctorName} bold /></View>}
+                  {hv(doctorData?.doctorId)     && <View style={S.c2}><FV label="Doctor ID"          value={doctorData.doctorId} /></View>}
+                  {hv(therapistName)            && <View style={S.c2}><FV label="Assigned Therapist" value={therapistName} bold /></View>}
+                  {hv(topTherapistId)           && <View style={S.c2}><FV label="Therapist ID"       value={topTherapistId} /></View>}
+                  {hv(treatmentPlan?.frequency) && <View style={S.c2}><FV label="Session Frequency"  value={treatmentPlan.frequency} /></View>}
+                </View>
+                {hv(treatmentPlan?.manualTherapy) && (
+                  <View style={{ marginTop: 4 }}>
+                    <FV label="Manual Therapy Techniques" value={treatmentPlan.manualTherapy} />
                   </View>
-                  {followUp.reviewNotes
-                    ? <View style={{ marginTop: 6 }}>
-                        <Text style={S.lbl}>Review Notes</Text>
-                        <Text style={S.val}>{followUp.reviewNotes}</Text>
-                      </View>
-                    : null}
-                  {followUp.modifications
-                    ? <View style={{ marginTop: 6 }}>
-                        <Text style={S.lbl}>Modifications</Text>
-                        <Text style={S.val}>{followUp.modifications}</Text>
-                      </View>
-                    : null}
-                </View>
+                )}
+                {hv(treatmentPlan?.precautions) && (
+                  <View style={{ marginTop: 4 }}>
+                    <FV label="Precautions" value={
+                      Array.isArray(treatmentPlan.precautions)
+                        ? treatmentPlan.precautions.join(", ")
+                        : treatmentPlan.precautions
+                    } />
+                  </View>
+                )}
+                {Array.isArray(treatmentPlan?.modalities) && treatmentPlan.modalities.length > 0 && (
+                  <View style={{ marginTop: 6 }}>
+                    <Text style={S.lbl}>Modalities Used</Text>
+                    <View style={S.chipRow}>{treatmentPlan.modalities.map((m, i) => <Chip key={i} text={m} variant="blue" />)}</View>
+                  </View>
+                )}
               </View>
-            : null}
+            </View>
+          )}
 
-          {/* ── AUTHORIZED BY ─────────────────────────────────────────────── */}
-          {(doctorData?.doctorName || treatmentPlan?.doctorName || treatmentPlan?.therapistName)
-            ? <View style={[S.sec, { marginTop: 8 }]}>
-                <SH title="Authorized By" />
-                <View style={S.row2}>
-                  {(doctorData?.doctorName || treatmentPlan?.doctorName)
-                    ? <View style={[S.card, { flex: 1, marginRight: 8 }]}>
-                        <LVB label="Doctor" value={doctorData?.doctorName || treatmentPlan?.doctorName} />
-                        {doctorData?.qualification ? <LV label="Qualification" value={doctorData.qualification} /> : null}
-                        {doctorData?.regNumber     ? <LV label="Reg. No."      value={doctorData.regNumber}     /> : null}
-                      </View>
-                    : null}
-                  {treatmentPlan?.therapistName
-                    ? <View style={[S.card, S.cAcc, { flex: 1 }]}>
-                        <LVB label="Therapist" value={treatmentPlan.therapistName} />
-                        {treatmentPlan?.therapistId ? <LV label="Therapist ID" value={treatmentPlan.therapistId} /> : null}
-                      </View>
-                    : null}
+          {/* 9 · THERAPY SESSIONS */}
+          {sessionsList.length > 0 && (
+            <View style={S.sec}>
+              <SH num="09" title="Therapy Sessions" badge={`${sessionsList.length} session(s)`} />
+              {hv(overallStatus) && (
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 9 }}>
+                  <Text style={[S.lbl, { marginBottom: 0, marginRight: 8 }]}>Overall Status</Text>
+                  <View style={[S.hStatusPill, { backgroundColor: statusBg }]}>
+                    <Text style={[S.hStatusTx, { color: statusColor }]}>{overallStatus}</Text>
+                  </View>
                 </View>
+              )}
+              {sessionsList.map((sess, i) => (
+                <SessionBlock key={i} sess={sess} isLast={i === sessionsList.length - 1}
+                  therapistId={topTherapistId} therapistName={topTherapistName} />
+              ))}
+            </View>
+          )}
+
+          {/* 10 · HOME EXERCISE PLAN */}
+          {(homeExercises.length > 0 || hv(homeAdvice)) && (
+            <View style={S.sec}>
+              <SH num="10" title="Home Exercise Plan"
+                badge={homeExercises.length > 0 ? `${homeExercises.length} exercise(s)` : null}
+              />
+              {homeExercises.length > 0 && (
+                <View style={S.tbl}>
+                  <View style={S.tHead}>
+                    <Text style={[S.tHCell, { flex: 0.25 }]}>#</Text>
+                    <Text style={[S.tHCell, { flex: 2    }]}>Exercise</Text>
+                    <Text style={[S.tHCell, { flex: 0.55 }]}>Sets</Text>
+                    <Text style={[S.tHCell, { flex: 0.55 }]}>Reps</Text>
+                    <Text style={[S.tHCell, { flex: 0.9  }]}>Duration</Text>
+                    <Text style={[S.tHCell, { flex: 0.9  }]}>Frequency</Text>
+                    <Text style={[S.tHCell, { flex: 2.5  }]}>Instructions</Text>
+                  </View>
+                  {homeExercises.map((ex, i) => (
+                    <View key={i} style={[S.tRow, i % 2 === 1 ? S.tRowAlt : {}]}>
+                      <Text style={[S.tCellNum, { flex: 0.25 }]}>{i + 1}</Text>
+                      <Text style={[S.tCellB,   { flex: 2    }]}>{ex.name || "—"}</Text>
+                      <Text style={[S.tCell,    { flex: 0.55 }]}>{dv(ex.sets)}</Text>
+                      <Text style={[S.tCell,    { flex: 0.55 }]}>{dv(ex.reps)}</Text>
+                      <Text style={[S.tCell,    { flex: 0.9  }]}>{dv(ex.duration)}</Text>
+                      <Text style={[S.tCell,    { flex: 0.9  }]}>{dv(ex.frequency)}</Text>
+                      <Text style={[S.tCell,    { flex: 2.5, lineHeight: 1.5 }]}>{dv(ex.instructions)}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              {hv(homeAdvice) && (
+                <View style={[S.cardAccent, S.cEm, { marginTop: homeExercises.length > 0 ? 8 : 0 }]}>
+                  <Text style={S.lbl}>Home Advice & Instructions</Text>
+                  <Text style={[S.val, { lineHeight: 1.7, marginTop: 3 }]}>{homeAdvice}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* 11 · FOLLOW UP */}
+          {(hv(followUpEntry.nextVisitDate) || hv(followUpEntry.reviewNotes)) && (
+            <View style={S.sec}>
+              <SH num="11" title="Follow-Up Plan" />
+              <View style={[S.cardAccent, S.cPurple]}>
+                <View style={S.grid}>
+                  {hv(followUpEntry.nextVisitDate) && (
+                    <View style={S.c2}>
+                      <Text style={S.lbl}>Next Visit Date</Text>
+                      <Text style={[S.valXL, { color: C.purple700 }]}>{followUpEntry.nextVisitDate}</Text>
+                    </View>
+                  )}
+                  {hv(followUpEntry.treatmentStatus) && (
+                    <View style={S.c2}>
+                      <Text style={S.lbl}>Treatment Status</Text>
+                      <View style={{ marginTop: 2 }}>
+                        <Chip
+                          text={followUpEntry.treatmentStatus}
+                          variant={
+                            ["Active", "Completed"].includes(followUpEntry.treatmentStatus) ? "em"
+                            : followUpEntry.treatmentStatus === "Discharged" ? "red"
+                            : "amber"
+                          }
+                        />
+                      </View>
+                    </View>
+                  )}
+                </View>
+                {hv(followUpEntry.reviewNotes)   && <View style={{ marginTop: 6 }}><FV label="Review Notes"            value={followUpEntry.reviewNotes} /></View>}
+                {hv(followUpEntry.modifications) && <View style={{ marginTop: 6 }}><FV label="Treatment Modifications" value={followUpEntry.modifications} /></View>}
               </View>
-            : null}
+            </View>
+          )}
 
-        </View>
+          {/* 12 · TREATMENT TEMPLATES */}
+          {treatmentTemplates.length > 0 && (
+            <View style={S.sec}>
+              <SH num="12" title="Treatment Templates" badge={`${treatmentTemplates.length}`} />
+              <View style={S.tbl}>
+                <View style={S.tHead}>
+                  <Text style={[S.tHCell, { flex: 0.25 }]}>#</Text>
+                  <Text style={[S.tHCell, { flex: 1.8  }]}>Condition</Text>
+                  <Text style={[S.tHCell, { flex: 1.8  }]}>Manual Therapy</Text>
+                  <Text style={[S.tHCell, { flex: 1    }]}>Duration</Text>
+                  <Text style={[S.tHCell, { flex: 1    }]}>Frequency</Text>
+                </View>
+                {treatmentTemplates.map((t, i) => (
+                  <View key={i} style={[S.tRow, i % 2 === 1 ? S.tRowAlt : {}]}>
+                    <Text style={[S.tCellNum, { flex: 0.25 }]}>{i + 1}</Text>
+                    <Text style={[S.tCellB,   { flex: 1.8  }]}>{t.condition     || "—"}</Text>
+                    <Text style={[S.tCell,    { flex: 1.8  }]}>{t.manualTherapy || "—"}</Text>
+                    <Text style={[S.tCell,    { flex: 1    }]}>{t.duration      || "—"}</Text>
+                    <Text style={[S.tCell,    { flex: 1    }]}>{t.frequency     || "—"}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
 
-        {/* ── FOOTER ────────────────────────────────────────────────────── */}
-        <View style={S.footer}>
-          <Text style={S.ftTx}>Generated: {today} · {clicniData?.name || "PhysioCare Clinic"}</Text>
-          <Text style={S.ftTx}>This document is confidential and intended for medical use only.</Text>
+          {/* 13 · SIGNATURES */}
+          {(hv(doctorName) || hv(therapistName)) && (
+            <View style={S.sigSection}>
+              {hv(doctorName) && (
+                <View style={S.sigBox}>
+                  <View style={S.sigLine} />
+                  <Text style={S.sigRole}>Authorized by</Text>
+                  <Text style={S.sigName}>{doctorName}</Text>
+                  {hv(doctorData?.qualification) && <Text style={S.sigSub}>{doctorData.qualification}</Text>}
+                  {hv(doctorData?.regNumber)     && <Text style={S.sigSub}>Reg. {doctorData.regNumber}</Text>}
+                </View>
+              )}
+              {hv(therapistName) && (
+                <View style={S.sigBox}>
+                  <View style={S.sigLine} />
+                  <Text style={S.sigRole}>Physiotherapist</Text>
+                  <Text style={S.sigName}>{therapistName}</Text>
+                  {hv(topTherapistId) && <Text style={S.sigSub}>ID: {topTherapistId}</Text>}
+                </View>
+              )}
+            </View>
+          )}
+
+        </View>{/* end bodyWrap */}
+
+        {/* ══ FOOTER ══ */}
+        <View style={{ flexDirection: "column" }} fixed>
+          <View style={S.footerAccentLine} />
+          <View style={S.footer}>
+            <Text style={S.ftLeft}>{clicniData?.name || "PhysioCare Clinic"}</Text>
+            <Text style={S.ftMid}>CONFIDENTIAL  ·  FOR AUTHORIZED MEDICAL PERSONNEL ONLY</Text>
+            <Text style={S.ftRight} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
+          </View>
         </View>
 
       </Page>

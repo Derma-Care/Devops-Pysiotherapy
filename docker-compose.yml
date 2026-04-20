@@ -250,23 +250,6 @@ services:
       - apigateway
     restart: always
 
-
-  # therapy-report:
-  #   build: ./therapy-report
-  #   container_name: therapy-report-container
-  #   ports:
-  #     - "6000:80"
-  #   environment:
-  #     - HOST=52.66.144.177
-  #     - PORT=6000
-  #     - JAVA_TOOL_OPTIONS=-XX:-UseContainerSupport
-  #   networks:
-  #     - app-network
-  #   depends_on:
-  #     - apigateway
-  #   restart: always  
-
-
 networks:
   app-network:
     driver: bridge
