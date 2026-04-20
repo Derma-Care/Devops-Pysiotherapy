@@ -109,6 +109,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	Optional<Booking> booking = repository.findByBookingId(request.getBookingId());
 	if(booking.isPresent()) {
 	BookingResponse bookingResponse = toResponse(booking.get());
+	bookingResponse.setConsultationType("follow-up");;
 	response = ResponseStructure.buildResponse(
 			bookingResponse,
             "Service booked successfully",
@@ -164,7 +165,8 @@ public class BookingService_ServiceImpl implements BookingService_Service {
             try {
 		    entity = new ObjectMapper().convertValue(request, Booking.class);
 		    entity.setFollowupStatus("pending");
-		    entity.setPatientId(generatePatientId(request.getBranchId()));	  
+		    entity.setPatientId(generatePatientId(request.getBranchId()));	
+		    entity.setConsultationType("First-Time");
 		    ZonedDateTime istTime = ZonedDateTime.now(ZoneId.of("Asia/Kolkata"));
 		    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy hh:mm a");
             if(request.getTotalFee() != 0.0) {
