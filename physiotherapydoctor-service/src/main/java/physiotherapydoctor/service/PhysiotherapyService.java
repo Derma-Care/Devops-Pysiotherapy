@@ -43,6 +43,10 @@ public interface PhysiotherapyService {
 
 	Response getByClinicBranchAndBooking(String clinicId, String branchId, String bookingId);
 
+	ResponseEntity<?> getInProgressBookingsByIds(String patientId, String bookingId);
+
+	ResponseEntity<?> getTodaysAppointments(String clinicId, String doctorId);
+
 
 
 //	Response getTherapistDashboard(String clinicId, String branchId, String therapistId);
