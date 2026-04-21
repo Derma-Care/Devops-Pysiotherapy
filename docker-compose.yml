@@ -248,12 +248,7 @@ services:
       - app-network
     depends_on:
       - apigateway
-<<<<<<< HEAD
-    restart: always
-=======
     restart: always 
-
->>>>>>> 63e29e6 (merge resolution over conflicts)
 
 networks:
   app-network:
