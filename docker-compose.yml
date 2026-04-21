@@ -250,6 +250,21 @@ services:
       - apigateway
     restart: always 
 
+    therapy-report:
+    build: ./therapy-report
+    container_name: therapyreport-container
+    ports:
+      - "5001:80"
+    environment:
+      - HOST=3.111.28.174
+      - PORT=5001
+      - JAVA_TOOL_OPTIONS=-XX:-UseContainerSupport
+    networks:
+      - app-network
+    depends_on:
+      - apigateway
+    restart: always
+
 
 
 networks:
