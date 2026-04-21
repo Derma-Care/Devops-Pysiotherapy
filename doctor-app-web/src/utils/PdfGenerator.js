@@ -1,120 +1,72 @@
-// src/utils/PdfGenerator.jsx  — PREMIUM REDESIGN v3
+// src/utils/PdfGenerator.jsx  — BRAND REDESIGN v5
 import React from "react";
-import { Document, Page, Text, View, Image, StyleSheet, Svg, Path, Rect, Circle, Line } from "@react-pdf/renderer";
+import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer";
 import { capitalizeEachWord } from "./CaptalZeWord";
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  PALETTE  — Refined monochromatic slate + surgical green accent
+//  BRAND COLOR PALETTE  (matches your COLORS export)
 // ─────────────────────────────────────────────────────────────────────────────
 const C = {
-  // Pure tones
+  // Brand
+  navy:      "#1B4F8A",   // bgcolor / primary
+  navyDark:  "#163f70",   // darker navy for hover/depth
+  navyDeep:  "#0f2d52",   // deepest navy (header bg)
+  navyMid:   "#2A6DB5",   // secondary / lighter navy
+  orange:    "#f9c571",   // accent orange
+  orangeDk:  "#e8a93a",   // darker orange for borders/text
+  orangeLt:  "#fdf3dc",   // very light orange tint
   white:     "#ffffff",
-  paper:     "#fafafa",
-  ink:       "#0a0f1a",
-
-  // Slate scale (cool, neutral)
-  slate50:   "#f8fafc",
-  slate100:  "#f1f5f9",
-  slate150:  "#e9eef5",
-  slate200:  "#e2e8f0",
-  slate300:  "#cbd5e1",
-  slate400:  "#94a3b8",
-  slate500:  "#64748b",
-  slate600:  "#475569",
-  slate700:  "#334155",
-  slate800:  "#1e293b",
-  slate850:  "#172032",
-  slate900:  "#0f172a",
-  slate950:  "#080d18",
-
-  // Primary accent — Surgical Green / Emerald
-  em50:      "#ecfdf5",
-  em100:     "#d1fae5",
-  em200:     "#a7f3d0",
-  em300:     "#6ee7b7",
-  em400:     "#34d399",
-  em500:     "#10b981",
-  em600:     "#059669",
-  em700:     "#047857",
-  em800:     "#065f46",
-  em900:     "#064e3b",
-
-  // Secondary accent — Warm gold (for highlights)
-  gold400:   "#fbbf24",
-  gold500:   "#f59e0b",
-  gold600:   "#d97706",
-  gold100:   "#fef3c7",
-  gold50:    "#fffbeb",
-
+  // Light blues (for programs)
+  skyBrand:  "#e8f1fb",   // light blue bg for programs
+  skyBorder: "#b8d0f0",   // border for light blue cards
+  skyText:   "#1B4F8A",   // text on light blue
+  // Grays
+  gray50:    "#f8fafc",
+  gray100:   "#f0f4f8",
+  gray150:   "#e5ecf3",
+  gray200:   "#d4dfec",
+  gray300:   "#b0c1d4",
+  gray400:   "#7a94b0",
+  gray500:   "#5a7592",
+  gray600:   "#3d5a75",
+  gray700:   "#2a3f55",
+  gray800:   "#1a2a3a",
   // Semantic
   red50:     "#fef2f2",
   red100:    "#fee2e2",
   red500:    "#ef4444",
   red600:    "#dc2626",
   red700:    "#b91c1c",
-
   amber50:   "#fffbeb",
   amber100:  "#fef3c7",
   amber600:  "#d97706",
   amber700:  "#b45309",
-
-  blue50:    "#eff6ff",
-  blue100:   "#dbeafe",
-  blue600:   "#2563eb",
-  blue700:   "#1d4ed8",
-
+  em50:      "#ecfdf5",
+  em100:     "#d1fae5",
+  em200:     "#a7f3d0",
+  em400:     "#34d399",
+  em500:     "#10b981",
+  em600:     "#059669",
+  em700:     "#047857",
+  em800:     "#065f46",
   purple50:  "#faf5ff",
   purple100: "#ede9fe",
   purple600: "#7c3aed",
   purple700: "#6d28d9",
-
-  sky50:     "#f0f9ff",
-  sky100:    "#e0f2fe",
-  sky600:    "#0284c7",
-  sky700:    "#0369a1",
+  blue50:    "#eff6ff",
+  blue100:   "#dbeafe",
+  blue600:   "#2563eb",
+  blue700:   "#1d4ed8",
+  teal:      "#16a085",
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  TYPOGRAPHY SCALE
-// ─────────────────────────────────────────────────────────────────────────────
-const T = {
-  // Display
-  display:    { fontSize: 18, fontFamily: "Helvetica-Bold", letterSpacing: -0.3 },
-  // Headings
-  h1:         { fontSize: 11, fontFamily: "Helvetica-Bold", letterSpacing: 0.2 },
-  h2:         { fontSize: 9,  fontFamily: "Helvetica-Bold", letterSpacing: 0.5 },
-  h3:         { fontSize: 8,  fontFamily: "Helvetica-Bold", letterSpacing: 0.3 },
-  // Body
-  body:       { fontSize: 8,  fontFamily: "Helvetica",      lineHeight: 1.6 },
-  bodyBold:   { fontSize: 8,  fontFamily: "Helvetica-Bold", lineHeight: 1.6 },
-  bodyLg:     { fontSize: 9,  fontFamily: "Helvetica",      lineHeight: 1.7 },
-  // Labels
-  label:      { fontSize: 6.5, fontFamily: "Helvetica-Bold", letterSpacing: 0.8, textTransform: "uppercase" },
-  labelSm:    { fontSize: 6,   fontFamily: "Helvetica-Bold", letterSpacing: 0.6, textTransform: "uppercase" },
-  // Caption
-  caption:    { fontSize: 7,   fontFamily: "Helvetica",      lineHeight: 1.5 },
-  captionBold:{ fontSize: 7,   fontFamily: "Helvetica-Bold" },
-  // Micro
-  micro:      { fontSize: 6,   fontFamily: "Helvetica" },
-  microBold:  { fontSize: 6,   fontFamily: "Helvetica-Bold" },
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  LAYOUT CONSTANTS
-// ─────────────────────────────────────────────────────────────────────────────
 const L = {
-  pageH: 28,   // header height approx
-  pageP: 32,   // horizontal page padding
-  colGap: 10,
-  sectionGap: 16,
-  cardR: 4,    // card border radius
+  pageP: 32,
+  sectionGap: 14,
+  cardR: 4,
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  STYLES
-// ─────────────────────────────────────────────────────────────────────────────
 const S = StyleSheet.create({
-  // ── PAGE ──
   page: {
     fontSize: 8,
     fontFamily: "Helvetica",
@@ -124,70 +76,63 @@ const S = StyleSheet.create({
 
   // ── HEADER ──
   header: {
-    backgroundColor: C.slate900,
-    paddingTop: 0,
-    paddingBottom: 0,
-    paddingLeft: 0,
-    paddingRight: 0,
+    backgroundColor: C.navyDeep,
     flexDirection: "column",
   },
-  // The top accent strip
   headerAccentBar: {
-    height: 3,
+    height: 4,
     flexDirection: "row",
   },
-  headerAccentSeg1: { flex: 3, backgroundColor: C.em500 },
-  headerAccentSeg2: { flex: 1, backgroundColor: C.em700 },
-  headerAccentSeg3: { flex: 5, backgroundColor: C.slate700 },
-
+  headerAccentSeg1: { flex: 3, backgroundColor: C.orange },
+  headerAccentSeg2: { flex: 1, backgroundColor: C.orangeDk },
+  headerAccentSeg3: { flex: 5, backgroundColor: C.navyMid },
   headerInner: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: 16,
-    paddingBottom: 16,
+    alignItems: "flex-start",
+    paddingTop: 14,
+    paddingBottom: 14,
     paddingLeft: L.pageP,
     paddingRight: L.pageP,
   },
-  hLeft: { flex: 1 },
+  hLeft: { flex: 1, paddingRight: 16 },
   hClinicName: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: "Helvetica-Bold",
     color: C.white,
     letterSpacing: -0.2,
-    marginBottom: 3,
+    marginBottom: 4,
   },
-  hMeta: { fontSize: 7, color: C.slate400, lineHeight: 1.7 },
-  hRight: { alignItems: "flex-end" },
+  // address rendered as multiple Text lines so it wraps naturally
+  hAddress: {
+    fontSize: 7,
+    color: C.gray300,
+    lineHeight: 1.8,
+    flexWrap: "wrap",
+  },
+  hMeta: { fontSize: 7, color: C.gray400, lineHeight: 1.7 },
+  hRight: { alignItems: "flex-end", flexShrink: 0 },
   hDocType: {
     fontSize: 7,
     fontFamily: "Helvetica-Bold",
-    color: C.em400,
+    color: C.orange,
     letterSpacing: 3,
     textTransform: "uppercase",
-    marginBottom: 5,
+    marginBottom: 4,
   },
-  hDate:      { fontSize: 7.5, color: C.slate300, textAlign: "right", marginBottom: 2 },
-  hRef:       { fontSize: 7,   color: C.slate500, textAlign: "right", marginBottom: 2 },
-  hStatusWrap:{ flexDirection: "row", justifyContent: "flex-end", marginTop: 4 },
-  hStatusPill:{
+  hDate:       { fontSize: 7.5, color: C.gray300, textAlign: "right", marginBottom: 2 },
+  hRef:        { fontSize: 7,   color: C.gray500, textAlign: "right", marginBottom: 2 },
+  hStatusWrap: { flexDirection: "row", justifyContent: "flex-end", marginTop: 3 },
+  hStatusPill: {
     borderRadius: 2,
     paddingTop: 2, paddingBottom: 2,
     paddingLeft: 8, paddingRight: 8,
   },
-  hStatusTx:  { fontSize: 6.5, fontFamily: "Helvetica-Bold", letterSpacing: 1.2 },
-
-  // ── HEADER BOTTOM RULE ──
-  headerRule: {
-    height: 1,
-    backgroundColor: C.slate800,
-    marginLeft: L.pageP,
-    marginRight: L.pageP,
-  },
+  hStatusTx: { fontSize: 6.5, fontFamily: "Helvetica-Bold", letterSpacing: 1.2 },
 
   // ── PATIENT BANNER ──
   patientBanner: {
-    backgroundColor: C.slate900,
+    backgroundColor: C.navy,
     paddingTop: 10,
     paddingBottom: 12,
     paddingLeft: L.pageP,
@@ -196,126 +141,128 @@ const S = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     borderBottomWidth: 3,
-    borderBottomColor: C.em600,
+    borderBottomColor: C.orange,
   },
   pbLeft: { flexDirection: "row", alignItems: "center" },
   pbAvatar: {
-    width: 40, height: 40,
+    width: 38, height: 38,
     borderRadius: 4,
-    backgroundColor: C.em800,
+    backgroundColor: C.navyDark,
     alignItems: "center", justifyContent: "center",
-    marginRight: 14, flexShrink: 0,
-    borderTopWidth: 1, borderRightWidth: 1,
-    borderBottomWidth: 1, borderLeftWidth: 1,
-    borderTopColor: C.em600, borderRightColor: C.em600,
-    borderBottomColor: C.em600, borderLeftColor: C.em600,
+    marginRight: 12, flexShrink: 0,
+    borderTopWidth: 2, borderRightWidth: 2,
+    borderBottomWidth: 2, borderLeftWidth: 2,
+    borderTopColor: C.orange, borderRightColor: C.orange,
+    borderBottomColor: C.orange, borderLeftColor: C.orange,
   },
-  pbAvatarTx: { fontSize: 13, fontFamily: "Helvetica-Bold", color: C.em300 },
-  pbName:     { fontSize: 15, fontFamily: "Helvetica-Bold", color: C.white, letterSpacing: -0.1 },
-  pbMeta:     { fontSize: 7.5, color: C.slate400, marginTop: 3, letterSpacing: 0.2 },
+  pbAvatarTx: { fontSize: 12, fontFamily: "Helvetica-Bold", color: C.orange },
+  pbName:     { fontSize: 14, fontFamily: "Helvetica-Bold", color: C.white, letterSpacing: -0.1 },
+  pbMeta:     { fontSize: 7.5, color: C.gray300, marginTop: 3, letterSpacing: 0.2 },
   pbRight:    { alignItems: "flex-end" },
   pbIdWrap: {
-    backgroundColor: C.slate800,
+    backgroundColor: C.navyDark,
     borderRadius: 3,
     paddingTop: 5, paddingBottom: 5,
     paddingLeft: 10, paddingRight: 10,
     borderTopWidth: 1, borderRightWidth: 1,
     borderBottomWidth: 1, borderLeftWidth: 1,
-    borderTopColor: C.slate700, borderRightColor: C.slate700,
-    borderBottomColor: C.slate700, borderLeftColor: C.slate700,
+    borderTopColor: C.orange, borderRightColor: C.orange,
+    borderBottomColor: C.orange, borderLeftColor: C.orange,
   },
-  pbIdLbl:    { fontSize: 6, color: C.slate500, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 2, fontFamily: "Helvetica-Bold" },
-  pbIdVal:    { fontSize: 9, fontFamily: "Helvetica-Bold", color: C.em400, letterSpacing: 0.5 },
+  pbIdLbl: { fontSize: 6, color: C.gray400, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 2, fontFamily: "Helvetica-Bold" },
+  pbIdVal: { fontSize: 9, fontFamily: "Helvetica-Bold", color: C.orange, letterSpacing: 0.5 },
 
   // ── BODY ──
   bodyWrap: {
-    flexDirection: "column",
     flex: 1,
-    paddingTop: 22,
-    paddingBottom: 32,
+    paddingTop: 20,
+    paddingBottom: 28,
     paddingLeft: L.pageP,
     paddingRight: L.pageP,
     backgroundColor: C.white,
   },
 
-  // ── SECTION ──
   sec: { marginBottom: L.sectionGap },
 
+  // ── SECTION HEADER — with background highlight ──
   secHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 8,
+    backgroundColor: C.navy,
+    borderRadius: 3,
+    paddingTop: 6,
+    paddingBottom: 6,
+    paddingLeft: 10,
+    paddingRight: 10,
   },
   secNumBox: {
     width: 18, height: 18,
-    backgroundColor: C.slate900,
+    backgroundColor: C.orange,
     borderRadius: 2,
     alignItems: "center", justifyContent: "center",
     marginRight: 8,
     flexShrink: 0,
   },
-  secNum: { fontSize: 7, fontFamily: "Helvetica-Bold", color: C.em400 },
+  secNum: { fontSize: 7, fontFamily: "Helvetica-Bold", color: C.navyDeep },
   secTitleWrap: { flex: 1, flexDirection: "row", alignItems: "center" },
   secTitle: {
-    fontSize: 8.5, fontFamily: "Helvetica-Bold", color: C.slate800,
+    fontSize: 8.5, fontFamily: "Helvetica-Bold", color: C.white,
     textTransform: "uppercase", letterSpacing: 1.5,
   },
   secRule: {
     flex: 1, height: 1,
-    backgroundColor: C.slate200,
+    backgroundColor: C.navyMid,
     marginLeft: 10,
   },
   secBadge: {
-    backgroundColor: C.em50,
+    backgroundColor: C.orange,
     borderRadius: 12,
     paddingTop: 2, paddingBottom: 2,
     paddingLeft: 8, paddingRight: 8,
     marginLeft: 8,
-    borderTopWidth: 1, borderRightWidth: 1,
-    borderBottomWidth: 1, borderLeftWidth: 1,
-    borderTopColor: C.em200, borderRightColor: C.em200,
-    borderBottomColor: C.em200, borderLeftColor: C.em200,
   },
-  secBadgeTx: { fontSize: 6, color: C.em700, fontFamily: "Helvetica-Bold", letterSpacing: 0.3 },
+  secBadgeTx: { fontSize: 6, color: C.navyDeep, fontFamily: "Helvetica-Bold", letterSpacing: 0.3 },
 
   subSecTitle: {
-    fontSize: 7, fontFamily: "Helvetica-Bold", color: C.slate500,
+    fontSize: 7, fontFamily: "Helvetica-Bold", color: C.navy,
     textTransform: "uppercase", letterSpacing: 1,
-    marginBottom: 9, marginTop: 4,
+    marginBottom: 8, marginTop: 2,
     paddingBottom: 5,
-    borderBottomWidth: 1, borderBottomColor: C.slate100,
+    borderBottomWidth: 1, borderBottomColor: C.gray150,
   },
 
   // ── CARDS ──
   card: {
-    backgroundColor: C.slate50,
+    backgroundColor: C.gray50,
     borderRadius: L.cardR,
     borderTopWidth: 1, borderRightWidth: 1,
     borderBottomWidth: 1, borderLeftWidth: 1,
-    borderTopColor: C.slate200, borderRightColor: C.slate200,
-    borderBottomColor: C.slate200, borderLeftColor: C.slate200,
-    padding: 14, marginBottom: 8,
+    borderTopColor: C.gray200, borderRightColor: C.gray200,
+    borderBottomColor: C.gray200, borderLeftColor: C.gray200,
+    padding: 14,
+    marginBottom: 6,
   },
   cardAccent: {
     backgroundColor: C.white,
     borderRadius: L.cardR,
     borderTopWidth: 1, borderRightWidth: 1,
     borderBottomWidth: 1, borderLeftWidth: 2,
-    borderTopColor: C.slate150, borderRightColor: C.slate150,
-    borderBottomColor: C.slate150, borderLeftColor: C.slate200,
-    padding: 12, marginBottom: 8,
+    borderTopColor: C.gray150, borderRightColor: C.gray150,
+    borderBottomColor: C.gray150, borderLeftColor: C.gray200,
+    padding: 12,
+    marginBottom: 6,
   },
-  // Left-border accent colors
   cEm:     { borderLeftColor: C.em500,     borderLeftWidth: 3 },
-  cGold:   { borderLeftColor: C.gold500,   borderLeftWidth: 3 },
+  cGold:   { borderLeftColor: C.orange,    borderLeftWidth: 3 },
   cRed:    { borderLeftColor: C.red500,    borderLeftWidth: 3 },
   cAmber:  { borderLeftColor: C.amber600,  borderLeftWidth: 3 },
-  cBlue:   { borderLeftColor: C.blue600,   borderLeftWidth: 3 },
+  cBlue:   { borderLeftColor: C.navyMid,   borderLeftWidth: 3 },
   cPurple: { borderLeftColor: C.purple600, borderLeftWidth: 3 },
-  cSky:    { borderLeftColor: C.sky600,    borderLeftWidth: 3 },
-  cSlate:  { borderLeftColor: C.slate400,  borderLeftWidth: 3 },
+  cSky:    { borderLeftColor: C.teal,      borderLeftWidth: 3 },
+  cSlate:  { borderLeftColor: C.gray400,   borderLeftWidth: 3 },
+  cNavy:   { borderLeftColor: C.navy,      borderLeftWidth: 3 },
 
-  // ── COMPLAINT BOX ──
   complaintBox: {
     backgroundColor: C.red50,
     borderRadius: L.cardR,
@@ -323,32 +270,33 @@ const S = StyleSheet.create({
     borderBottomWidth: 1, borderLeftWidth: 3,
     borderTopColor: C.red100, borderRightColor: C.red100,
     borderBottomColor: C.red100, borderLeftColor: C.red600,
-    padding: 12, marginBottom: 8,
+    padding: 12, marginBottom: 6,
   },
 
-  // ── INFO GRID ──
+  // ── GRID ──
   grid: { flexDirection: "row", flexWrap: "wrap" },
   c2:  { width: "50%",    marginBottom: 10, paddingRight: 14 },
   c3:  { width: "33.33%", marginBottom: 10, paddingRight: 10 },
   c4:  { width: "25%",    marginBottom: 10, paddingRight: 8  },
 
-  // ── FIELD ──
-  fieldBox: {
-    marginBottom: 5,
-  },
+  // ── FIELD: label clearly visible ──
+  fieldBox: { marginBottom: 4 },
   lbl: {
-    fontSize: 6,
-    color: C.slate400,
+    fontSize: 6.5,
+    color: C.navyMid,                 // brand navy — clearly visible
     textTransform: "uppercase",
-    letterSpacing: 0.8,
-    marginBottom: 2.5,
+    letterSpacing: 0.9,
+    marginBottom: 3,
     fontFamily: "Helvetica-Bold",
+    backgroundColor: C.gray100,       // subtle bg so it stands out
+    paddingTop: 2, paddingBottom: 2,
+    paddingLeft: 4, paddingRight: 4,
+    borderRadius: 2,
   },
-  val:   { fontSize: 8, color: C.slate700, lineHeight: 1.5 },
-  valB:  { fontSize: 8, color: C.slate900, fontFamily: "Helvetica-Bold", lineHeight: 1.5 },
-  valXL: { fontSize: 12, color: C.slate900, fontFamily: "Helvetica-Bold" },
+  val:   { fontSize: 8, color: C.gray700, lineHeight: 1.5 },
+  valB:  { fontSize: 8, color: C.navyDeep, fontFamily: "Helvetica-Bold", lineHeight: 1.5 },
+  valXL: { fontSize: 12, color: C.navy, fontFamily: "Helvetica-Bold" },
 
-  // ── CHIPS ──
   chipRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 3 },
   chip: {
     borderRadius: 3,
@@ -359,114 +307,110 @@ const S = StyleSheet.create({
     borderBottomWidth: 1, borderLeftWidth: 1,
   },
   chipTx: { fontSize: 6.5, fontFamily: "Helvetica-Bold" },
-  // chip variants
-  chipEm:     { backgroundColor: C.em50,     borderTopColor: C.em200,    borderRightColor: C.em200,    borderBottomColor: C.em200,    borderLeftColor: C.em200    },
-  chipEmTx:   { color: C.em700 },
-  chipGold:   { backgroundColor: C.gold50,   borderTopColor: C.gold100,  borderRightColor: C.gold100,  borderBottomColor: C.gold100,  borderLeftColor: C.gold100  },
-  chipGoldTx: { color: C.gold600 },
-  chipRed:    { backgroundColor: C.red50,    borderTopColor: C.red100,   borderRightColor: C.red100,   borderBottomColor: C.red100,   borderLeftColor: C.red100   },
-  chipRedTx:  { color: C.red700 },
-  chipAmb:    { backgroundColor: C.amber50,  borderTopColor: C.amber100, borderRightColor: C.amber100, borderBottomColor: C.amber100, borderLeftColor: C.amber100 },
-  chipAmbTx:  { color: C.amber700 },
-  chipBlue:   { backgroundColor: C.blue50,   borderTopColor: C.blue100,  borderRightColor: C.blue100,  borderBottomColor: C.blue100,  borderLeftColor: C.blue100  },
-  chipBlueTx: { color: C.blue700 },
-  chipPur:    { backgroundColor: C.purple50, borderTopColor: C.purple100,borderRightColor: C.purple100,borderBottomColor: C.purple100,borderLeftColor: C.purple100},
-  chipPurTx:  { color: C.purple700 },
-  chipSky:    { backgroundColor: C.sky50,    borderTopColor: C.sky100,   borderRightColor: C.sky100,   borderBottomColor: C.sky100,   borderLeftColor: C.sky100   },
-  chipSkyTx:  { color: C.sky700 },
-  chipSlate:  { backgroundColor: C.slate100, borderTopColor: C.slate200, borderRightColor: C.slate200, borderBottomColor: C.slate200, borderLeftColor: C.slate200 },
-  chipSlateTx:{ color: C.slate600 },
+  // Brand chips
+  chipNavy:    { backgroundColor: C.navy,    borderTopColor: C.navyDark, borderRightColor: C.navyDark, borderBottomColor: C.navyDark, borderLeftColor: C.navyDark },
+  chipNavyTx:  { color: C.white },
+  chipOrange:  { backgroundColor: C.orangeLt,borderTopColor: C.orangeDk, borderRightColor: C.orangeDk, borderBottomColor: C.orangeDk, borderLeftColor: C.orangeDk },
+  chipOrangeTx:{ color: C.orangeDk },
+  // Semantic chips
+  chipEm:      { backgroundColor: C.em50,     borderTopColor: C.em200,    borderRightColor: C.em200,    borderBottomColor: C.em200,    borderLeftColor: C.em200    },
+  chipEmTx:    { color: C.em700 },
+  chipRed:     { backgroundColor: C.red50,    borderTopColor: C.red100,   borderRightColor: C.red100,   borderBottomColor: C.red100,   borderLeftColor: C.red100   },
+  chipRedTx:   { color: C.red700 },
+  chipAmb:     { backgroundColor: C.amber50,  borderTopColor: C.amber100, borderRightColor: C.amber100, borderBottomColor: C.amber100, borderLeftColor: C.amber100 },
+  chipAmbTx:   { color: C.amber700 },
+  chipBlue:    { backgroundColor: C.blue50,   borderTopColor: C.blue100,  borderRightColor: C.blue100,  borderBottomColor: C.blue100,  borderLeftColor: C.blue100  },
+  chipBlueTx:  { color: C.blue700 },
+  chipPur:     { backgroundColor: C.purple50, borderTopColor: C.purple100,borderRightColor: C.purple100,borderBottomColor: C.purple100,borderLeftColor: C.purple100},
+  chipPurTx:   { color: C.purple700 },
+  chipSky:     { backgroundColor: C.skyBrand, borderTopColor: C.skyBorder,borderRightColor: C.skyBorder,borderBottomColor: C.skyBorder,borderLeftColor: C.skyBorder},
+  chipSkyTx:   { color: C.skyText },
+  chipSlate:   { backgroundColor: C.gray100,  borderTopColor: C.gray200,  borderRightColor: C.gray200,  borderBottomColor: C.gray200,  borderLeftColor: C.gray200  },
+  chipSlateTx: { color: C.gray600 },
 
-  // ── DIVIDER ──
-  divider: { borderBottomWidth: 1, borderBottomColor: C.slate100, marginTop: 8, marginBottom: 10 },
-  dividerDashed: { borderBottomWidth: 1, borderBottomColor: C.slate200, borderStyle: "dashed", marginTop: 6, marginBottom: 8 },
+  divider: { borderBottomWidth: 1, borderBottomColor: C.gray100, marginTop: 8, marginBottom: 8 },
 
-  // ── PAIN BAR ──
-  pbTrack:  { height: 7, backgroundColor: C.slate100, borderRadius: 3.5, marginTop: 4, marginBottom: 3, overflow: "hidden" },
+  pbTrack:  { height: 7, backgroundColor: C.gray100, borderRadius: 3.5, marginTop: 4, marginBottom: 3, overflow: "hidden" },
   pbFill:   { height: 7, borderRadius: 3.5 },
   pbLabels: { flexDirection: "row", justifyContent: "space-between" },
-  pbLblTx:  { fontSize: 6, color: C.slate400 },
+  pbLblTx:  { fontSize: 6, color: C.gray400 },
 
-  // ── CHECK ROW ──
   checkRow: {
     flexDirection: "row", alignItems: "flex-start",
     marginBottom: 6, paddingBottom: 6,
-    borderBottomWidth: 1, borderBottomColor: C.slate50,
+    borderBottomWidth: 1, borderBottomColor: C.gray50,
   },
-  checkLabel: { fontSize: 7.5, color: C.slate600, fontFamily: "Helvetica-Bold", width: 120, marginTop: 2, flexShrink: 0 },
+  checkLabel: { fontSize: 7.5, color: C.navy, fontFamily: "Helvetica-Bold", width: 120, marginTop: 2, flexShrink: 0 },
   checkPills: { flexDirection: "row", flexWrap: "wrap", flex: 1 },
   checkOn: {
-    backgroundColor: C.em50, borderRadius: 3,
+    backgroundColor: C.navy, borderRadius: 3,
     paddingTop: 2, paddingBottom: 2, paddingLeft: 7, paddingRight: 7,
     marginRight: 4, marginBottom: 3,
     borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
-    borderTopColor: C.em200, borderRightColor: C.em200, borderBottomColor: C.em200, borderLeftColor: C.em200,
+    borderTopColor: C.navyDark, borderRightColor: C.navyDark, borderBottomColor: C.navyDark, borderLeftColor: C.navyDark,
   },
   checkOff: {
-    backgroundColor: C.slate50, borderRadius: 3,
+    backgroundColor: C.gray50, borderRadius: 3,
     paddingTop: 2, paddingBottom: 2, paddingLeft: 7, paddingRight: 7,
     marginRight: 4, marginBottom: 3,
     borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
-    borderTopColor: C.slate150, borderRightColor: C.slate150, borderBottomColor: C.slate150, borderLeftColor: C.slate150,
+    borderTopColor: C.gray150, borderRightColor: C.gray150, borderBottomColor: C.gray150, borderLeftColor: C.gray150,
   },
-  checkOnTx:  { fontSize: 7, color: C.em700, fontFamily: "Helvetica-Bold" },
-  checkOffTx: { fontSize: 7, color: C.slate400 },
-  checkNote:  { fontSize: 6, color: C.slate500, fontStyle: "italic", marginTop: 3, flex: 1 },
+  checkOnTx:  { fontSize: 7, color: C.white, fontFamily: "Helvetica-Bold" },
+  checkOffTx: { fontSize: 7, color: C.gray400 },
+  checkNote:  { fontSize: 6, color: C.gray500, fontStyle: "italic", marginTop: 3, flex: 1 },
 
-  // ── Q&A ──
   qaWrap: {
-    borderRadius: L.cardR, overflow: "hidden", marginBottom: 7,
+    borderRadius: L.cardR, overflow: "hidden", marginBottom: 6,
     borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
-    borderTopColor: C.slate200, borderRightColor: C.slate200, borderBottomColor: C.slate200, borderLeftColor: C.slate200,
+    borderTopColor: C.gray200, borderRightColor: C.gray200, borderBottomColor: C.gray200, borderLeftColor: C.gray200,
   },
   qaHead: {
-    backgroundColor: C.slate800,
+    backgroundColor: C.navy,
     paddingTop: 7, paddingBottom: 7, paddingLeft: 12, paddingRight: 12,
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
   },
   qaHeadTx:    { fontSize: 8, fontFamily: "Helvetica-Bold", color: C.white },
-  qaHeadCount: { fontSize: 6.5, color: C.em400 },
+  qaHeadCount: { fontSize: 6.5, color: C.orange },
   qaRow: {
     flexDirection: "row", alignItems: "center",
     paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 12,
-    borderTopWidth: 1, borderTopColor: C.slate100,
+    borderTopWidth: 1, borderTopColor: C.gray100,
   },
-  qaRowAlt: { backgroundColor: C.slate50 },
+  qaRowAlt: { backgroundColor: C.gray50 },
   qaNum: {
     width: 15, height: 15, borderRadius: 2,
-    backgroundColor: C.em100, alignItems: "center", justifyContent: "center",
+    backgroundColor: C.orangeLt, alignItems: "center", justifyContent: "center",
     marginRight: 8, flexShrink: 0,
   },
-  qaNumTx: { fontSize: 6, color: C.em700, fontFamily: "Helvetica-Bold" },
-  qaQ:     { fontSize: 7.5, color: C.slate600, flex: 1, paddingRight: 12, lineHeight: 1.5 },
+  qaNumTx: { fontSize: 6, color: C.navyDeep, fontFamily: "Helvetica-Bold" },
+  qaQ:    { fontSize: 7.5, color: C.gray600, flex: 1, paddingRight: 12, lineHeight: 1.5 },
 
-  // ── TABLES ──
   tbl: {
-    borderRadius: L.cardR, overflow: "hidden", marginBottom: 8,
+    borderRadius: L.cardR, overflow: "hidden", marginBottom: 6,
     borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
-    borderTopColor: C.slate200, borderRightColor: C.slate200, borderBottomColor: C.slate200, borderLeftColor: C.slate200,
+    borderTopColor: C.gray200, borderRightColor: C.gray200, borderBottomColor: C.gray200, borderLeftColor: C.gray200,
   },
   tHead: {
     flexDirection: "row",
-    backgroundColor: C.slate800,
+    backgroundColor: C.navy,
     paddingTop: 7, paddingBottom: 7, paddingLeft: 12, paddingRight: 12,
   },
-  tHCell:  { fontSize: 6.5, color: C.slate300, fontFamily: "Helvetica-Bold", paddingRight: 6, letterSpacing: 0.5, textTransform: "uppercase" },
+  tHCell:  { fontSize: 6.5, color: C.orange, fontFamily: "Helvetica-Bold", paddingRight: 6, letterSpacing: 0.5, textTransform: "uppercase" },
   tRow: {
     flexDirection: "row",
-    borderTopWidth: 1, borderTopColor: C.slate100,
+    borderTopWidth: 1, borderTopColor: C.gray100,
     paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 12,
   },
-  tRowAlt: { backgroundColor: C.slate50 },
-  tCell:   { fontSize: 7.5, color: C.slate500, paddingRight: 6, lineHeight: 1.4 },
-  tCellB:  { fontSize: 7.5, color: C.slate800, fontFamily: "Helvetica-Bold", paddingRight: 6 },
+  tRowAlt: { backgroundColor: C.gray50 },
+  tCell:   { fontSize: 7.5, color: C.gray500, paddingRight: 6, lineHeight: 1.4 },
+  tCellB:  { fontSize: 7.5, color: C.navyDeep, fontFamily: "Helvetica-Bold", paddingRight: 6 },
   tCellEm: { fontSize: 7.5, color: C.em600,    fontFamily: "Helvetica-Bold", paddingRight: 6 },
-  tCellNum:{ fontSize: 7,   color: C.slate400, paddingRight: 6 },
+  tCellNum:{ fontSize: 7,   color: C.gray400,  paddingRight: 6 },
 
-  // ── SEVERITY / STAGE BADGES ──
-  sevMild:        { backgroundColor: C.em50,     borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
-  sevModerate:    { backgroundColor: C.amber50,  borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
-  sevSevere:      { backgroundColor: C.red50,    borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
+  sevMild:        { backgroundColor: C.em50,    borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
+  sevModerate:    { backgroundColor: C.amber50, borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
+  sevSevere:      { backgroundColor: C.red50,   borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
   sevMildTx:      { fontSize: 6.5, color: C.em700,    fontFamily: "Helvetica-Bold" },
   sevModerateTx:  { fontSize: 6.5, color: C.amber700, fontFamily: "Helvetica-Bold" },
   sevSevereTx:    { fontSize: 6.5, color: C.red700,   fontFamily: "Helvetica-Bold" },
@@ -478,25 +422,27 @@ const S = StyleSheet.create({
   stageSubTx:     { fontSize: 6.5, color: C.amber700,  fontFamily: "Helvetica-Bold" },
   stageChronicTx: { fontSize: 6.5, color: C.purple700, fontFamily: "Helvetica-Bold" },
 
-  // ── THERAPY / PACKAGE NESTING ──
-  pkgWrap:   { marginBottom: 10 },
+  // ── PACKAGE — navy themed ──
+  pkgWrap:   { marginBottom: 8 },
   pkgHeader: {
-    backgroundColor: C.slate800,
+    backgroundColor: C.navyDeep,
     paddingTop: 9, paddingBottom: 9, paddingLeft: 14, paddingRight: 14,
     borderTopLeftRadius: L.cardR, borderTopRightRadius: L.cardR,
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
   },
   pkgTitle: { fontSize: 9, fontFamily: "Helvetica-Bold", color: C.white },
-  pkgPrice: { fontSize: 7.5, color: C.em400 },
+  pkgPrice: { fontSize: 7.5, color: C.orange },
   pkgBody: {
     borderTopWidth: 0,
     borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
-    borderRightColor: C.slate200, borderBottomColor: C.slate200, borderLeftColor: C.slate200,
+    borderRightColor: C.gray200, borderBottomColor: C.gray200, borderLeftColor: C.gray200,
     borderBottomLeftRadius: L.cardR, borderBottomRightRadius: L.cardR,
-    padding: 12, backgroundColor: C.slate50,
+    padding: 12, backgroundColor: C.gray50,
   },
+
+  // ── PROGRAM — LIGHT BLUE ──
   progHeader: {
-    backgroundColor: C.em700,
+    backgroundColor: C.navyMid,          // medium navy header
     paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 12,
     borderTopLeftRadius: 3, borderTopRightRadius: 3,
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
@@ -505,105 +451,66 @@ const S = StyleSheet.create({
   progBody: {
     borderTopWidth: 0,
     borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
-    borderRightColor: C.em200, borderBottomColor: C.em200, borderLeftColor: C.em200,
+    borderRightColor: C.skyBorder, borderBottomColor: C.skyBorder, borderLeftColor: C.skyBorder,
     borderBottomLeftRadius: 3, borderBottomRightRadius: 3,
-    padding: 9, marginBottom: 8, backgroundColor: C.white,
+    padding: 9, marginBottom: 8,
+    backgroundColor: C.skyBrand,         // ← LIGHT BLUE background
   },
+
+  // ── THERAPY — orange-accented ──
   therapyHeader: {
-    backgroundColor: C.em50,
+    backgroundColor: C.orangeLt,
     paddingTop: 6, paddingBottom: 6, paddingLeft: 10, paddingRight: 10,
     borderTopLeftRadius: 3, borderTopRightRadius: 3,
     flexDirection: "row", justifyContent: "space-between",
     borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 0, borderLeftWidth: 1,
-    borderTopColor: C.em200, borderRightColor: C.em200, borderLeftColor: C.em200,
+    borderTopColor: C.orangeDk, borderRightColor: C.orangeDk, borderLeftColor: C.orangeDk,
   },
-  therapyTitle: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: C.em700 },
+  therapyTitle: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: C.navyDeep },
   therapyBody: {
     borderTopWidth: 0,
     borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
-    borderRightColor: C.em200, borderBottomColor: C.em200, borderLeftColor: C.em200,
+    borderRightColor: C.orangeDk, borderBottomColor: C.orangeDk, borderLeftColor: C.orangeDk,
     borderBottomLeftRadius: 3, borderBottomRightRadius: 3,
     overflow: "hidden", marginBottom: 6,
   },
 
-  // ── META BAR ──
   metaBar: {
     flexDirection: "row", flexWrap: "wrap", marginBottom: 8,
     paddingTop: 5, paddingBottom: 5, paddingLeft: 8, paddingRight: 8,
     backgroundColor: C.white, borderRadius: 3,
     borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
-    borderTopColor: C.slate150, borderRightColor: C.slate150,
-    borderBottomColor: C.slate150, borderLeftColor: C.slate150,
+    borderTopColor: C.gray150, borderRightColor: C.gray150,
+    borderBottomColor: C.gray150, borderLeftColor: C.gray150,
   },
-
-  // ── IMAGES ──
   imgContainer: { flexDirection: "row", flexWrap: "wrap", marginTop: 6 },
   img: { width: 75, height: 75, borderRadius: 4, marginRight: 8, marginBottom: 6 },
 
-  // ── STAT CARD ROW ──
-  statRow: { flexDirection: "row", marginBottom: 10 },
-  statCard: {
-    flex: 1,
-    backgroundColor: C.slate50,
-    borderRadius: L.cardR,
-    borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
-    borderTopColor: C.slate150, borderRightColor: C.slate150,
-    borderBottomColor: C.slate150, borderLeftColor: C.slate150,
-    paddingTop: 9, paddingBottom: 9, paddingLeft: 12, paddingRight: 12,
-    marginRight: 8,
-  },
-  statCardLast: { marginRight: 0 },
-  statCardLabel:{ fontSize: 6, color: C.slate400, textTransform: "uppercase", letterSpacing: 0.8, fontFamily: "Helvetica-Bold", marginBottom: 3 },
-  statCardValue:{ fontSize: 12, color: C.slate900, fontFamily: "Helvetica-Bold" },
-  statCardSub:  { fontSize: 6.5, color: C.slate500, marginTop: 2 },
-
-  // ── SIGNATURE ──
-  sigSection: { marginTop: 24, flexDirection: "row", justifyContent: "flex-end" },
+  sigSection: { marginTop: 20, flexDirection: "row", justifyContent: "flex-end" },
   sigBox:     { alignItems: "center", width: 140, marginLeft: 32 },
   sigLine: {
-    borderTopWidth: 1, borderTopColor: C.slate300,
+    borderTopWidth: 2, borderTopColor: C.orange,
     width: "100%", marginBottom: 6, marginTop: 28,
   },
-  sigRole: { fontSize: 6, color: C.slate400, textAlign: "center", textTransform: "uppercase", letterSpacing: 0.8 },
-  sigName: { fontSize: 9, fontFamily: "Helvetica-Bold", color: C.slate800, textAlign: "center", marginTop: 2 },
-  sigSub:  { fontSize: 6.5, color: C.slate500, textAlign: "center", marginTop: 1 },
+  sigRole: { fontSize: 6, color: C.gray400, textAlign: "center", textTransform: "uppercase", letterSpacing: 0.8 },
+  sigName: { fontSize: 9, fontFamily: "Helvetica-Bold", color: C.navy, textAlign: "center", marginTop: 2 },
+  sigSub:  { fontSize: 6.5, color: C.gray500, textAlign: "center", marginTop: 1 },
 
-  // ── FOOTER ──
   footer: {
-    backgroundColor: C.slate900,
+    backgroundColor: C.navyDeep,
     paddingTop: 7, paddingBottom: 7,
     paddingLeft: L.pageP, paddingRight: L.pageP,
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    borderTopWidth: 1, borderTopColor: C.slate800,
+    borderTopWidth: 1, borderTopColor: C.navy,
   },
-  footerAccentLine: { height: 2, backgroundColor: C.em600 },
-  ftLeft:  { fontSize: 7,   color: C.em500 },
-  ftMid:   { fontSize: 6,   color: C.slate600, textAlign: "center", letterSpacing: 0.3 },
-  ftRight: { fontSize: 6.5, color: C.slate500 },
-
-  // ── 2-COL LAYOUT FOR LARGE SECTIONS ──
-  twoCol: { flexDirection: "row" },
-  colLeft:  { flex: 1, paddingRight: 8 },
-  colRight: { flex: 1, paddingLeft: 4 },
+  footerAccentLine: { height: 2, backgroundColor: C.orange },
+  ftLeft:  { fontSize: 7,   color: C.orange },
+  ftMid:   { fontSize: 6,   color: C.gray500, textAlign: "center", letterSpacing: 0.3 },
+  ftRight: { fontSize: 6.5, color: C.gray400 },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  SIDEBAR NAV ITEMS  (not used as sidebar, repurposed as header nav chips)
-// ─────────────────────────────────────────────────────────────────────────────
-const NAV_ITEMS = [
-  { num: "01", label: "Patient Info" },
-  { num: "02", label: "Complaint" },
-  { num: "03", label: "History" },
-  { num: "04", label: "Assessment" },
-  { num: "05", label: "Diagnosis" },
-  { num: "06", label: "Treatment" },
-  { num: "07", label: "Therapy" },
-  { num: "08", label: "Exercises" },
-  { num: "09", label: "Follow Up" },
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  DATA RESOLVER  (identical logic, preserved exactly)
+//  DATA RESOLVER  (unchanged logic)
 // ─────────────────────────────────────────────────────────────────────────────
 function resolve(props) {
   const { bookingData, formData, patientData } = props;
@@ -728,42 +635,69 @@ const getInitials = (name) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  ADDRESS HELPER — splits long address into max 4 lines
+// ─────────────────────────────────────────────────────────────────────────────
+function splitAddress(address) {
+  if (!address) return [];
+  // Split on commas, then group into ~4 segments
+  const parts = address.split(",").map((s) => s.trim()).filter(Boolean);
+  if (parts.length <= 4) return parts;
+  // Merge groups so we get max 4 lines
+  const result = [];
+  const groupSize = Math.ceil(parts.length / 4);
+  for (let i = 0; i < parts.length; i += groupSize) {
+    result.push(parts.slice(i, i + groupSize).join(", "));
+  }
+  return result.slice(0, 4);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  PRIMITIVES
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Section Header with ruled line
-const SH = ({ title, badge, num }) => (
-  <View style={S.secHeader}>
-    {num && (
-      <View style={S.secNumBox}>
-        <Text style={S.secNum}>{num}</Text>
-      </View>
-    )}
-    <View style={S.secTitleWrap}>
-      <Text style={S.secTitle}>{title}</Text>
-      <View style={S.secRule} />
-      {badge && (
-        <View style={S.secBadge}>
-          <Text style={S.secBadgeTx}>{badge}</Text>
+const SectionBlock = ({ num, title, badge, children }) => (
+  <View style={S.sec} wrap={false}>
+    <View style={S.secHeader}>
+      {num && (
+        <View style={S.secNumBox}>
+          <Text style={S.secNum}>{num}</Text>
         </View>
       )}
+      <View style={S.secTitleWrap}>
+        <Text style={S.secTitle}>{title}</Text>
+        <View style={S.secRule} />
+        {badge && (
+          <View style={S.secBadge}>
+            <Text style={S.secBadgeTx}>{badge}</Text>
+          </View>
+        )}
+      </View>
     </View>
+    {children}
   </View>
 );
 
-// Inline label + value (no box)
-const LV = ({ label, value, bold = false, xl = false, color }) => {
-  if (!hv(value)) return null;
-  const valStyle = xl ? S.valXL : bold ? S.valB : S.val;
-  return (
-    <View>
-      <Text style={S.lbl}>{label}</Text>
-      <Text style={[valStyle, color ? { color } : {}]}>{dv(value)}</Text>
+const SectionBlockWrap = ({ num, title, badge, children }) => (
+  <View style={S.sec}>
+    <View style={S.secHeader} minPresenceAhead={40}>
+      {num && (
+        <View style={S.secNumBox}>
+          <Text style={S.secNum}>{num}</Text>
+        </View>
+      )}
+      <View style={S.secTitleWrap}>
+        <Text style={S.secTitle}>{title}</Text>
+        <View style={S.secRule} />
+        {badge && (
+          <View style={S.secBadge}>
+            <Text style={S.secBadgeTx}>{badge}</Text>
+          </View>
+        )}
+      </View>
     </View>
-  );
-};
+    {children}
+  </View>
+);
 
-// Boxed field (used in grid)
 const FV = ({ label, value, bold = false }) => {
   if (!hv(value)) return null;
   return (
@@ -774,17 +708,18 @@ const FV = ({ label, value, bold = false }) => {
   );
 };
 
-// Chip component
 const Chip = ({ text, variant = "em" }) => {
   const map = {
-    em:    [S.chipEm,    S.chipEmTx],
-    gold:  [S.chipGold,  S.chipGoldTx],
-    red:   [S.chipRed,   S.chipRedTx],
-    amber: [S.chipAmb,   S.chipAmbTx],
-    blue:  [S.chipBlue,  S.chipBlueTx],
-    purple:[S.chipPur,   S.chipPurTx],
-    sky:   [S.chipSky,   S.chipSkyTx],
-    slate: [S.chipSlate, S.chipSlateTx],
+    navy:   [S.chipNavy,   S.chipNavyTx],
+    orange: [S.chipOrange, S.chipOrangeTx],
+    em:     [S.chipEm,     S.chipEmTx],
+    red:    [S.chipRed,    S.chipRedTx],
+    amber:  [S.chipAmb,    S.chipAmbTx],
+    blue:   [S.chipBlue,   S.chipBlueTx],
+    purple: [S.chipPur,    S.chipPurTx],
+    sky:    [S.chipSky,    S.chipSkyTx],
+    slate:  [S.chipSlate,  S.chipSlateTx],
+    gold:   [S.chipOrange, S.chipOrangeTx],
   };
   const [bg, tx] = map[variant] || map.em;
   return <View style={[S.chip, bg]}><Text style={[S.chipTx, tx]}>{text}</Text></View>;
@@ -810,12 +745,12 @@ const PainBar = ({ scaleText }) => {
   const labelText = pct >= 70 ? "SEVERE" : pct >= 40 ? "MODERATE" : "MILD";
   const labelColor = pct >= 70 ? C.red700 : pct >= 40 ? C.amber700 : C.em700;
   return (
-    <View style={{ marginBottom: 12 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+    <View style={{ marginBottom: 10 }} wrap={false}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
         <Text style={S.lbl}>Pain Scale</Text>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color }}>{num}</Text>
-          <Text style={{ fontSize: 8, color: C.slate400 }}> / {max}  </Text>
+          <Text style={{ fontSize: 8, color: C.gray400 }}> / {max}  </Text>
           <View style={{ backgroundColor: bgColor, borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 }}>
             <Text style={{ fontSize: 6.5, color: labelColor, fontFamily: "Helvetica-Bold", letterSpacing: 0.8 }}>{labelText}</Text>
           </View>
@@ -864,9 +799,9 @@ const SevBadge = ({ sev }) => {
 const StageBadge = ({ stage }) => {
   if (!hv(stage)) return <Text style={S.tCell}>—</Text>;
   const map = {
-    Acute:      [S.stageAcute,   S.stageAcuteTx],
-    "Sub-acute":[S.stageSub,     S.stageSubTx],
-    Chronic:    [S.stageChronic, S.stageChronicTx],
+    Acute:       [S.stageAcute,   S.stageAcuteTx],
+    "Sub-acute": [S.stageSub,     S.stageSubTx],
+    Chronic:     [S.stageChronic, S.stageChronicTx],
   };
   const [bg, tx] = map[stage] || map["Sub-acute"];
   return <View style={bg}><Text style={tx}>{stage}</Text></View>;
@@ -879,7 +814,7 @@ const ExerciseTable = ({ exercises }) => {
   if (!exercises || exercises.length === 0)
     return (
       <View style={{ paddingTop: 8, paddingBottom: 8, paddingLeft: 12 }}>
-        <Text style={{ fontSize: 7, color: C.slate400, fontStyle: "italic" }}>No exercises recorded.</Text>
+        <Text style={{ fontSize: 7, color: C.gray400, fontStyle: "italic" }}>No exercises recorded.</Text>
       </View>
     );
   return (
@@ -901,7 +836,7 @@ const ExerciseTable = ({ exercises }) => {
           <Text style={[S.tCell,    { flex: 0.55 }]}>{dv(ex.sets)}</Text>
           <Text style={[S.tCell,    { flex: 0.55 }]}>{dv(ex.repetitions ?? ex.reps)}</Text>
           <Text style={[S.tCell,    { flex: 1.2  }]}>{dv(ex.frequency)}</Text>
-          <Text style={[S.tCell,    { flex: 2,   lineHeight: 1.4 }]}>{dv(ex.notes)}</Text>
+          <Text style={[S.tCell,    { flex: 2, lineHeight: 1.4 }]}>{dv(ex.notes)}</Text>
         </View>
       ))}
     </View>
@@ -909,14 +844,14 @@ const ExerciseTable = ({ exercises }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  THERAPY BLOCK
+//  THERAPY / SESSION BLOCKS
 // ─────────────────────────────────────────────────────────────────────────────
 const TherapyBlock = ({ therapy }) => (
-  <View style={{ marginBottom: 8 }}>
+  <View style={{ marginBottom: 8 }} wrap={false}>
     <View style={S.therapyHeader}>
       <Text style={S.therapyTitle}>{therapy.therapyName || "Therapy"}</Text>
       {therapy.totalPrice > 0 && (
-        <Text style={{ fontSize: 7, color: C.em600 }}>Rs. {therapy.totalPrice}</Text>
+        <Text style={{ fontSize: 7, color: C.navyDeep, fontFamily: "Helvetica-Bold" }}>Rs. {therapy.totalPrice}</Text>
       )}
     </View>
     <View style={S.therapyBody}>
@@ -925,9 +860,6 @@ const TherapyBlock = ({ therapy }) => (
   </View>
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  META BAR
-// ─────────────────────────────────────────────────────────────────────────────
 const MetaBar = ({ sess, therapistId, therapistName }) => {
   const tName = sess.therapistName || therapistName || "";
   const tId   = sess.therapistId   || therapistId   || "";
@@ -935,22 +867,19 @@ const MetaBar = ({ sess, therapistId, therapistName }) => {
   return (
     <View style={S.metaBar}>
       {sess.serviceType && <Chip text={`Type: ${sess.serviceType}`} variant="slate" />}
-      {tName && <Chip text={`Therapist: ${tName}`} variant="em" />}
+      {tName && <Chip text={`Therapist: ${tName}`} variant="navy" />}
       {tId   && <Chip text={`ID: ${tId}`}           variant="sky" />}
     </View>
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  SESSION BLOCK
-// ─────────────────────────────────────────────────────────────────────────────
 const SessionBlock = ({ sess, isLast, therapistId, therapistName }) => {
   const sType = (sess.serviceType || "").toLowerCase();
 
   if (sType === "package") {
     return (
-      <View style={[S.pkgWrap, { marginBottom: isLast ? 0 : 16 }]}>
-        <View style={S.pkgHeader}>
+      <View style={[S.pkgWrap, { marginBottom: isLast ? 0 : 12 }]}>
+        <View style={S.pkgHeader} wrap={false}>
           <Text style={S.pkgTitle}>{sess.packageName || "Package"}</Text>
           {sess.totalPrice > 0 && <Text style={S.pkgPrice}>Rs. {sess.totalPrice}</Text>}
         </View>
@@ -958,21 +887,21 @@ const SessionBlock = ({ sess, isLast, therapistId, therapistName }) => {
           <MetaBar sess={sess} therapistId={therapistId} therapistName={therapistName} />
           {Array.isArray(sess.programs) && sess.programs.length > 0
             ? sess.programs.map((prog, pi) => (
-                <View key={pi} style={{ marginBottom: pi < sess.programs.length - 1 ? 12 : 0 }}>
-                  <View style={S.progHeader}>
+                <View key={pi} style={{ marginBottom: pi < sess.programs.length - 1 ? 10 : 0 }}>
+                  <View style={S.progHeader} wrap={false}>
                     <Text style={S.progTitle}>{prog.programName || `Program ${pi + 1}`}</Text>
-                    {prog.totalPrice > 0 && <Text style={{ fontSize: 7, color: "rgba(255,255,255,0.75)" }}>Rs. {prog.totalPrice}</Text>}
+                    {prog.totalPrice > 0 && <Text style={{ fontSize: 7, color: C.orange }}>Rs. {prog.totalPrice}</Text>}
                   </View>
                   <View style={S.progBody}>
                     {Array.isArray(prog.therapyData ?? prog.therophyData)
                       ? (prog.therapyData ?? prog.therophyData).map((t, ti) => <TherapyBlock key={ti} therapy={t} />)
-                      : <Text style={{ fontSize: 7, color: C.slate400, fontStyle: "italic" }}>No therapy data.</Text>}
+                      : <Text style={{ fontSize: 7, color: C.gray400, fontStyle: "italic" }}>No therapy data.</Text>}
                   </View>
                 </View>
               ))
             : Array.isArray(sess.therapyData ?? sess.therophyData)
             ? (sess.therapyData ?? sess.therophyData).map((t, ti) => <TherapyBlock key={ti} therapy={t} />)
-            : <Text style={{ fontSize: 7, color: C.slate400, fontStyle: "italic" }}>No data.</Text>}
+            : <Text style={{ fontSize: 7, color: C.gray400, fontStyle: "italic" }}>No data.</Text>}
         </View>
       </View>
     );
@@ -981,11 +910,11 @@ const SessionBlock = ({ sess, isLast, therapistId, therapistName }) => {
   if (sType === "program") {
     const therapies = sess.therapyData ?? sess.therophyData ?? [];
     return (
-      <View style={{ marginBottom: isLast ? 0 : 16 }}>
-        <View style={S.progHeader}>
+      <View style={{ marginBottom: isLast ? 0 : 12 }}>
+        <View style={S.progHeader} wrap={false}>
           <Text style={S.progTitle}>{sess.programName || "Program"}</Text>
           {(sess.totalPrice || sess.totalTherapyPrice) > 0 && (
-            <Text style={{ fontSize: 7, color: "rgba(255,255,255,0.75)" }}>
+            <Text style={{ fontSize: 7, color: C.orange }}>
               Rs. {sess.totalPrice || sess.totalTherapyPrice}
             </Text>
           )}
@@ -994,7 +923,7 @@ const SessionBlock = ({ sess, isLast, therapistId, therapistName }) => {
           <MetaBar sess={sess} therapistId={therapistId} therapistName={therapistName} />
           {Array.isArray(therapies) && therapies.length > 0
             ? therapies.map((t, ti) => <TherapyBlock key={ti} therapy={t} />)
-            : <Text style={{ fontSize: 7, color: C.slate400, fontStyle: "italic" }}>No therapies.</Text>}
+            : <Text style={{ fontSize: 7, color: C.gray400, fontStyle: "italic" }}>No therapies.</Text>}
         </View>
       </View>
     );
@@ -1002,16 +931,16 @@ const SessionBlock = ({ sess, isLast, therapistId, therapistName }) => {
 
   if (sType === "therapy") {
     return (
-      <View style={{ marginBottom: isLast ? 0 : 16 }}>
-        <View style={[S.progHeader, { backgroundColor: C.purple700 }]}>
+      <View style={{ marginBottom: isLast ? 0 : 12 }}>
+        <View style={[S.progHeader, { backgroundColor: C.purple600 }]} wrap={false}>
           <Text style={S.progTitle}>{sess.therapyName || "Therapy Session"}</Text>
-          {sess.totalPrice > 0 && <Text style={{ fontSize: 7, color: "rgba(255,255,255,0.75)" }}>Rs. {sess.totalPrice}</Text>}
+          {sess.totalPrice > 0 && <Text style={{ fontSize: 7, color: C.orange }}>Rs. {sess.totalPrice}</Text>}
         </View>
         <View style={[S.progBody, { borderRightColor: C.purple100, borderBottomColor: C.purple100, borderLeftColor: C.purple100 }]}>
           <MetaBar sess={sess} therapistId={therapistId} therapistName={therapistName} />
           {Array.isArray(sess.exercises) && sess.exercises.length > 0
             ? <ExerciseTable exercises={sess.exercises} />
-            : <Text style={{ fontSize: 7, color: C.slate400, fontStyle: "italic" }}>No exercises.</Text>}
+            : <Text style={{ fontSize: 7, color: C.gray400, fontStyle: "italic" }}>No exercises.</Text>}
         </View>
       </View>
     );
@@ -1019,10 +948,10 @@ const SessionBlock = ({ sess, isLast, therapistId, therapistName }) => {
 
   if (sType === "exercise") {
     return (
-      <View style={{ marginBottom: isLast ? 0 : 16 }}>
-        <View style={[S.progHeader, { backgroundColor: C.em600 }]}>
+      <View style={{ marginBottom: isLast ? 0 : 12 }}>
+        <View style={[S.progHeader, { backgroundColor: C.em600 }]} wrap={false}>
           <Text style={S.progTitle}>Exercise Session</Text>
-          {sess.totalPrice > 0 && <Text style={{ fontSize: 7, color: "rgba(255,255,255,0.75)" }}>Rs. {sess.totalPrice}</Text>}
+          {sess.totalPrice > 0 && <Text style={{ fontSize: 7, color: C.orange }}>Rs. {sess.totalPrice}</Text>}
         </View>
         <View style={[S.progBody, { borderRightColor: C.em200, borderBottomColor: C.em200, borderLeftColor: C.em200 }]}>
           <MetaBar sess={sess} therapistId={therapistId} therapistName={therapistName} />
@@ -1033,7 +962,7 @@ const SessionBlock = ({ sess, isLast, therapistId, therapistName }) => {
   }
 
   return (
-    <View style={{ marginBottom: isLast ? 0 : 16 }}>
+    <View style={{ marginBottom: isLast ? 0 : 12 }}>
       <MetaBar sess={sess} therapistId={therapistId} therapistName={therapistName} />
       {Array.isArray(sess.therapyData) && sess.therapyData.map((t, ti) => <TherapyBlock key={ti} therapy={t} />)}
       {Array.isArray(sess.exercises) && sess.exercises.length > 0 && <ExerciseTable exercises={sess.exercises} />}
@@ -1119,33 +1048,42 @@ const PrescriptionPDF = (props) => {
   const therapistName = treatmentPlan?.therapistName || topTherapistName || "";
   const initials      = getInitials(patientName);
 
+  // Address split into lines
+  const addressLines = splitAddress(clicniData?.address);
+
   const statusColor =
     overallStatus === "Completed"   ? C.em600    :
     overallStatus === "Cancelled"   ? C.red600   :
-    overallStatus === "In Progress" ? C.sky600   : C.amber600;
+    overallStatus === "In Progress" ? C.navyMid  : C.amber600;
   const statusBg =
     overallStatus === "Completed"   ? C.em50     :
     overallStatus === "Cancelled"   ? C.red50    :
-    overallStatus === "In Progress" ? C.sky50    : C.amber50;
+    overallStatus === "In Progress" ? C.skyBrand : C.amber50;
 
   return (
     <Document>
       <Page size="A4" style={S.page} wrap>
 
-        {/* ══ HEADER ══ */}
+        {/* ══ HEADER (fixed) ══ */}
         <View style={S.header} fixed>
-          {/* Three-segment accent bar */}
           <View style={S.headerAccentBar}>
             <View style={S.headerAccentSeg1} />
             <View style={S.headerAccentSeg2} />
             <View style={S.headerAccentSeg3} />
           </View>
-
           <View style={S.headerInner}>
             <View style={S.hLeft}>
               <Text style={S.hClinicName}>{clicniData?.name || "PhysioCare Clinic"}</Text>
-              {hv(clicniData?.address) && <Text style={S.hMeta}>{clicniData.address}</Text>}
-              <View style={{ flexDirection: "row", marginTop: 2 }}>
+              {/* Address rendered line by line so it wraps in 3-4 lines */}
+              {addressLines.length > 0
+                ? addressLines.map((line, i) => (
+                    <Text key={i} style={S.hAddress}>{line}</Text>
+                  ))
+                : hv(clicniData?.address) && (
+                    <Text style={S.hAddress}>{clicniData.address}</Text>
+                  )
+              }
+              <View style={{ flexDirection: "row", marginTop: 3 }}>
                 {hv(clicniData?.phone) && <Text style={[S.hMeta, { marginRight: 14 }]}>T: {clicniData.phone}</Text>}
                 {hv(clicniData?.email) && <Text style={S.hMeta}>E: {clicniData.email}</Text>}
               </View>
@@ -1153,15 +1091,11 @@ const PrescriptionPDF = (props) => {
             <View style={S.hRight}>
               <Text style={S.hDocType}>Physiotherapy Report</Text>
               <Text style={S.hDate}>{today}</Text>
-              {bookingId && (
-                <Text style={S.hRef}>REF #{String(bookingId).slice(-8).toUpperCase()}</Text>
-              )}
+              {bookingId && <Text style={S.hRef}>REF #{String(bookingId).slice(-8).toUpperCase()}</Text>}
               {hv(overallStatus) && (
-                <View style={[S.hStatusWrap]}>
-                  <View style={[S.hStatusPill, { backgroundColor: statusColor + "25" }]}>
-                    <Text style={[S.hStatusTx, { color: statusColor }]}>
-                      {overallStatus.toUpperCase()}
-                    </Text>
+                <View style={S.hStatusWrap}>
+                  <View style={[S.hStatusPill, { backgroundColor: statusColor + "30" }]}>
+                    <Text style={[S.hStatusTx, { color: statusColor }]}>{overallStatus.toUpperCase()}</Text>
                   </View>
                 </View>
               )}
@@ -1171,7 +1105,7 @@ const PrescriptionPDF = (props) => {
 
         {/* ══ PATIENT BANNER ══ */}
         {hv(patientName) && (
-          <View style={S.patientBanner}>
+          <View style={S.patientBanner} wrap={false}>
             <View style={S.pbLeft}>
               <View style={S.pbAvatar}>
                 <Text style={S.pbAvatarTx}>{initials}</Text>
@@ -1201,10 +1135,9 @@ const PrescriptionPDF = (props) => {
         {/* ══ BODY ══ */}
         <View style={S.bodyWrap}>
 
-          {/* 1 · PATIENT INFO */}
-          <View style={S.sec}>
-            <SH num="01" title="Patient & Booking Information" />
-            <View style={S.card}>
+          {/* ── 01 · PATIENT INFO ── */}
+          <SectionBlock num="01" title="Patient & Booking Information">
+            <View style={S.card} wrap={false}>
               <View style={S.grid}>
                 {hv(patientName)                     && <View style={S.c3}><FV label="Full Name"  value={capitalizeEachWord(patientName)} bold /></View>}
                 {hv(patient?.age)                    && <View style={S.c3}><FV label="Age"        value={`${patient.age} years`} /></View>}
@@ -1219,21 +1152,20 @@ const PrescriptionPDF = (props) => {
                 {hv(overallStatus)                   && <View style={S.c3}><FV label="Status"     value={overallStatus} bold /></View>}
               </View>
             </View>
-          </View>
+          </SectionBlock>
 
-          {/* 2 · COMPLAINTS */}
+          {/* ── 02 · COMPLAINTS ── */}
           {(hv(complaints.complaintDetails) || parts.length > 0 || complaints.reportImages.length > 0) && (
-            <View style={S.sec}>
-              <SH num="02" title="Chief Complaint & Symptoms" />
+            <SectionBlock num="02" title="Chief Complaint & Symptoms">
               {hv(complaints.complaintDetails) && (
-                <View style={S.complaintBox}>
+                <View style={S.complaintBox} wrap={false}>
                   <Text style={S.lbl}>Chief Complaint</Text>
-                  <Text style={[S.val, { fontSize: 9, lineHeight: 1.7, marginTop: 3, color: C.slate700 }]}>
+                  <Text style={[S.val, { fontSize: 9, lineHeight: 1.7, marginTop: 3, color: C.gray700 }]}>
                     {complaints.complaintDetails}
                   </Text>
                 </View>
               )}
-              <View style={S.card}>
+              <View style={S.card} wrap={false}>
                 <View style={S.grid}>
                   {hv(complaints.duration)        && <View style={S.c3}><FV label="Duration"         value={complaints.duration} bold /></View>}
                   {hv(complaints.selectedTherapy) && <View style={S.c3}><FV label="Selected Therapy" value={complaints.selectedTherapy} /></View>}
@@ -1267,14 +1199,13 @@ const PrescriptionPDF = (props) => {
                   </View>
                 )}
               </View>
-            </View>
+            </SectionBlock>
           )}
 
-          {/* 3 · BACKGROUND */}
+          {/* ── 03 · BACKGROUND ── */}
           {hasBackground && (
-            <View style={S.sec}>
-              <SH num="03" title="Patient Background & History" />
-              <View style={S.card}>
+            <SectionBlock num="03" title="Patient Background & History">
+              <View style={S.card} wrap={false}>
                 <View style={S.grid}>
                   {hv(background.previousInjuries)   && <View style={S.c2}><FV label="Previous Injuries"   value={background.previousInjuries} /></View>}
                   {hv(background.currentMedications) && <View style={S.c2}><FV label="Current Medications" value={background.currentMedications} /></View>}
@@ -1290,23 +1221,22 @@ const PrescriptionPDF = (props) => {
                 {background.activityLevels.length > 0 && (
                   <View style={{ marginTop: 4 }}>
                     <Text style={S.lbl}>Activity Level</Text>
-                    <View style={S.chipRow}>{background.activityLevels.map((lvl, i) => <Chip key={i} text={lvl} variant="em" />)}</View>
+                    <View style={S.chipRow}>{background.activityLevels.map((lvl, i) => <Chip key={i} text={lvl} variant="navy" />)}</View>
                   </View>
                 )}
               </View>
-            </View>
+            </SectionBlock>
           )}
 
-          {/* 4 · QUESTIONNAIRE */}
+          {/* ── 04 · QUESTIONNAIRE ── */}
           {hasQuestionnaire && (
-            <View style={S.sec}>
-              <SH num="04" title="Therapy Questionnaire" badge={`${Object.keys(complaints.therapyAnswersObj).length} categories`} />
+            <SectionBlockWrap num="04" title="Therapy Questionnaire" badge={`${Object.keys(complaints.therapyAnswersObj).length} categories`}>
               {Object.entries(complaints.therapyAnswersObj).map(([cat, qs], ci) => {
                 const validQs = Array.isArray(qs) ? qs.filter((q) => hv(q.question)) : [];
                 if (validQs.length === 0) return null;
                 const answered = validQs.filter((q) => hv(q.answer) && q.answer.toLowerCase() !== "undefined").length;
                 return (
-                  <View key={ci} style={[S.qaWrap, { marginBottom: ci < Object.keys(complaints.therapyAnswersObj).length - 1 ? 8 : 0 }]}>
+                  <View key={ci} style={[S.qaWrap, { marginBottom: ci < Object.keys(complaints.therapyAnswersObj).length - 1 ? 6 : 0 }]} wrap={false}>
                     <View style={S.qaHead}>
                       <Text style={S.qaHeadTx}>{capitalizeEachWord(cat)}</Text>
                       <Text style={S.qaHeadCount}>{answered} / {validQs.length} answered</Text>
@@ -1321,32 +1251,34 @@ const PrescriptionPDF = (props) => {
                   </View>
                 );
               })}
-            </View>
+            </SectionBlockWrap>
           )}
 
-          {/* 5 · INVESTIGATION */}
+          {/* ── 05 · INVESTIGATION ── */}
           {(investigation.tests.length > 0 || hv(investigation.reason)) && (
-            <View style={S.sec}>
-              <SH num="05" title="Investigation & Tests" />
-              <View style={[S.cardAccent, S.cEm]}>
+            <SectionBlock num="05" title="Investigation & Tests">
+              <View style={[S.cardAccent, S.cNavy]} wrap={false}>
                 {investigation.tests.length > 0 && (
                   <View style={{ marginBottom: hv(investigation.reason) ? 9 : 0 }}>
                     <Text style={S.lbl}>Recommended Tests</Text>
-                    <View style={S.chipRow}>{investigation.tests.map((t, i) => <Chip key={i} text={t} variant="em" />)}</View>
+                    <View style={S.chipRow}>{investigation.tests.map((t, i) => <Chip key={i} text={t} variant="navy" />)}</View>
                   </View>
                 )}
-                {hv(investigation.reason) && <LV label="Clinical Notes / Reason" value={investigation.reason} />}
+                {hv(investigation.reason) && (
+                  <View style={S.fieldBox}>
+                    <Text style={S.lbl}>Clinical Notes / Reason</Text>
+                    <Text style={S.val}>{dv(investigation.reason)}</Text>
+                  </View>
+                )}
               </View>
-            </View>
+            </SectionBlock>
           )}
 
-          {/* 6 · ASSESSMENT */}
+          {/* ── 06 · ASSESSMENT ── */}
           {hasAssessment && (
-            <View style={S.sec}>
-              <SH num="06" title="Clinical Assessment" />
-
+            <SectionBlockWrap num="06" title="Clinical Assessment">
               {/* Subjective */}
-              <View style={[S.cardAccent, S.cGold]}>
+              <View style={[S.cardAccent, S.cGold]} wrap={false}>
                 <Text style={S.subSecTitle}>Subjective Assessment</Text>
                 {hv(painScale) && <PainBar scaleText={painScale} />}
                 <View style={S.grid}>
@@ -1362,7 +1294,7 @@ const PrescriptionPDF = (props) => {
 
               {/* Functional */}
               {(difficultiesIn.length > 0 || hv(dailyLivingAffected)) && (
-                <View style={[S.cardAccent, S.cSky]}>
+                <View style={[S.cardAccent, S.cSky]} wrap={false}>
                   <Text style={S.subSecTitle}>Functional Assessment</Text>
                   {difficultiesIn.length > 0 && (
                     <View style={{ marginBottom: 8 }}>
@@ -1379,7 +1311,7 @@ const PrescriptionPDF = (props) => {
 
               {/* Physical */}
               {(postureAssessment.length > 0 || romStatus.length > 0 || muscleStrength.length > 0 || neurologicalSigns.length > 0) && (
-                <View style={[S.cardAccent, S.cSlate]}>
+                <View style={[S.cardAccent, S.cSlate]} wrap={false}>
                   <Text style={S.subSecTitle}>Physical Examination</Text>
                   {postureAssessment.length > 0 && <CheckRow label="Posture Assessment" options={["Normal", "Deviations"]}      selected={postureAssessment} note={postureDeviations} />}
                   {romStatus.length > 0         && <CheckRow label="Range of Motion"    options={["Normal", "Restricted"]}      selected={romStatus}         note={romRestricted ? `${romRestricted}${romJoints ? " · " + romJoints : ""}` : romJoints} />}
@@ -1390,7 +1322,7 @@ const PrescriptionPDF = (props) => {
 
               {/* Chronic */}
               {patientPain === "chronicPain" && (hv(painTriggers) || hv(chronicRelieving)) && (
-                <View style={[S.cardAccent, S.cRed]}>
+                <View style={[S.cardAccent, S.cRed]} wrap={false}>
                   <Text style={S.subSecTitle}>Chronic Pain Assessment</Text>
                   <View style={S.grid}>
                     {hv(painTriggers)     && <View style={S.c2}><FV label="Pain Triggers"     value={painTriggers} /></View>}
@@ -1401,7 +1333,7 @@ const PrescriptionPDF = (props) => {
 
               {/* Sports */}
               {patientPain === "sportsRehab" && (hv(typeOfSport) || hv(recurringInjuries) || hv(returnToSportGoals)) && (
-                <View style={[S.cardAccent, S.cEm]}>
+                <View style={[S.cardAccent, S.cNavy]} wrap={false}>
                   <Text style={S.subSecTitle}>Sports Rehabilitation Assessment</Text>
                   <View style={S.grid}>
                     {hv(typeOfSport)        && <View style={S.c2}><FV label="Type of Sport"       value={typeOfSport} /></View>}
@@ -1413,7 +1345,7 @@ const PrescriptionPDF = (props) => {
 
               {/* Neuro */}
               {patientPain === "neuroRehab" && (hv(neuroDiagnosis) || hv(neuroOnset) || hv(mobilityStatus) || hv(cognitiveStatus)) && (
-                <View style={[S.cardAccent, S.cPurple]}>
+                <View style={[S.cardAccent, S.cPurple]} wrap={false}>
                   <Text style={S.subSecTitle}>Neuro Rehabilitation Assessment</Text>
                   <View style={S.grid}>
                     {hv(neuroDiagnosis)  && <View style={S.c2}><FV label="Diagnosis"       value={neuroDiagnosis} bold /></View>}
@@ -1423,13 +1355,12 @@ const PrescriptionPDF = (props) => {
                   </View>
                 </View>
               )}
-            </View>
+            </SectionBlockWrap>
           )}
 
-          {/* 7 · DIAGNOSIS */}
+          {/* ── 07 · DIAGNOSIS ── */}
           {diagnosisRows.length > 0 && (
-            <View style={S.sec}>
-              <SH num="07" title="Diagnosis" badge={`${diagnosisRows.length} entr${diagnosisRows.length > 1 ? "ies" : "y"}`} />
+            <SectionBlockWrap num="07" title="Diagnosis" badge={`${diagnosisRows.length} entr${diagnosisRows.length > 1 ? "ies" : "y"}`}>
               <View style={S.tbl}>
                 <View style={S.tHead}>
                   <Text style={[S.tHCell, { flex: 0.25 }]}>#</Text>
@@ -1440,7 +1371,7 @@ const PrescriptionPDF = (props) => {
                   <Text style={[S.tHCell, { flex: 2.2  }]}>Clinical Notes</Text>
                 </View>
                 {diagnosisRows.map((diag, i) => (
-                  <View key={i} style={[S.tRow, i % 2 === 1 ? S.tRowAlt : {}]}>
+                  <View key={i} style={[S.tRow, i % 2 === 1 ? S.tRowAlt : {}]} wrap={false}>
                     <Text style={[S.tCellNum, { flex: 0.25 }]}>{i + 1}</Text>
                     <Text style={[S.tCellB,   { flex: 2.2  }]}>{diag.physioDiagnosis || "—"}</Text>
                     <Text style={[S.tCell,    { flex: 1.5  }]}>{diag.affectedArea    || "—"}</Text>
@@ -1450,14 +1381,13 @@ const PrescriptionPDF = (props) => {
                   </View>
                 ))}
               </View>
-            </View>
+            </SectionBlockWrap>
           )}
 
-          {/* 8 · TREATMENT PLAN */}
+          {/* ── 08 · TREATMENT PLAN ── */}
           {(hv(therapistName) || hv(treatmentPlan?.manualTherapy) || hv(treatmentPlan?.precautions)) && (
-            <View style={S.sec}>
-              <SH num="08" title="Treatment Plan" />
-              <View style={[S.cardAccent, S.cEm]}>
+            <SectionBlock num="08" title="Treatment Plan">
+              <View style={[S.cardAccent, S.cNavy]} wrap={false}>
                 <View style={S.grid}>
                   {hv(doctorName)               && <View style={S.c2}><FV label="Assigned Doctor"   value={doctorName} bold /></View>}
                   {hv(doctorData?.doctorId)     && <View style={S.c2}><FV label="Doctor ID"          value={doctorData.doctorId} /></View>}
@@ -1466,9 +1396,7 @@ const PrescriptionPDF = (props) => {
                   {hv(treatmentPlan?.frequency) && <View style={S.c2}><FV label="Session Frequency"  value={treatmentPlan.frequency} /></View>}
                 </View>
                 {hv(treatmentPlan?.manualTherapy) && (
-                  <View style={{ marginTop: 4 }}>
-                    <FV label="Manual Therapy Techniques" value={treatmentPlan.manualTherapy} />
-                  </View>
+                  <View style={{ marginTop: 4 }}><FV label="Manual Therapy Techniques" value={treatmentPlan.manualTherapy} /></View>
                 )}
                 {hv(treatmentPlan?.precautions) && (
                   <View style={{ marginTop: 4 }}>
@@ -1486,15 +1414,14 @@ const PrescriptionPDF = (props) => {
                   </View>
                 )}
               </View>
-            </View>
+            </SectionBlock>
           )}
 
-          {/* 9 · THERAPY SESSIONS */}
+          {/* ── 09 · THERAPY SESSIONS ── */}
           {sessionsList.length > 0 && (
-            <View style={S.sec}>
-              <SH num="09" title="Therapy Sessions" badge={`${sessionsList.length} session(s)`} />
+            <SectionBlockWrap num="09" title="Therapy Sessions" badge={`${sessionsList.length} session(s)`}>
               {hv(overallStatus) && (
-                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 9 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }} wrap={false}>
                   <Text style={[S.lbl, { marginBottom: 0, marginRight: 8 }]}>Overall Status</Text>
                   <View style={[S.hStatusPill, { backgroundColor: statusBg }]}>
                     <Text style={[S.hStatusTx, { color: statusColor }]}>{overallStatus}</Text>
@@ -1505,15 +1432,14 @@ const PrescriptionPDF = (props) => {
                 <SessionBlock key={i} sess={sess} isLast={i === sessionsList.length - 1}
                   therapistId={topTherapistId} therapistName={topTherapistName} />
               ))}
-            </View>
+            </SectionBlockWrap>
           )}
 
-          {/* 10 · HOME EXERCISE PLAN */}
+          {/* ── 10 · HOME EXERCISE PLAN ── */}
           {(homeExercises.length > 0 || hv(homeAdvice)) && (
-            <View style={S.sec}>
-              <SH num="10" title="Home Exercise Plan"
-                badge={homeExercises.length > 0 ? `${homeExercises.length} exercise(s)` : null}
-              />
+            <SectionBlockWrap num="10" title="Home Exercise Plan"
+              badge={homeExercises.length > 0 ? `${homeExercises.length} exercise(s)` : null}
+            >
               {homeExercises.length > 0 && (
                 <View style={S.tbl}>
                   <View style={S.tHead}>
@@ -1526,7 +1452,7 @@ const PrescriptionPDF = (props) => {
                     <Text style={[S.tHCell, { flex: 2.5  }]}>Instructions</Text>
                   </View>
                   {homeExercises.map((ex, i) => (
-                    <View key={i} style={[S.tRow, i % 2 === 1 ? S.tRowAlt : {}]}>
+                    <View key={i} style={[S.tRow, i % 2 === 1 ? S.tRowAlt : {}]} wrap={false}>
                       <Text style={[S.tCellNum, { flex: 0.25 }]}>{i + 1}</Text>
                       <Text style={[S.tCellB,   { flex: 2    }]}>{ex.name || "—"}</Text>
                       <Text style={[S.tCell,    { flex: 0.55 }]}>{dv(ex.sets)}</Text>
@@ -1539,24 +1465,23 @@ const PrescriptionPDF = (props) => {
                 </View>
               )}
               {hv(homeAdvice) && (
-                <View style={[S.cardAccent, S.cEm, { marginTop: homeExercises.length > 0 ? 8 : 0 }]}>
+                <View style={[S.cardAccent, S.cNavy, { marginTop: homeExercises.length > 0 ? 6 : 0 }]} wrap={false}>
                   <Text style={S.lbl}>Home Advice & Instructions</Text>
                   <Text style={[S.val, { lineHeight: 1.7, marginTop: 3 }]}>{homeAdvice}</Text>
                 </View>
               )}
-            </View>
+            </SectionBlockWrap>
           )}
 
-          {/* 11 · FOLLOW UP */}
+          {/* ── 11 · FOLLOW UP ── */}
           {(hv(followUpEntry.nextVisitDate) || hv(followUpEntry.reviewNotes)) && (
-            <View style={S.sec}>
-              <SH num="11" title="Follow-Up Plan" />
-              <View style={[S.cardAccent, S.cPurple]}>
+            <SectionBlock num="11" title="Follow-Up Plan">
+              <View style={[S.cardAccent, S.cPurple]} wrap={false}>
                 <View style={S.grid}>
                   {hv(followUpEntry.nextVisitDate) && (
                     <View style={S.c2}>
                       <Text style={S.lbl}>Next Visit Date</Text>
-                      <Text style={[S.valXL, { color: C.purple700 }]}>{followUpEntry.nextVisitDate}</Text>
+                      <Text style={[S.valXL, { color: C.navy }]}>{followUpEntry.nextVisitDate}</Text>
                     </View>
                   )}
                   {hv(followUpEntry.treatmentStatus) && (
@@ -1578,13 +1503,12 @@ const PrescriptionPDF = (props) => {
                 {hv(followUpEntry.reviewNotes)   && <View style={{ marginTop: 6 }}><FV label="Review Notes"            value={followUpEntry.reviewNotes} /></View>}
                 {hv(followUpEntry.modifications) && <View style={{ marginTop: 6 }}><FV label="Treatment Modifications" value={followUpEntry.modifications} /></View>}
               </View>
-            </View>
+            </SectionBlock>
           )}
 
-          {/* 12 · TREATMENT TEMPLATES */}
+          {/* ── 12 · TREATMENT TEMPLATES ── */}
           {treatmentTemplates.length > 0 && (
-            <View style={S.sec}>
-              <SH num="12" title="Treatment Templates" badge={`${treatmentTemplates.length}`} />
+            <SectionBlockWrap num="12" title="Treatment Templates" badge={`${treatmentTemplates.length}`}>
               <View style={S.tbl}>
                 <View style={S.tHead}>
                   <Text style={[S.tHCell, { flex: 0.25 }]}>#</Text>
@@ -1594,7 +1518,7 @@ const PrescriptionPDF = (props) => {
                   <Text style={[S.tHCell, { flex: 1    }]}>Frequency</Text>
                 </View>
                 {treatmentTemplates.map((t, i) => (
-                  <View key={i} style={[S.tRow, i % 2 === 1 ? S.tRowAlt : {}]}>
+                  <View key={i} style={[S.tRow, i % 2 === 1 ? S.tRowAlt : {}]} wrap={false}>
                     <Text style={[S.tCellNum, { flex: 0.25 }]}>{i + 1}</Text>
                     <Text style={[S.tCellB,   { flex: 1.8  }]}>{t.condition     || "—"}</Text>
                     <Text style={[S.tCell,    { flex: 1.8  }]}>{t.manualTherapy || "—"}</Text>
@@ -1603,12 +1527,12 @@ const PrescriptionPDF = (props) => {
                   </View>
                 ))}
               </View>
-            </View>
+            </SectionBlockWrap>
           )}
 
-          {/* 13 · SIGNATURES */}
+          {/* ── 13 · SIGNATURES ── */}
           {(hv(doctorName) || hv(therapistName)) && (
-            <View style={S.sigSection}>
+            <View style={S.sigSection} wrap={false}>
               {hv(doctorName) && (
                 <View style={S.sigBox}>
                   <View style={S.sigLine} />
@@ -1631,7 +1555,7 @@ const PrescriptionPDF = (props) => {
 
         </View>{/* end bodyWrap */}
 
-        {/* ══ FOOTER ══ */}
+        {/* ══ FOOTER (fixed) ══ */}
         <View style={{ flexDirection: "column" }} fixed>
           <View style={S.footerAccentLine} />
           <View style={S.footer}>
