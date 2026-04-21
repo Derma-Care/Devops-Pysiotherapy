@@ -250,7 +250,7 @@ services:
       - apigateway
     restart: always 
 
-    therapy-report:
+  therapy-report:
     build: ./therapy-report
     container_name: therapyreport-container
     ports:
