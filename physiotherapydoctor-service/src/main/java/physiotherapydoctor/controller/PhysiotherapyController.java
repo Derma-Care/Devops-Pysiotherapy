@@ -139,4 +139,17 @@ public class PhysiotherapyController {
 //
 //	    service.updateSessionStatusFromTherapist(therapistRecordId, sessionId);
 //	}
+	
+	 @GetMapping("/getIn-progressByUsingPatientIdAndBookingId/{patientId}/{bookingId}")
+	   public ResponseEntity<?> getInprogressBookingsByPatientId(
+				 @PathVariable String patientId, @PathVariable String bookingId){
+		   return service.getInProgressBookingsByIds(patientId, bookingId);
+		   
+	 }
+	 @GetMapping("/getTodaysAppointmentsByUsingClinicIdAndDoctorId/{clinicId}/{doctorId}")
+	    public ResponseEntity<?> getTodaysAppointments(
+	            @PathVariable String clinicId,
+	            @PathVariable String doctorId) {
+	        return service.getTodaysAppointments(clinicId, doctorId);
+	    }
 }
