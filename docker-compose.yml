@@ -250,6 +250,8 @@ services:
       - apigateway
     restart: always 
 
+
+
 networks:
   app-network:
     driver: bridge
