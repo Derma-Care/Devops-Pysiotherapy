@@ -104,7 +104,7 @@ export const getNavigation = (permissions = {}) => {
     {
       component: CNavItem,
       to: '/exercises',
-      name: 'Exercises Management', //Exercises Management
+      name: 'Exercise Management', //Exercises Management
 
       as: NavLink,
       icon: <CIcon icon={cilRunning} customClassName="nav-icon" />,
@@ -136,17 +136,17 @@ export const getNavigation = (permissions = {}) => {
 
 
 
-    {
-      component: CNavItem,
-      to: '/consent-forms',
-      name: 'ConsentForms',
-      as: NavLink,
-      icon: <CIcon icon={cilNoteAdd} customClassName="nav-icon" />,
-    },
+    // {
+    //   component: CNavItem,
+    //   to: '/consent-forms',
+    //   name: 'ConsentForms',
+    //   as: NavLink,
+    //   icon: <CIcon icon={cilNoteAdd} customClassName="nav-icon" />,
+    // },
     {
       component: CNavItem,
       to: '/ref-doctor',
-      name: 'Refer Doctor',  //Referred BY Doctors
+      name: 'Refered By Doctor',  //Referred BY Doctors
       as: NavLink,
       icon: <CIcon icon={cilNotes} customClassName="nav-icon" />,
     },
