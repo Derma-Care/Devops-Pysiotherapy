@@ -33,7 +33,7 @@ import { MainAdmin_URL, AllCustomerAdvertisements } from '../../baseUrl'
 // import { appointments_Ref } from '../../baseUrl'
 import { AppointmentData, bookingUpdate, GetBookingByClinicIdData, GetTodayBooking } from '../AppointmentManagement/appointmentAPI'
 import { DoctorData, getDoctorByClinicIdData } from '../Doctors/DoctorAPI'
-import { COLORS } from '../../Constant/Themes'
+import { COLORS, FONT_SIZES } from '../../Constant/Themes'
 import './Widget.css'
 import LoadingIndicator from '../../Utils/loader'
 import { useGlobalSearch } from '../Usecontext/GlobalSearchContext'
@@ -552,23 +552,23 @@ const WidgetsDropdown = (props) => {
   }
   return (
     <>
-    
+   
       {/* Carousel Section */}
-      {/* <CCard */}
-        {/* className="mt-4 text-center border-2 border-dashed rounded" */}
-        {/* style={{ backgroundColor: 'var(--color-bgcolor)' }} */}
-      {/* > */}
-        {/* <CCardBody className="fw-bold fs-3" style={{ color: 'var(--color-black)' }}> */}
+      {/* <CCard
+        className="mt-4 text-center border-2 border-dashed rounded"
+        style={{ backgroundColor: 'var(--color-bgcolor)' }}
+      > */}
+        {/* <CCardBody className="fw-bold fs-3" style={{ color: 'var(--color-black)' }}>
           {/* Ad Space */}
         {/* </CCardBody> */}
-      {/* </CCard> */}
+      {/* </CCard> */} 
 
       {/*to display today Appointments Table */}
       <div className="container mt-3 ">
 
         <div className="row">
           <div className="d-flex justify-content-between align-items-center align-content-center  ">
-            <h5 className="mb-4 text-md">Today's Appointments</h5>
+            <h5 className="mb-4 "  style={{ color: "var(--color-bgcolor)"  , fontSize: FONT_SIZES.lg}}>Today's Appointments</h5>
 
             {/* 
             <div className="d-flex gap-2">
@@ -614,7 +614,7 @@ const WidgetsDropdown = (props) => {
           <div className="d-flex gap-2 mb-3">
             <CButton
               style={{
-                backgroundColor: statusFilter === '' ? 'var(--color-black)' : '#ccc',
+                backgroundColor: statusFilter === '' ? 'var(--color-bgcolor)' : '#ccc',
                 color: '#fff'
               }}
               onClick={() => setStatusFilter('')}
@@ -786,7 +786,7 @@ const WidgetsDropdown = (props) => {
                       <CTableDataCell>{item.slot || item.servicetime}</CTableDataCell>
                       <CTableDataCell>
                         <CBadge
-                          style={{ backgroundColor: 'var(--color-black)', color: COLORS.white }}
+                          style={{ backgroundColor: 'var(--color-bgcolor)', color: COLORS.white }}
                         >
                           {statusLabelMap[item.status] || item.status}
                         </CBadge>
@@ -811,8 +811,8 @@ const WidgetsDropdown = (props) => {
                         <div className="d-flex align-items-center gap-2">
 
                           <CButton
-                            style={{ backgroundColor: 'var(--color-black)' }}
-                            className="text-white d-flex align-items-center justify-content-center"
+
+                            className="text-white d-flex align-items-center justify-content-center actionBtn"
                             size="sm"
                             onClick={() =>
                               navigate(`/appointment-details/${item.bookingId}`, {
@@ -824,8 +824,8 @@ const WidgetsDropdown = (props) => {
                           </CButton>
 
                           <CButton
-                            style={{ backgroundColor: 'var(--color-black)' }}
-                            className="text-white d-flex align-items-center justify-content-center"
+
+                            className="text-white d-flex align-items-center justify-content-center actionBtn"
                             size="sm"
                             onClick={() => handlePrint(item)}
                           >
@@ -841,7 +841,7 @@ const WidgetsDropdown = (props) => {
           </CTableBody>
         </CTable>
       </div>
-        {role.toLowerCase() === "admin" && (
+         {role.toLowerCase() === "admin" && (
         <>
           {/*to display cards*/}
           <CRow className={props.className} xs={{ gutter: 4 }}>
@@ -975,7 +975,7 @@ const WidgetsDropdown = (props) => {
                         alignItems: "center",
                         justifyContent: "center",
                         fontWeight: "bold",
-                        color: "var(--color-black)",
+                        color: "var(--color-bgcolor)",
 
                         fontSize: "16px",
                       }}
@@ -984,13 +984,13 @@ const WidgetsDropdown = (props) => {
                     </div>
 
                     {/* 📝 Text */}
-                    <div style={{ fontSize: "15px", color: "var(--color-black)", fontWeight: "500" }}>
+                    <div style={{ fontSize: "15px", color: "var(--color-bgcolor)", fontWeight: "500" }}>
                       Search Patients
                     </div>
                   </div>
 
                   {/* ➡️ Arrow */}
-                  <CIcon icon={cilArrowRight} size="lg" style={{ color: "var(--color-black)" }} />
+                  <CIcon icon={cilArrowRight} size="lg" style={{ color: "var(--color-bgcolor)" }} />
                 </CCardBody>
               </CCard>
 
@@ -1047,7 +1047,7 @@ const WidgetsDropdown = (props) => {
                         alignItems: "center",
                         justifyContent: "center",
                         fontWeight: "bold",
-                        color: "var(--color-black)",
+                        color: "var(--color-bgcolor)",
 
                         fontSize: "16px",
                       }}
@@ -1056,13 +1056,13 @@ const WidgetsDropdown = (props) => {
                     </div>
 
                     {/* 📝 Text */}
-                    <div style={{ fontSize: "15px", color: "var(--color-black)", fontWeight: "500" }}>
+                    <div style={{ fontSize: "15px", color: "var(--color-bgcolor)", fontWeight: "500" }}>
                       Search Doctors
                     </div>
                   </div>
 
                   {/* ➡️ Arrow */}
-                  <CIcon icon={cilArrowRight} size="lg" style={{ color: "var(--color-black)" }} />
+                  <CIcon icon={cilArrowRight} size="lg" style={{ color: "var(--color-bgcolor)" }} />
                 </CCardBody>
               </CCard>
             </CCol>
