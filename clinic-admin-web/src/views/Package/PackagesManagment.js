@@ -267,10 +267,10 @@ export default function PackagesManagement() {
         {can("Package Management", "create") && (
           <CButton
             onClick={() => setModal(true)}
-            style={{
-              backgroundColor: 'var(--color-black)',
-              color: 'white'
-            }}
+           style={{
+                  color: 'var(--color-black)',
+                  backgroundColor: 'var(--color-bgcolor)',
+                }}
           >
             + Add Package
           </CButton>
@@ -359,7 +359,7 @@ export default function PackagesManagement() {
       <CModal visible={modal} onClose={resetForm} className="custom-modal" backdrop="static" alignment="center">
         <CModalHeader>
           <CModalTitle style={{
-            color: 'var(--color-black)',
+            color: 'var(--color-bgcolor)',
           }}>{editId ? "Edit" : "Add"} Package</CModalTitle>
         </CModalHeader>
 
@@ -489,7 +489,7 @@ export default function PackagesManagement() {
             borderBottom: '1px solid var(--color-border)',
           }}
         >
-          <CModalTitle style={{ fontWeight: '600' }}>Package Details</CModalTitle>
+          <CModalTitle style={{ fontWeight: '600' , color: 'var(--color-bgcolor)',}}>Package Details</CModalTitle>
         </CModalHeader>
 
         <CModalBody style={{ backgroundColor: 'var(--color-bg-light)' }}>
@@ -610,6 +610,7 @@ export default function PackagesManagement() {
                       <div
                         id={`program-${pIndex}`}
                         className="accordion-collapse collapse"
+                        style={{color:"var(--color--black)"}}
                         data-bs-parent="#programAccordion"
                       >
                         <div className="accordion-body">
@@ -629,8 +630,8 @@ export default function PackagesManagement() {
                                       data-bs-toggle="collapse"
                                       data-bs-target={`#therapy-${pIndex}-${tIndex}`}
                                       style={{
-                                        backgroundColor: 'var(--color-bg-light)',
-                                        color: 'var(--color-black)',
+                                        backgroundColor: 'var(--color-bgcolor)',
+                                        color: 'var(--color-white)',
                                       }}
                                     >
                                       {tIndex + 1}. {therapy.therapyName}
