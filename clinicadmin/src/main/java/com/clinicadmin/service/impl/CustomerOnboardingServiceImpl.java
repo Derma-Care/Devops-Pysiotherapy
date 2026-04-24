@@ -3,7 +3,9 @@ package com.clinicadmin.service.impl;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -135,6 +137,26 @@ public class CustomerOnboardingServiceImpl implements CustomerOnboardingService 
 			response.setStatus(500);
 		}
 		return response;
+	}
+
+	
+	@Override
+	public Map<String,String> getCustomerByMobilenumberAndName(String mobilenumber,String name) {		
+		Map<String,String> details = new LinkedHashMap<>();
+		try {
+			Optional<CustomerOnbording> optional = onboardingRepository.findByMobileNumberAndFullName(mobilenumber, name);
+			if (optional.isPresent()) {
+				details.put("customerId", optional.get().getCustomerId());
+				details.put("patientId", optional.get().getPatientId());
+				////System.out.println(details); 
+				return details;
+			} else {
+				return null;
+			}
+		} catch (Exception e) {
+			return null;
+		}
+		
 	}
 
 	

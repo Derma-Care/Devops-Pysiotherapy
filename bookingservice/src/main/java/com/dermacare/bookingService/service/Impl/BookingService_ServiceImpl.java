@@ -73,6 +73,10 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	@Autowired
 	private PhysioDoctorFeign physioDoctorFeign;
 	
+	@Autowired
+	private ClinicAdminFeign clinnicfeign;
+	
+	
 //	@Autowired
 //	private KafkaProducer kafkaProducer;
 	
@@ -178,10 +182,19 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 		  try {
 		    entity = new ObjectMapper().convertValue(request, Booking.class);
 		    entity.setFollowupStatus("pending");
+		    String patientId = null;
+		    String customerId = null;
+		    Map<String,String> res = new LinkedHashMap<>();
+		    try {
+		    if(request.getCustomerId().isEmpty() ||request.getPatientId().isEmpty() ) {
+		    	res = clinnicfeign.getCustomerByMobilenumberAndName(request.getMobileNumber(), request.getName());
+		    	customerId = res.get("customerId");
+		    	patientId = res.get("patientId");}
+		    }catch(Exception e) {System.out.println(e.getMessage());}
 		    if(request.getCustomerId().isEmpty()){
-			entity.setCustomerId(generateCustomerId(request.getBranchId()));}		    
+			entity.setCustomerId(customerId);}		    
 		    if(request.getPatientId().isEmpty()){
-		    entity.setPatientId(generatePatientId(request.getBranchId()));}
+		    entity.setPatientId(patientId);}
 		    entity.setConsultationType("First-Time");
 		    ZonedDateTime istTime = ZonedDateTime.now(ZoneId.of("Asia/Kolkata"));
 		    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy hh:mm a");
