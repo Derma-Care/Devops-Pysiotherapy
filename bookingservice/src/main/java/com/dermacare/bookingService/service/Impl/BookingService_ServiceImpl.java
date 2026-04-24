@@ -179,6 +179,8 @@ public class BookingService_ServiceImpl implements BookingService_Service {
             try {
 		    entity = new ObjectMapper().convertValue(request, Booking.class);
 		    entity.setFollowupStatus("pending");
+			if(request.getCustomerId().isEmpty()){
+			entity.setCustomerId(generateCustomerId(request.getBranchId()));}		    
 		    if(request.getPatientId().isEmpty()) {
 		    entity.setPatientId(generatePatientId(request.getBranchId()));}
 		    entity.setConsultationType("First-Time");
@@ -310,6 +312,12 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	        String randomPart = uuid.replaceAll("-", "").substring(0, 6).toUpperCase();
 	        return id+"_"+"PT_" + randomPart;
 	    }
+
+	  private static String generateCustomerId(String branchId) {
+		    String uuid = UUID.randomUUID().toString();
+		    String randomPart = uuid.replaceAll("-", "").substring(0, 6).toUpperCase();
+		    return branchId + "_CR_" + randomPart;
+		}
 	
 	
 	private static String randomNumber() {
