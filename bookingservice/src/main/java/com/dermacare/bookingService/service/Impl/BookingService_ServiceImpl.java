@@ -90,7 +90,6 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	public DoctorSaveDetailsDTO saveDetails = new DoctorSaveDetailsDTO();
 	public DoctorSaveDetailsDTO sDetails = new DoctorSaveDetailsDTO();
 	public DoctorSaveDetailsDTO sd = new DoctorSaveDetailsDTO();
-	 LocalDate exp = null;
 
 	 private static final List<String> VALID_STATUS =
 		        Arrays.asList("PENDING","pending","confirmed","In-progress","IN-PROGRESS","CONFIRMED","due for Investigation","investigation done","session","follow-up pending","DUE FOR INVESTIGATION",
@@ -176,10 +175,12 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	 
 	 private Booking toEntity(BookingRequset request) {
 		 Booking entity = null;
-            try {
+		  try {
 		    entity = new ObjectMapper().convertValue(request, Booking.class);
 		    entity.setFollowupStatus("pending");
-		    if(request.getPatientId().isEmpty()) {
+		    if(request.getCustomerId().isEmpty()){
+			entity.setCustomerId(generateCustomerId(request.getBranchId()));}		    
+		    if(request.getPatientId().isEmpty()){
 		    entity.setPatientId(generatePatientId(request.getBranchId()));}
 		    entity.setConsultationType("First-Time");
 		    ZonedDateTime istTime = ZonedDateTime.now(ZoneId.of("Asia/Kolkata"));
@@ -310,6 +311,12 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	        String randomPart = uuid.replaceAll("-", "").substring(0, 6).toUpperCase();
 	        return id+"_"+"PT_" + randomPart;
 	    }
+	  
+	  private static String generateCustomerId(String branchId) {
+		    String uuid = UUID.randomUUID().toString();
+		    String randomPart = uuid.replaceAll("-", "").substring(0, 6).toUpperCase();
+		    return branchId + "_CR_" + randomPart;
+		}
 	
 	
 	private static String randomNumber() {
