@@ -47,6 +47,7 @@ import com.dermacare.bookingService.dto.TreatmentResponseDTO;
 import com.dermacare.bookingService.entity.Booking;
 import com.dermacare.bookingService.entity.ConsultationFees;
 import com.dermacare.bookingService.entity.FollowupBooking;
+import com.dermacare.bookingService.entity.Reports;
 import com.dermacare.bookingService.entity.ReportsList;
 import com.dermacare.bookingService.entity.Status;
 import com.dermacare.bookingService.entity.TheraphyAnswersEntity;
@@ -898,27 +899,14 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	         mapper.registerModule(new JavaTimeModule());
 	         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);	        
 	        List<Booking> bookings = repository.findByPatientId(patientId);
-
 	        List<ReportsDTO> responseList = new ArrayList<>();
-
 	        for (Booking booking : bookings) {
-
 	            if (booking.getReports() != null) {
-
 	                for (ReportsList report : booking.getReports()) {
-
-	                    // Convert ReportsList → ReportsDTO
-	                    ReportsDTO dto = mapper.convertValue(report, ReportsDTO.class);
-
-	                    // Manually set missing fields (important!)
-	                    dto.setBookingId(booking.getBookingId());
-	                    dto.setCustomerMobileNumber(booking.getMobileNumber());
-
+	                for(Reports reportEntity : report.getReportsList()) {          
+	                    ReportsDTO dto = mapper.convertValue(reportEntity, ReportsDTO.class);
 	                    responseList.add(dto);
-	                }
-	            }
-	        }
-
+	                }}}}
 	        return responseList;
 	    }
 		

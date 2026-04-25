@@ -73,6 +73,7 @@ public class BookingRequset {
 	private List<String> activityLevels;
 	private String reasonforVisit;
 	private boolean isFollowupStatus;
+	private List<ReportsDtoList> reports;
 	
 	
 	public void setIsFollowupStatus(boolean followupStatus) {
