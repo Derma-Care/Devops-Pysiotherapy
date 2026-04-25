@@ -410,7 +410,7 @@ public class BookingServiceController {
 
 	        List<ReportsDTO> reports = service.getReportsByPatientId(patientId);
 
-	        if (reports.isEmpty()) {
+	        if (reports == null || reports.isEmpty()) {
 	            Response response = Response.builder()
 	                    .success(false)
 	                    .message("No reports found for given patientId")
