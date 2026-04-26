@@ -618,22 +618,23 @@ const CategoryManagement = () => {
               onChange={(e) => {
                 let value = e.target.value;
 
-                // Replace multiple spaces with single space
-                value = value.replace(/\s+/g, ' ');
+                // Prevent leading space
+                if (value.startsWith(' ')) return;
 
                 // Block numbers
                 value = value.replace(/[0-9]/g, '');
 
+                // Replace multiple consecutive spaces with a single space
+                value = value.replace(/ {2,}/g, ' ');
+
                 // Capitalize each word
                 const formatted = value
                   .split(' ')
-                  .filter(word => word.length > 0)
-                  .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                  .map(word => word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : '')
                   .join(' ');
 
                 setNewCategory(prev => ({ ...prev, categoryName: formatted }));
 
-                // 🔥 Only remove error while typing
                 if (errors.categoryName) {
                   setErrors(prev => ({ ...prev, categoryName: '' }));
                 }
