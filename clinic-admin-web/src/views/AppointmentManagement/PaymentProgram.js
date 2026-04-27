@@ -959,7 +959,7 @@ export default function ProgramPayment() {
           navigate("/paymentDetails", {
             state: { paymentData: fullPaymentData },
           })
-        } style={{ backgroundColor: "var(--color-black)", color: "#fff", marginRight: "10px" }}>
+        } style={{ backgroundColor: "var(--color-bgcolor)", color: "#fff", marginRight: "10px" }}>
           Payment Details
         </CButton>
       )}
