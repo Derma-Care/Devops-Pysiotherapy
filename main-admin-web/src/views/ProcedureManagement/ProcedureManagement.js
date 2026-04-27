@@ -23,16 +23,21 @@ import {
   CForm,
   CCardHeader,
   CInputGroup,
-  CInputGroupText, CCardBody
+  CInputGroupText,
+  CCardBody,
 } from '@coreui/react'
-import Select from 'react-select'
 import CIcon from '@coreui/icons-react'
 import { cilSearch } from '@coreui/icons'
 import { CategoryData } from '../categoryManagement/CategoryAPI'
 import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
-import { BASE_URL, subService_URL, updateSubservices, getService } from '../../baseUrl'
-import { postSubService, getAllSubServices, deleteSubServiceData, getSubServiceId } from './ProcedureAPI'
+import { BASE_URL, updateSubservices } from '../../baseUrl'
+import {
+  postSubService,
+  getAllSubServices,
+  deleteSubServiceData,
+  getSubServiceId,
+} from './ProcedureAPI'
 import { getServiceByCategoryId } from '../servicesManagement/ServiceAPI'
 import { ConfirmationModal } from '../../Utils/ConfirmationDelete'
 import { Edit2, Eye, Trash2 } from 'lucide-react'
@@ -43,7 +48,7 @@ const ProcedureManagement = () => {
   const [category, setCategory] = useState([])
   const [serviceOptions, setServiceOptions] = useState([])
   const [selectedSubServices, setSelectedSubServices] = useState([])
-  const [selectSubService, setSelectSubService] = useState(false)
+  const [selectSubService, setSelectSubService] = useState(null)
   const [subServiceInput, setSubServiceInput] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [removeShowModal, setRemoveShowModal] = useState(false)
@@ -95,66 +100,83 @@ const ProcedureManagement = () => {
         handleSubmit()
       }
     }
-
     window.addEventListener('keydown', handleEnterKey)
-
-    return () => {
-      window.removeEventListener('keydown', handleEnterKey)
-    }
+    return () => window.removeEventListener('keydown', handleEnterKey)
   }, [showModal, newService, selectedSubServices, editMode])
 
+  // ─── FETCH SUB SERVICES ───────────────────────────────────────────────────
   const fetchSubServices = async () => {
     try {
       const result = await getAllSubServices()
 
-      // result should be an array of category objects
       const formattedSubServices = result.flatMap((category) =>
         Array.isArray(category.subServices)
           ? category.subServices.map((sub) => ({
-            id: sub.subServiceId,
-            name: sub.subServiceName,
-            category: category.categoryName,  // ✅ from top level
-            service: sub.serviceName,         // ✅ directly from subService
-            serviceId: sub.serviceId,
-          }))
+              id: sub.subServiceId,
+              name: sub.subServiceName,
+              category: category.categoryName,
+              service: sub.serviceName,
+              serviceId: sub.serviceId,
+            }))
           : []
       )
 
       setSubServices(formattedSubServices)
       setFilteredSubServices(formattedSubServices)
     } catch (err) {
-      console.error("❌ Failed to fetch subservices:", err)
+      console.error('❌ Failed to fetch subservices:', err)
       setSubServices([])
       setFilteredSubServices([])
     }
   }
 
+  // ─── VALIDATION ───────────────────────────────────────────────────────────
   const validateFields = () => {
     const newErrors = {}
     if (!newService.categoryId) newErrors.category = 'Please select a category'
     if (!newService.serviceId) newErrors.service = 'Please select a service'
-    if (!editMode && selectedSubServices.length === 0) newErrors.subService = 'Please add at least one Procedure'
-    if (editMode && selectedSubServices[0]?.subServiceName?.trim() === '') newErrors.subService = 'Procedure name cannot be empty'
+    if (!editMode && selectedSubServices.length === 0)
+      newErrors.subService = 'Please add at least one Procedure'
+    if (editMode && selectedSubServices[0]?.subServiceName?.trim() === '')
+      newErrors.subService = 'Procedure name cannot be empty'
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
+
+  // ─── NORMALIZE HELPER ─────────────────────────────────────────────────────
+  const normalize = (val) => (val ? val.toString().trim().toLowerCase() : '')
+
+  // ─── VIEW SERVICE ─────────────────────────────────────────────────────────
+  // FIX 1: Filter the returned entity's subServices to only the clicked one.
+  // The backend returns the full parent document (which may contain "Stretching"
+  // under both KneeRehab and Spine Rehab). We scope to the exact subServiceId.
   const handleViewService = async (subServiceId) => {
-    console.log("👀 handleViewService called with:", subServiceId)
     try {
       const res = await getSubServiceId(subServiceId)
-      console.log("🔎 Full API Response:", res)
 
-      // ✅ set the actual data object
+      if (!res?.data) {
+        toast.error('SubService not found')
+        return
+      }
 
-      setSelectSubService(res.data)
+      // Filter to only the subService that was actually clicked
+      const filtered = {
+        ...res.data,
+        subServices: (res.data.subServices || []).filter(
+          (s) => s.subServiceId === subServiceId
+        ),
+      }
+
+      setSelectSubService(filtered)
       setViewModalVisible(true)
     } catch (error) {
-      console.error("❌ Failed to fetch SubService details:", error)
-      toast.error("Failed to fetch SubService details")
+      console.error('❌ Failed to fetch SubService details:', error)
+      toast.error('Failed to fetch SubService details')
     }
   }
 
+  // ─── REMOVE FROM PENDING LIST ─────────────────────────────────────────────
   const handleRemoveClick = (sub) => {
     setSelectedSub(sub)
     setRemoveShowModal(true)
@@ -165,6 +187,7 @@ const ProcedureManagement = () => {
     setRemoveShowModal(false)
   }
 
+  // ─── DELETE ───────────────────────────────────────────────────────────────
   const confirmDelete = (serviceId) => {
     setDeleteServiceId(serviceId)
     setShowDeleteModal(true)
@@ -176,7 +199,9 @@ const ProcedureManagement = () => {
     try {
       const res = await deleteSubServiceData(deleteServiceId)
       if (res?.success) {
-        toast.success(res.message || 'Subservice deleted successfully!', { position: 'top-right' })
+        toast.success(res.message || 'Subservice deleted successfully!', {
+          position: 'top-right',
+        })
         await fetchSubServices()
       } else {
         toast.error('Failed to delete subservice.', { position: 'top-right' })
@@ -190,17 +215,16 @@ const ProcedureManagement = () => {
     setDeleteServiceId(null)
   }
 
+  // ─── CLOSE FORM ───────────────────────────────────────────────────────────
   const handleCloseForm = () => {
-    setNewService({
-      categoryId: '',
-      serviceId: '',
-    })
-    setSelectedSubServices([])   // clear procedures
-    setErrors({})                // clear validation errors
-    setEditMode(false)           // reset mode
-    setShowModal(false)          // ✅ correct hook for closing modal
+    setNewService({ categoryId: '', categoryName: '', serviceName: '', serviceId: '' })
+    setSelectedSubServices([])
+    setErrors({})
+    setEditMode(false)
+    setShowModal(false)
   }
 
+  // ─── OPEN EDIT ────────────────────────────────────────────────────────────
   const handleCategoryEdit = async (row) => {
     setEditMode(true)
     setEditSubServiceId(row.id)
@@ -235,21 +259,24 @@ const ProcedureManagement = () => {
     ])
   }
 
+  // ─── FETCH CATEGORIES ─────────────────────────────────────────────────────
   const fetchCategories = async () => {
     try {
       const res = await CategoryData()
-      if (res?.data) {
-        setCategory(res.data || [])
-      }
+      if (res?.data) setCategory(res.data || [])
     } catch (err) {
       console.error('Failed to fetch categories:', err)
       setCategory([])
     }
   }
 
+  // ─── DROPDOWN CHANGES ─────────────────────────────────────────────────────
   const handleChanges = async (e) => {
     const { name, value } = e.target
-    setErrors((prev) => ({ ...prev, [name === 'categoryName' ? 'category' : 'service']: '' }))
+    setErrors((prev) => ({
+      ...prev,
+      [name === 'categoryName' ? 'category' : 'service']: '',
+    }))
 
     if (name === 'categoryName') {
       const selectedCategory = category.find((cat) => cat.categoryId === value)
@@ -278,26 +305,36 @@ const ProcedureManagement = () => {
     }
   }
 
+  // ─── SUBMIT ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!validateFields()) return;
+    if (!validateFields()) return
 
     try {
       if (editMode && editSubServiceId) {
-        const normalize = (val) => (val ? val.toString().trim().toLowerCase() : "");
-        const existingSubNames = Array.isArray(subServices)
-          ? subServices
-            .filter((s) => s.id !== editSubServiceId)
-            .map((s) => normalize(s.name))
-          : [];
-
+        // ─── EDIT MODE ──────────────────────────────────────────────────────
+        // FIX 2: Scope the duplicate check to (serviceId + name) together.
+        // Previously it only compared names globally, which incorrectly blocked
+        // editing "Stretching" under Spine Rehab when "Stretching" already
+        // existed under KneeRehab (a completely different service).
         for (const sub of selectedSubServices) {
-          const normalized = normalize(sub.subServiceName);
-          if (existingSubNames.includes(normalized)) {
+          const normalized = normalize(sub.subServiceName)
+          const targetServiceId = sub.serviceId
+
+          const isDuplicate =
+            Array.isArray(subServices) &&
+            subServices.some(
+              (s) =>
+                s.id !== editSubServiceId &&        // not the record being edited
+                s.serviceId === targetServiceId &&   // same service
+                normalize(s.name) === normalized     // same name
+            )
+
+          if (isDuplicate) {
             setErrors((prev) => ({
               ...prev,
-              subService: `Procedure "${sub.subServiceName}" already exists.`,
-            }));
-            return;
+              subService: `Procedure "${sub.subServiceName}" already exists under this service.`,
+            }))
+            return
           }
         }
 
@@ -307,127 +344,127 @@ const ProcedureManagement = () => {
             serviceName: subService.serviceName,
             subServiceName: subService.subServiceName,
           })),
-        };
+        }
 
         try {
           const res = await axios.put(
             `${BASE_URL}/${updateSubservices}/${editSubServiceId}`,
             payload
-          );
+          )
 
           if (res?.data?.success) {
-            fetchSubServices();
-            toast.success("Procedure updated successfully!");
+            fetchSubServices()
+            toast.success('Procedure updated successfully!')
           } else {
-            toast.error(res?.data?.message || "Failed to update Procedure.");
+            toast.error(res?.data?.message || 'Failed to update Procedure.')
           }
         } catch (err) {
-          console.error("❌ Update error:", err);
-          toast.error(err.response?.data?.message || "Error updating Procedure");
+          console.error('❌ Update error:', err)
+          toast.error(err.response?.data?.message || 'Error updating Procedure')
         }
       } else {
-        // 🟣 ADD MODE
-        const normalize = (val) => (val ? val.toString().trim().toLowerCase() : "");
-        const existingSubNames = Array.isArray(subServices)
-          ? subServices.map((s) => normalize(s.name))
-          : [];
-
+        // ─── ADD MODE ───────────────────────────────────────────────────────
+        // FIX 2 (add mode): Same scoped duplicate check — compare serviceId + name.
+        // "Stretching" under KneeRehab and "Stretching" under Spine Rehab are
+        // two valid, distinct records and must not block each other.
         for (const sub of selectedSubServices) {
-          const normalized = normalize(sub.subServiceName);
-          if (existingSubNames.includes(normalized)) {
+          const normalized = normalize(sub.subServiceName)
+
+          const isDuplicate =
+            Array.isArray(subServices) &&
+            subServices.some(
+              (s) =>
+                s.serviceId === sub.serviceId &&    // same service
+                normalize(s.name) === normalized     // same name
+            )
+
+          if (isDuplicate) {
             setErrors((prev) => ({
               ...prev,
-              subService: `Procedure "${sub.subServiceName}" already exists.`,
-            }));
-            return;
+              subService: `Procedure "${sub.subServiceName}" already exists under this service.`,
+            }))
+            return
           }
         }
 
-        // 💥 FIXED: DO NOT SEARCH AGAIN. USE STORED VALUES.
         const formattedSubServices = selectedSubServices.map((sub) => ({
-          serviceId: sub.serviceId,              // ⭐ ALWAYS CORRECT NOW
+          serviceId: sub.serviceId,
           serviceName: sub.serviceName,
           subServiceName: sub.subServiceName,
-        }));
+        }))
 
         const payload = {
           categoryId: newService.categoryId,
           subServices: formattedSubServices,
-        };
+        }
 
         try {
-          const res = await postSubService(payload);
+          const res = await postSubService(payload)
           if (res?.data?.success) {
-            toast.success("Procedure added successfully");
+            toast.success('Procedure added successfully')
           } else {
-            toast.error(res?.data?.message || "Submission failed");
+            toast.error(res?.data?.message || 'Submission failed')
           }
         } catch (err) {
-          console.error("Error submitting Procedures:", err);
-          toast.error(err.response?.data?.message || "Error submitting Procedures");
+          console.error('Error submitting Procedures:', err)
+          toast.error(err.response?.data?.message || 'Error submitting Procedures')
         }
       }
 
-      await fetchSubServices();
-      setSelectedSubServices([]);
-      setSubServiceInput("");
-      setNewService({
-        categoryName: "",
-        categoryId: "",
-        serviceName: "",
-        serviceId: "",
-      });
-      setEditMode(false);
-      setEditSubServiceId(null);
-      setShowModal(false);
+      await fetchSubServices()
+      setSelectedSubServices([])
+      setSubServiceInput('')
+      setNewService({ categoryName: '', categoryId: '', serviceName: '', serviceId: '' })
+      setEditMode(false)
+      setEditSubServiceId(null)
+      setShowModal(false)
     } catch (err) {
-      console.error("Submission Error:", err);
-      toast.error("Error submitting subservices");
+      console.error('Submission Error:', err)
+      toast.error('Error submitting subservices')
     }
-  };
+  }
 
-
+  // ─── SEARCH FILTER ────────────────────────────────────────────────────────
   useEffect(() => {
-    let filtered = [];
+    let filtered = []
 
     if (!searchQuery.trim()) {
-      filtered = subServices;
+      filtered = subServices
     } else {
-      const lowerSearch = searchQuery.toLowerCase();
+      const lowerSearch = searchQuery.toLowerCase()
       filtered = subServices.filter(
         (item) =>
           item.category?.toLowerCase()?.includes(lowerSearch) ||
           item.service?.toLowerCase()?.includes(lowerSearch) ||
           item.name?.toLowerCase()?.includes(lowerSearch)
-      );
+      )
     }
 
-    setFilteredSubServices(filtered);
+    setFilteredSubServices(filtered)
 
-    // 👉 Keep user on current page, but adjust if not valid
-    const newTotalPages = Math.ceil(filtered.length / itemsPerPage);
+    const newTotalPages = Math.ceil(filtered.length / itemsPerPage)
     if (currentPage > newTotalPages) {
-      setCurrentPage(newTotalPages || 1);
+      setCurrentPage(newTotalPages || 1)
     }
-  }, [searchQuery, subServices, currentPage, itemsPerPage]);
+  }, [searchQuery, subServices, currentPage, itemsPerPage])
 
-
+  // ─── RENDER ───────────────────────────────────────────────────────────────
   return (
     <div className="container-fluid p-4">
       <ToastContainer />
       <CCard>
-
+        {/* Header */}
         <CCardHeader className="d-flex justify-content-between align-items-center">
           <h4 className="mb-0">Procedure Management</h4>
           <div className="d-flex" style={{ gap: '1rem' }}>
             <CInputGroup style={{ width: '300px' }}>
               <CFormInput
-                style={{ border: "1px solid #7e3a93" }}
+                style={{ border: '1px solid #7e3a93' }}
                 placeholder="Search Service..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <CInputGroupText style={{ border: "1px solid #7e3a93" }}>
+              <CInputGroupText style={{ border: '1px solid #7e3a93' }}>
                 <CIcon icon={cilSearch} />
               </CInputGroupText>
             </CInputGroup>
@@ -437,14 +474,10 @@ const ProcedureManagement = () => {
               onClick={() => {
                 setEditMode(false)
                 setEditSubServiceId(null)
-                setNewService({
-                  categoryName: '',
-                  categoryId: '',
-                  serviceName: '',
-                  serviceId: '',
-                })
+                setNewService({ categoryName: '', categoryId: '', serviceName: '', serviceId: '' })
                 setSelectedSubServices([])
                 setSubServiceInput('')
+                setErrors({})
                 setShowModal(true)
               }}
             >
@@ -453,6 +486,7 @@ const ProcedureManagement = () => {
           </div>
         </CCardHeader>
 
+        {/* Table */}
         {loading ? (
           <LoadingIndicator message="Fetching Procedure Details, Please wait..." />
         ) : error ? (
@@ -462,8 +496,7 @@ const ProcedureManagement = () => {
             <CTable striped hover responsive>
               <CTableHead className="pink-table">
                 <CTableRow>
-                  <CTableHeaderCell >S.No</CTableHeaderCell>
-
+                  <CTableHeaderCell>S.No</CTableHeaderCell>
                   <CTableHeaderCell>Category</CTableHeaderCell>
                   <CTableHeaderCell>Service</CTableHeaderCell>
                   <CTableHeaderCell>Procedure</CTableHeaderCell>
@@ -474,8 +507,9 @@ const ProcedureManagement = () => {
                 {currentItems && currentItems.length > 0 ? (
                   currentItems.map((row, index) => (
                     <CTableRow key={row.id}>
-                      <CTableDataCell>{(currentPage - 1) * itemsPerPage + index + 1}</CTableDataCell>
-
+                      <CTableDataCell>
+                        {(currentPage - 1) * itemsPerPage + index + 1}
+                      </CTableDataCell>
                       <CTableDataCell>{row.category}</CTableDataCell>
                       <CTableDataCell>{row.service}</CTableDataCell>
                       <CTableDataCell>{row.name}</CTableDataCell>
@@ -483,8 +517,9 @@ const ProcedureManagement = () => {
                         <div className="d-flex justify-content-center align-items-center gap-2">
                           <button
                             className="actionBtn"
-                            onClick={() => handleViewService(row.id)} // ✅ pass row.id directly
-                            title="View">
+                            onClick={() => handleViewService(row.id)}
+                            title="View"
+                          >
                             <Eye size={18} />
                           </button>
                           <button
@@ -515,7 +550,7 @@ const ProcedureManagement = () => {
               </CTableBody>
             </CTable>
 
-            {/* Pagination Controls */}
+            {/* Pagination */}
             {filteredSubServices.length > 0 && (
               <div className="d-flex justify-content-between align-items-center mt-3">
                 <div>
@@ -536,11 +571,13 @@ const ProcedureManagement = () => {
                 </div>
                 <div>
                   <span className="me-3">
-                    Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredSubServices.length)} of {filteredSubServices.length} entries
+                    Showing {indexOfFirstItem + 1} to{' '}
+                    {Math.min(indexOfLastItem, filteredSubServices.length)} of{' '}
+                    {filteredSubServices.length} entries
                   </span>
                   <CPagination>
                     <CPaginationItem
-                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                       disabled={currentPage === 1}
                     >
                       Previous
@@ -555,7 +592,9 @@ const ProcedureManagement = () => {
                       </CPaginationItem>
                     ))}
                     <CPaginationItem
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                      }
                       disabled={currentPage === totalPages}
                     >
                       Next
@@ -566,7 +605,15 @@ const ProcedureManagement = () => {
             )}
           </>
         )}
-        <CModal visible={showModal} onClose={handleCloseForm} size="lg" backdrop="static" className='custom-modal'>
+
+        {/* ─── ADD / EDIT MODAL ──────────────────────────────────────────── */}
+        <CModal
+          visible={showModal}
+          onClose={handleCloseForm}
+          size="lg"
+          backdrop="static"
+          className="custom-modal"
+        >
           <CForm
             onSubmit={(e) => {
               e.preventDefault()
@@ -575,10 +622,14 @@ const ProcedureManagement = () => {
             id="procedureForm"
           >
             <CModalHeader closeButton>
-              <CModalTitle>{editMode ? 'Edit Procedure' : '➕ Add New Procedure'}</CModalTitle>
+              <CModalTitle>
+                {editMode ? 'Edit Procedure' : '➕ Add New Procedure'}
+              </CModalTitle>
             </CModalHeader>
+
             <CModalBody>
               <CRow className="g-4">
+                {/* Category */}
                 <CCol md={6}>
                   <h6>
                     Category <span className="text-danger">*</span>
@@ -587,11 +638,10 @@ const ProcedureManagement = () => {
                     name="categoryName"
                     value={newService.categoryId || ''}
                     onChange={handleChanges}
-                    // disabled={editMode}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault()
-                        document.querySelector('select[name="serviceName"]').focus()
+                        document.querySelector('select[name="serviceName"]')?.focus()
                       }
                     }}
                   >
@@ -602,9 +652,12 @@ const ProcedureManagement = () => {
                       </option>
                     ))}
                   </CFormSelect>
-                  {errors.category && <div className="text-danger mt-1">{errors.category}</div>}
+                  {errors.category && (
+                    <div className="text-danger mt-1">{errors.category}</div>
+                  )}
                 </CCol>
 
+                {/* Service */}
                 <CCol md={6}>
                   <h6>
                     Service <span className="text-danger">*</span>
@@ -613,15 +666,15 @@ const ProcedureManagement = () => {
                     name="serviceName"
                     value={newService.serviceId || ''}
                     onChange={handleChanges}
-                    // disabled={editMode}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault()
-                        if (editMode) {
-                          document.querySelector('input[placeholder="Edit Procedure"]').focus()
-                        } else {
-                          document.querySelector('input[placeholder="Enter Procedure"]').focus()
-                        }
+                        const placeholder = editMode
+                          ? 'Edit Procedure'
+                          : 'Enter Procedure'
+                        document
+                          .querySelector(`input[placeholder="${placeholder}"]`)
+                          ?.focus()
                       }
                     }}
                   >
@@ -632,161 +685,170 @@ const ProcedureManagement = () => {
                       </option>
                     ))}
                   </CFormSelect>
-                  {errors.service && <div className="text-danger mt-1">{errors.service}</div>}
+                  {errors.service && (
+                    <div className="text-danger mt-1">{errors.service}</div>
+                  )}
                 </CCol>
+
+                {/* Procedure input */}
                 <CCol md={12}>
                   <h6>
-                    {editMode ? 'Edit Procedure' : 'Add Procedure'} <span className="text-danger">*</span>
+                    {editMode ? 'Edit Procedure' : 'Add Procedure'}{' '}
+                    <span className="text-danger">*</span>
                   </h6>
 
-                  {/* ---------------- ADD MODE ---------------- */}
+                  {/* ── ADD MODE ── */}
                   {!editMode && (
-                    <div className="d-flex flex-wrap gap-2 mb-3" style={{ width: "100%" }}>
+                    <div
+                      className="d-flex flex-wrap gap-2 mb-3"
+                      style={{ width: '100%' }}
+                    >
                       <CFormInput
                         placeholder="Enter Procedure"
                         value={subServiceInput}
                         onChange={(e) => {
-                          const value = e.target.value;
-
-                          // ❌ BLOCK NUMBERS WHILE TYPING
-                          if (/\d/.test(value)) return;
-
-                          // ❌ BLOCK invalid symbols
-                          if (!/^[A-Za-z\s@&\-.()]*$/.test(value)) return;
-
-                          setSubServiceInput(value);
-
+                          const value = e.target.value
+                          if (/\d/.test(value)) return
+                          if (!/^[A-Za-z\s@&\-.()]*$/.test(value)) return
+                          setSubServiceInput(value)
                           if (value.trim() !== '') {
-                            setErrors((prev) => ({ ...prev, subService: '' }));
+                            setErrors((prev) => ({ ...prev, subService: '' }))
                           }
                         }}
-
-                        // ❌ BLOCK PASTING NUMBERS OR INVALID CHARACTERS
                         onPaste={(e) => {
-                          const pasted = e.clipboardData.getData('text');
-                          if (/\d/.test(pasted) || !/^[A-Za-z\s@&\-.()]+$/.test(pasted)) {
-                            e.preventDefault();
-                            toast.error("❌ Numbers and invalid symbols are not allowed!", { autoClose: 2000 });
+                          const pasted = e.clipboardData.getData('text')
+                          if (
+                            /\d/.test(pasted) ||
+                            !/^[A-Za-z\s@&\-.()]+$/.test(pasted)
+                          ) {
+                            e.preventDefault()
+                            toast.error(
+                              '❌ Numbers and invalid symbols are not allowed!',
+                              { autoClose: 2000 }
+                            )
                           }
                         }}
                         style={{ flexGrow: 1 }}
                       />
 
                       {errors.subService && (
-                        <div className="text-danger mt-1">{errors.subService}</div>
+                        <div className="text-danger mt-1 w-100">
+                          {errors.subService}
+                        </div>
                       )}
 
                       <CButton
                         color="success"
                         className="text-white"
                         onClick={() => {
-                          const trimmedInput = subServiceInput.trim();
-                          let errorMsg = "";
+                          const trimmedInput = subServiceInput.trim()
+                          let errorMsg = ''
 
-                          if (!trimmedInput) errorMsg = "Procedure name is required.";
-                          else if (/\d/.test(trimmedInput)) errorMsg = "Numbers are not allowed.";
+                          if (!trimmedInput) errorMsg = 'Procedure name is required.'
+                          else if (/\d/.test(trimmedInput))
+                            errorMsg = 'Numbers are not allowed.'
                           else if (!/^[A-Za-z\s@&\-.()]+$/.test(trimmedInput))
-                            errorMsg = "Only letters, spaces & @, &, -, ., (, ) allowed.";
+                            errorMsg =
+                              'Only letters, spaces & @, &, -, ., (, ) allowed.'
                           else if (trimmedInput.length < 3)
-                            errorMsg = "Minimum 3 characters required.";
+                            errorMsg = 'Minimum 3 characters required.'
 
                           if (errorMsg) {
-                            setErrors((prev) => ({ ...prev, subService: errorMsg }));
-                            return;
+                            setErrors((prev) => ({
+                              ...prev,
+                              subService: errorMsg,
+                            }))
+                            return
                           }
 
-                          // 🎯 ALWAYS FETCH SERVICE SELECTED IN DROPDOWN
                           const selectedService = serviceOptions.find(
                             (s) => s.serviceId === newService.serviceId
-                          );
+                          )
 
                           if (!selectedService) {
-                            toast.warn("⚠️ Please select a service first!");
-                            return;
+                            toast.warn('⚠️ Please select a service first!')
+                            return
                           }
 
-                          // 🎯 FINAL DATA FOR ONE ENTRY
                           const newEntry = {
                             serviceId: selectedService.serviceId,
                             serviceName: selectedService.serviceName,
                             subServiceName: trimmedInput,
-                          };
+                          }
 
-                          // 🚫 Duplicate inside list
+                          // Duplicate check inside the pending list
                           const exists = selectedSubServices.some(
                             (sub) =>
                               sub.serviceId === newEntry.serviceId &&
-                              sub.subServiceName.toLowerCase() === newEntry.subServiceName.toLowerCase()
-                          );
+                              sub.subServiceName.toLowerCase() ===
+                                newEntry.subServiceName.toLowerCase()
+                          )
 
                           if (exists) {
-                            toast.warn("⚠️ Procedure already added!");
-                            return;
+                            toast.warn('⚠️ Procedure already added!')
+                            return
                           }
 
-                          // 🎯 PUSH ENTRY
-                          setSelectedSubServices((prev) => [...prev, newEntry]);
-                          setSubServiceInput("");
-
-                          console.log("✔ NEW ENTRY ADDED:", newEntry);
+                          setSelectedSubServices((prev) => [...prev, newEntry])
+                          setSubServiceInput('')
                         }}
                       >
                         Add
                       </CButton>
-
-
                     </div>
                   )}
 
-                  {/* ---------------- EDIT MODE ---------------- */}
+                  {/* ── EDIT MODE ── */}
                   {editMode && (
                     <>
                       <CFormInput
                         placeholder="Edit Procedure"
                         value={selectedSubServices[0]?.subServiceName || ''}
                         onChange={(e) => {
-                          const value = e.target.value;
-                          const trimmedValue = value.trim();
-                          let errorMsg = "";
+                          const value = e.target.value
+                          const trimmedValue = value.trim()
+                          let errorMsg = ''
 
-                          // ✋ BLOCK NUMBERS instantly
-                          if (/\d/.test(value)) return;
+                          if (/\d/.test(value)) return
+                          if (!/^[A-Za-z\s@&\-.()]*$/.test(value)) return
 
-                          // ✋ BLOCK invalid symbols
-                          if (!/^[A-Za-z\s@&\-.()]*$/.test(value)) return;
-
-                          if (!trimmedValue) errorMsg = "Procedure name is required.";
+                          if (!trimmedValue)
+                            errorMsg = 'Procedure name is required.'
                           else if (trimmedValue.length < 3)
-                            errorMsg = "Minimum 3 characters required.";
+                            errorMsg = 'Minimum 3 characters required.'
 
-                          setErrors((prev) => ({ ...prev, subService: errorMsg }));
-                          setSelectedSubServices([{ ...selectedSubServices[0], subServiceName: value }]);
+                          setErrors((prev) => ({ ...prev, subService: errorMsg }))
+                          setSelectedSubServices([
+                            { ...selectedSubServices[0], subServiceName: value },
+                          ])
                         }}
-
                         onPaste={(e) => {
-                          const pasted = e.clipboardData.getData('text');
-                          if (/\d/.test(pasted) || !/^[A-Za-z\s@&\-.()]+$/.test(pasted)) {
-                            e.preventDefault();
-                            toast.error("❌ Numbers and invalid symbols are not allowed!");
+                          const pasted = e.clipboardData.getData('text')
+                          if (
+                            /\d/.test(pasted) ||
+                            !/^[A-Za-z\s@&\-.()]+$/.test(pasted)
+                          ) {
+                            e.preventDefault()
+                            toast.error(
+                              '❌ Numbers and invalid symbols are not allowed!'
+                            )
                           }
                         }}
-
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleSubmit();
+                            e.preventDefault()
+                            handleSubmit()
                           }
                         }}
                         invalid={!!errors.subService}
                       />
-
                       {errors.subService && (
                         <div className="text-danger mt-1">{errors.subService}</div>
                       )}
                     </>
                   )}
 
-                  {/* ---------------- SHOW ADDED LIST ---------------- */}
+                  {/* ── PENDING LIST (Add mode) ── */}
                   {!editMode && selectedSubServices.length > 0 && (
                     <ul className="list-group mt-3">
                       {selectedSubServices.map((sub, index) => (
@@ -810,19 +872,18 @@ const ProcedureManagement = () => {
                     </ul>
                   )}
                 </CCol>
-
               </CRow>
 
               {removeShowModal && (
                 <ConfirmationModal
                   isVisible={removeShowModal}
-                  message="Are you sure you want to delete this item?"
+                  message="Are you sure you want to remove this item?"
                   onConfirm={handleConfirmRemove}
                   onCancel={() => setRemoveShowModal(false)}
                 />
               )}
-
             </CModalBody>
+
             <CModalFooter>
               <CButton color="secondary" variant="outline" onClick={handleCloseForm}>
                 Cancel
@@ -833,12 +894,17 @@ const ProcedureManagement = () => {
                 className="text-white"
                 form="procedureForm"
               >
-                <h6 className="text-white">{editMode ? 'Update Procedure' : 'Add Procedure'}</h6>
+                <h6 className="text-white mb-0">
+                  {editMode ? 'Update Procedure' : 'Add Procedure'}
+                </h6>
               </CButton>
             </CModalFooter>
           </CForm>
         </CModal>
-        {/* View Sub Service Modal */}
+
+        {/* ─── VIEW MODAL ────────────────────────────────────────────────── */}
+        {/* FIX 1 applied here: selectSubService.subServices now only contains
+            the single subService that was clicked, filtered in handleViewService */}
         <CModal
           visible={viewModalVisible}
           onClose={() => setViewModalVisible(false)}
@@ -847,7 +913,10 @@ const ProcedureManagement = () => {
           className="custom-modal"
         >
           <CModalHeader className="bg-info text-white justify-content-center">
-            <CModalTitle className="fs-4 fw-bold text-center" style={{ color: "white" }}>
+            <CModalTitle
+              className="fs-4 fw-bold text-center"
+              style={{ color: 'white' }}
+            >
               Sub Service Details
             </CModalTitle>
           </CModalHeader>
@@ -862,11 +931,9 @@ const ProcedureManagement = () => {
                 >
                   <CCardBody>
                     <div className="d-flex justify-content-between align-items-center mb-2">
-                      <h6
-                        className="fw-semibold mb-0"
-                        style={{ color: '#7e3a93' }}
-                      >
-                        {index + 1}. {item.subServiceName || 'Unnamed Sub Service'}
+                      <h6 className="fw-semibold mb-0" style={{ color: '#7e3a93' }}>
+                        {index + 1}.{' '}
+                        {item.subServiceName || 'Unnamed Sub Service'}
                       </h6>
                       <span className="badge bg-light text-dark border">
                         ID: {item.subServiceId}
@@ -884,7 +951,9 @@ const ProcedureManagement = () => {
                       </CCol>
                       <CCol sm={6} className="mb-3">
                         <strong className="text-secondary">Service Name:</strong>
-                        <div className="mt-1 text-dark">{item.serviceName || '-'}</div>
+                        <div className="mt-1 text-dark">
+                          {item.serviceName || '-'}
+                        </div>
                       </CCol>
                     </CRow>
                   </CCardBody>
@@ -903,13 +972,18 @@ const ProcedureManagement = () => {
               color="light"
               className="px-4 py-2 border-0 shadow-sm"
               onClick={() => setViewModalVisible(false)}
-              style={{ backgroundColor: '#6c757d', color: 'white', borderRadius: '8px' }}
+              style={{
+                backgroundColor: '#6c757d',
+                color: 'white',
+                borderRadius: '8px',
+              }}
             >
               Close
             </CButton>
           </CModalFooter>
         </CModal>
 
+        {/* ─── DELETE CONFIRM MODAL ──────────────────────────────────────── */}
         {showDeleteModal && (
           <ConfirmationModal
             isVisible={showDeleteModal}
