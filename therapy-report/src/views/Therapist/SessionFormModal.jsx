@@ -18,6 +18,7 @@ import { createTherapyNotes, getDashboard } from "./TheraphyApi"
 import { useNavigate } from "react-router-dom"
 import { convertToBase64 } from "../../Utils/Base64Convert"
 import { showCustomToast } from "../../Utils/Toaster"
+import { COLORS } from "../../Constant/Themes"
 
 export default function SessionFormModal({
   visible,
@@ -99,16 +100,18 @@ export default function SessionFormModal({
         therapistId: theraphydata?.therapistId,
         sessionId: data.sessionId,
 
+        //  exercises: data?.exercises || "",
+//  date: data?.sessionDate || data?.date || "",
         patientName: data.patientName,
         serviceType: data.serviceType,
 
-        date: data.sessionDate,
+        date: now.toLocaleDateString(),
         completedDate: now.toLocaleDateString(),
         completedTime: now.toLocaleTimeString(),
 
-
-        // exercises: data.exercises,
-
+// therapy: data.serviceType || "",
+        // exercises: data.sessionId,
+// status: "Completed",
         painBefore,
         painAfter,
         duration: data.sessionTime,
@@ -116,9 +119,11 @@ export default function SessionFormModal({
 
         setsDone: completedSets,
         repetationDone: completedRepitations,
+        setsDone: `${completedSets || 0}/${data?.sets || 0}`,
+repetationDone: `${completedRepitations || 0}/${data?.repetitions || 0}`,
 
         therapistNotes: notes,
-        // patientResponse: data.patientResponse,
+        patientResponse: data.patientResponse || "Good",
 
         result,
         mode: "complete",
@@ -165,7 +170,7 @@ export default function SessionFormModal({
       console.log("FAILED", err?.response?.data || err.message)
 
       // ❌ Error toast
-      toast.error(
+      showCustomToast(
         err?.response?.data?.message || "Something went wrong!"
       )
     } finally {
@@ -410,26 +415,52 @@ export default function SessionFormModal({
 
         {/* Sets and Reps */}
         <CRow className="g-3 mt-3 mb-4">
-          <CCol xs={12} md={6}>
-            <label className="fw-bold mb-1">Completed Sets</label>
-            <CFormInput
-              type="number"
-              min="0"
-              placeholder="e.g. 3"
-              value={completedSets}
-              onChange={(e) => setCompletedSets(e.target.value)}
-            />
-          </CCol>
-          <CCol xs={12} md={6}>
-            <label className="fw-bold mb-1">Completed Repetitions</label>
-            <CFormInput
-              type="number"
-              min="0"
-              placeholder="e.g. 15"
-              value={completedRepitations}
-              onChange={(e) => setCompletedRepitations(e.target.value)}
-            />
-          </CCol>
+         <CCol xs={12} md={6}>
+  <label className="fw-bold mb-1">
+    Completed Sets
+  </label>
+
+  <div className="input-group">
+    <CFormInput
+      type="number"
+      min="0"
+      max={data?.sets || 0}
+      placeholder="e.g. 3"
+      value={completedSets}
+      onChange={(e) => setCompletedSets(e.target.value)}
+    />
+
+    <span className="input-group-text">
+      out of {data?.sets || 0}
+    </span>
+  </div>
+</CCol>
+   <CCol xs={12} md={6}>
+  <label className="fw-bold mb-1">
+    Completed Repetitions
+  </label>
+
+  <div className="input-group">
+    <CFormInput
+      type="number"
+      min="0"
+      max={data?.repetitions || 0}
+      placeholder="e.g. 15"
+      value={completedRepitations}
+      onChange={(e) => {
+        const val = Number(e.target.value);
+
+        if (val <= (data?.repetitions || 0)) {
+          setCompletedRepitations(e.target.value);
+        }
+      }}
+    />
+
+    <span className="input-group-text">
+      out of {data?.repetitions || 0}
+    </span>
+  </div>
+</CCol>
         </CRow>
         <hr />
 
@@ -512,7 +543,8 @@ export default function SessionFormModal({
         <hr />
         <div className="d-flex justify-content-end w-100 mt-4 mb-2">
           <CButton
-            color="success"
+           backdrop="static"
+            style={{color:"white",backgroundColor:COLORS.primary}}
             onClick={save}
             disabled={loading} // 🔥 disable while loading
           >
