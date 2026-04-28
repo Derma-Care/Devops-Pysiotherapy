@@ -112,10 +112,20 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 
 	                Integer freeLeft = res.getData().getFreeFollowUpsLeft();
 
-	                if (freeLeft != null && freeLeft > 0) {
-	                    updatedFreeLeft = freeLeft - 1;
-	                } else {
+	                // ✅ First time for bookingId + patientId ignore
+	                long visitCount = repository.countByBookingIdAndPatientInfoPatientId(
+	                        dto.getBookingId(),
+	                        dto.getPatientInfo().getPatientId()
+	                );
+
+	                if (visitCount <= 1) {
 	                    updatedFreeLeft = freeLeft;
+	                } else {
+	                    if (freeLeft != null && freeLeft > 0) {
+	                        updatedFreeLeft = freeLeft - 1;
+	                    } else {
+	                        updatedFreeLeft = freeLeft;
+	                    }
 	                }
 	            }
 
@@ -1491,7 +1501,8 @@ private ProgramCalculations handleProgram(PhysiotherapyRecord record, TherapySes
     dto.setClinicId(record.getClinicId());
     dto.setBranchId(record.getBranchId());
     dto.setPatientId(record.getPatientInfo().getPatientId());
-
+    dto.setTherapistId(record.getTreatmentPlan().getTherapistId());
+    dto.setTherapistName(record.getTreatmentPlan().getTherapistName());
     dto.setDoctorId(record.getTreatmentPlan().getDoctorId());
     dto.setDoctorName(record.getTreatmentPlan().getDoctorName());
 
@@ -1541,7 +1552,8 @@ private TherapyCalculations handleTherapy(PhysiotherapyRecord record, TherapySes
     dto.setClinicId(record.getClinicId());
     dto.setBranchId(record.getBranchId());
     dto.setPatientId(record.getPatientInfo().getPatientId());
-
+    dto.setTherapistId(record.getTreatmentPlan().getTherapistId());
+    dto.setTherapistName(record.getTreatmentPlan().getTherapistName());
     dto.setDoctorId(record.getTreatmentPlan().getDoctorId());
     dto.setDoctorName(record.getTreatmentPlan().getDoctorName());
 
@@ -1574,7 +1586,8 @@ private ExerciseCalculations handleExercise(PhysiotherapyRecord record, TherapyS
     dto.setClinicId(record.getClinicId());
     dto.setBranchId(record.getBranchId());
     dto.setPatientId(record.getPatientInfo().getPatientId());
-
+    dto.setTherapistId(record.getTreatmentPlan().getTherapistId());
+    dto.setTherapistName(record.getTreatmentPlan().getTherapistName());
     dto.setDoctorId(record.getTreatmentPlan().getDoctorId());
     dto.setDoctorName(record.getTreatmentPlan().getDoctorName());
 
@@ -1626,13 +1639,13 @@ private double calculateExerciseCost(Exercise ex) {
     return sessions * price;
 }
 
-private Integer parseInteger(String value) {
-    try {
-        return value != null ? Integer.parseInt(value) : 0;
-    } catch (Exception e) {
-        return 0;
-    }
-}
+//private Integer parseInteger(String value) {
+//    try {
+//        return value != null ? Integer.parseInt(value) : 0;
+//    } catch (Exception e) {
+//        return 0;
+//    }
+//}
 
 @SuppressWarnings("unchecked")
 private PhysiotherapyRecord extractRecord(Object data) {
