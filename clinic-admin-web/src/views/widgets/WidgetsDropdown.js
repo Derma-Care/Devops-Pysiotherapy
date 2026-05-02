@@ -41,6 +41,7 @@ import Pagination from '../../Utils/Pagination'
 import { CustomerByClinicNdBranchId } from '../customerManagement/CustomerManagementAPI'
 import { Eye, Printer } from 'lucide-react'
 import PrintLetterHead from '../../Utils/PrintLetterHead'
+import ConfirmationModal from '../../components/ConfirmationModal'
 
 const WidgetsDropdown = (props) => {
   const [slides, setSlides] = useState([])
@@ -78,6 +79,8 @@ const WidgetsDropdown = (props) => {
   const [showAppointments, setShowAppointments] = useState(false)
   const [editingPaymentId, setEditingPaymentId] = useState(null)
   const [printData, setPrintData] = useState(null)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [confirmData, setConfirmData] = useState({ bookingId: null, paymentType: '' })
 
   const statusLabelMap = {
     'In-Progress': 'Active',
@@ -90,10 +93,26 @@ const WidgetsDropdown = (props) => {
   // Status badge color map aligned with pm-* design language
   const statusColorMap = {
     'In-Progress': { bg: '#e6f1fb', color: '#185fa5', border: '#b5d4f4' },
-    Completed:    { bg: '#eaf3de', color: '#3b6d11', border: '#c0dd97' },
-    Pending:      { bg: '#fff8e1', color: '#92680a', border: '#f0d080' },
-    Rejected:     { bg: '#fcebeb', color: '#a32d2d', border: '#f4b5b5' },
-    Confirmed:    { bg: '#eaf3de', color: '#3b6d11', border: '#c0dd97' },
+    Completed: { bg: '#eaf3de', color: '#3b6d11', border: '#c0dd97' },
+    Pending: { bg: '#fff8e1', color: '#92680a', border: '#f0d080' },
+    Rejected: { bg: '#fcebeb', color: '#a32d2d', border: '#f4b5b5' },
+    Confirmed: { bg: '#eaf3de', color: '#3b6d11', border: '#c0dd97' },
+  }
+  const paymentOptions = ['Cash', 'Card', 'UPI']
+
+  const handlePaymentUpdate = async (bookingId, paymentType) => {
+    try {
+      await bookingUpdate({
+        bookingId,
+        paymentType,
+        status: 'confirmed',
+      })
+
+      fetchAppointments(localStorage.getItem('HospitalId'))
+      setEditingPaymentId(null)
+    } catch (error) {
+      console.error('Payment update failed:', error)
+    }
   }
 
   const role = localStorage.getItem('role')
@@ -416,11 +435,18 @@ const WidgetsDropdown = (props) => {
               <CIcon icon={cilArrowRight} style={{ width: '13px', height: '13px' }} />
             </button>
 
+
+
             {/* Search Doctors */}
             <button className="wd-nav-btn" onClick={() => navigate('/employee-management/doctor')}>
               <span className="wd-count-badge">{totalDoctorsCount}</span>
               Search Doctors
               <CIcon icon={cilArrowRight} style={{ width: '13px', height: '13px' }} />
+            </button>
+            {/* Attendance Tracker */}
+            <button className="wd-nav-btn" onClick={() => navigate('/attendance-tracker')} style={{ backgroundColor: '#185fa5', color: '#fff', border: 'none' }}>
+              Attendance Tracker
+              <CIcon icon={cilArrowRight} style={{ width: '13px', height: '13px', color: '#fff' }} />
             </button>
           </div>
         </div>
@@ -546,16 +572,52 @@ const WidgetsDropdown = (props) => {
                             {item.slot || item.servicetime}
                           </CTableDataCell>
                           <CTableDataCell className="wd-td">
-                            <span
-                              className="wd-status-badge"
-                              style={{
-                                background: statusStyle.bg,
-                                color: statusStyle.color,
-                                border: `0.5px solid ${statusStyle.border}`,
-                              }}
-                            >
-                              {statusKey}
-                            </span>
+                            {item.status?.toLowerCase() === 'pending' ? (
+                              editingPaymentId === item.bookingId ? (
+                                <select
+                                  className="wd-fu-select"
+                                  defaultValue=""
+                                  onChange={(e) => {
+                                    const mode = e.target.value
+                                    if (mode) {
+                                      setConfirmData({ bookingId: item.bookingId, paymentType: mode })
+                                      setShowConfirm(true)
+                                    }
+                                  }}
+                                >
+                                  <option value="">Select</option>
+                                  {paymentOptions.map((pay) => (
+                                    <option key={pay} value={pay}>
+                                      {pay}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span
+                                  className="wd-status-badge"
+                                  onClick={() => setEditingPaymentId(item.bookingId)}
+                                  style={{
+                                    cursor: 'pointer',
+                                    background: statusStyle.bg,
+                                    color: statusStyle.color,
+                                    border: `0.5px solid ${statusStyle.border}`,
+                                  }}
+                                >
+                                  {statusKey}
+                                </span>
+                              )
+                            ) : (
+                              <span
+                                className="wd-status-badge"
+                                style={{
+                                  background: statusStyle.bg,
+                                  color: statusStyle.color,
+                                  border: `0.5px solid ${statusStyle.border}`,
+                                }}
+                              >
+                                {statusKey}
+                              </span>
+                            )}
                           </CTableDataCell>
                           <CTableDataCell className="wd-td">
                             <div className="wd-actions">
@@ -587,6 +649,19 @@ const WidgetsDropdown = (props) => {
             </CTableBody>
           </CTable>
         </div>
+
+        <ConfirmationModal
+          isVisible={showConfirm}
+          title="Confirm Payment"
+          message={`Are you sure you want to confirm payment via ${confirmData.paymentType}?`}
+          confirmText="Confirm"
+          confirmColor={COLORS.primary}
+          onConfirm={() => {
+            handlePaymentUpdate(confirmData.bookingId, confirmData.paymentType)
+            setShowConfirm(false)
+          }}
+          onCancel={() => setShowConfirm(false)}
+        />
       </div>
 
       {/* ── ADMIN CARDS ───────────────────────────────────────────────────── */}

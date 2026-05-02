@@ -87,32 +87,32 @@ const SafeVideoLink = ({ src }) => {
 }
 
 export default function TherapyManagement() {
-  const [list, setList]                           = useState([])
-  const [exerciseOptions, setExerciseOptions]     = useState([])
-  const [modal, setModal]                         = useState(false)
-  const [editId, setEditId]                       = useState(null)
-  const [isModalVisible, setIsModalVisible]       = useState(false)
-  const [delloading, setDelLoading]               = useState(false)
+  const [list, setList] = useState([])
+  const [exerciseOptions, setExerciseOptions] = useState([])
+  const [modal, setModal] = useState(false)
+  const [editId, setEditId] = useState(null)
+  const [isModalVisible, setIsModalVisible] = useState(false)
+  const [delloading, setDelLoading] = useState(false)
   const [serviceIdToDelete, setServiceIdToDelete] = useState(null)
-  const [viewModal, setViewModal]                 = useState(false)
-  const [viewLoading, setViewLoading]             = useState(false)
-  const [viewTherapy, setViewTherapy]             = useState(null)
-  const [viewError, setViewError]                 = useState(null)
-  const [loading, setLoading]                     = useState(false)
-  const [saveLoading, setSaveLoading]             = useState(false)
+  const [viewModal, setViewModal] = useState(false)
+  const [viewLoading, setViewLoading] = useState(false)
+  const [viewTherapy, setViewTherapy] = useState(null)
+  const [viewError, setViewError] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [saveLoading, setSaveLoading] = useState(false)
 
   // ── Pagination state ──────────────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(10)
 
   const { searchQuery } = useGlobalSearch()
-  const { user }        = useHospital()
+  const { user } = useHospital()
   const can = (feature, action) => user?.permissions?.[feature]?.includes(action)
 
   const clinicId = localStorage.getItem("HospitalId")
   const branchId = localStorage.getItem("branchId")
 
-  const [form, setForm]     = useState({ therapyName: "", exercisesIds: [], exercises: [] })
+  const [form, setForm] = useState({ therapyName: "", exercisesIds: [], exercises: [] })
   const [errors, setErrors] = useState({})
 
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function TherapyManagement() {
 
   const fetchExercises = async () => {
     try {
-      const res  = await getExercises(clinicId, branchId)
+      const res = await getExercises(clinicId, branchId)
       const data = res?.data?.data || []
       setExerciseOptions(data.map((item) => ({
         value: item.therapyExercisesId,
@@ -152,7 +152,7 @@ export default function TherapyManagement() {
     setViewModal(true)
     setViewLoading(true)
     try {
-      const res  = await getTherapiesServicebytherapyId(id, clinicId, branchId)
+      const res = await getTherapiesServicebytherapyId(id, clinicId, branchId)
       const data = res?.data?.data || res?.data || res || null
       if (!data) throw new Error("No data returned from API")
       setViewTherapy(data)
@@ -166,7 +166,7 @@ export default function TherapyManagement() {
 
   const validate = () => {
     let err = {}
-    if (!form.therapyName.trim())       err.therapyName  = "Therapy name is required"
+    if (!form.therapyName.trim()) err.therapyName = "Therapy name is required"
     if (form.exercisesIds.length === 0) err.exercisesIds = "Select at least one exercise"
     setErrors(err)
     return Object.keys(err).length === 0
@@ -200,8 +200,8 @@ export default function TherapyManagement() {
       (item.exercises || []).map((e) => e.exerciseId).includes(opt.value)
     )
     setForm({
-      therapyName:  item.therapyName,
-      exercises:    selectedExercises,
+      therapyName: item.therapyName,
+      exercises: selectedExercises,
       exercisesIds: selectedExercises.map((e) => String(e.value)),
     })
     setModal(true)
@@ -239,7 +239,7 @@ export default function TherapyManagement() {
     )
   })
 
-  const totalPages  = Math.ceil(filteredList.length / rowsPerPage)
+  const totalPages = Math.ceil(filteredList.length / rowsPerPage)
   const displayData = filteredList.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
 
   // Reset to page 1 when search changes
@@ -256,8 +256,8 @@ export default function TherapyManagement() {
       boxShadow: state.isFocused ? "0 0 0 2px rgba(24,95,165,0.15)" : "none",
       "&:hover": { borderColor: "#185fa5" },
     }),
-    multiValue:       (base) => ({ ...base, background: "#e6f1fb", borderRadius: "20px", border: "0.5px solid #b5d4f4" }),
-    multiValueLabel:  (base) => ({ ...base, color: "#0c447c", fontSize: "11px", fontWeight: "500", padding: "1px 6px" }),
+    multiValue: (base) => ({ ...base, background: "#e6f1fb", borderRadius: "20px", border: "0.5px solid #b5d4f4" }),
+    multiValueLabel: (base) => ({ ...base, color: "#0c447c", fontSize: "11px", fontWeight: "500", padding: "1px 6px" }),
     multiValueRemove: (base) => ({ ...base, color: "#185fa5", borderRadius: "0 20px 20px 0", "&:hover": { background: "#b5d4f4", color: "#042c53" } }),
     option: (base, state) => ({
       ...base,
@@ -309,7 +309,7 @@ export default function TherapyManagement() {
             <CTableRow>
               <CTableHeaderCell className="tm-th" style={{ width: 56 }}>S.No</CTableHeaderCell>
               <CTableHeaderCell className="tm-th">Therapy Name</CTableHeaderCell>
-              <CTableHeaderCell className="tm-th">No. of Exercises</CTableHeaderCell>
+              <CTableHeaderCell className="tm-th">No. of Activity</CTableHeaderCell>
               <CTableHeaderCell className="tm-th" style={{ width: 120 }}>Actions</CTableHeaderCell>
             </CTableRow>
           </CTableHead>
@@ -334,7 +334,7 @@ export default function TherapyManagement() {
                     <span className="tm-therapy-name">{item.therapyName}</span>
                   </CTableDataCell>
                   <CTableDataCell className="tm-td">
-                    <span className="tm-count-badge">{item.noExerciseIdCount} exercises</span>
+                    <span className="tm-count-badge">{item.noExerciseIdCount} Activity</span>
                   </CTableDataCell>
                   <CTableDataCell className="tm-td">
                     <div className="tm-actions">
@@ -470,19 +470,19 @@ export default function TherapyManagement() {
                   <span className="tm-summary-value tm-id-pill">{viewTherapy.id || viewTherapy.therapyId || "—"}</span>
                 </div>
                 <div className="tm-summary-card">
-                  <span className="tm-summary-label">No. of Exercises</span>
+                  <span className="tm-summary-label">No. of Activity</span>
                   <span className="tm-summary-value">
                     {viewTherapy.noExerciseIdCount ?? getExerciseList(viewTherapy).length ?? "—"}
                   </span>
                 </div>
               </div>
 
-              <div className="tm-section-label">Exercises</div>
+              <div className="tm-section-label">Activity</div>
 
               {getExerciseList(viewTherapy).length === 0 ? (
                 <div className="tm-empty">
                   <Stethoscope size={32} className="tm-empty-icon" />
-                  <p>No exercises linked to this therapy</p>
+                  <p>No Actvity linked to this therapy</p>
                 </div>
               ) : (
                 <div className="tm-ex-table-wrap">
@@ -491,12 +491,12 @@ export default function TherapyManagement() {
                       <CTableRow>
                         <CTableHeaderCell className="tm-ex-th">#</CTableHeaderCell>
                         <CTableHeaderCell className="tm-ex-th">Name</CTableHeaderCell>
-                        <CTableHeaderCell className="tm-ex-th">Image</CTableHeaderCell>
+                        <CTableHeaderCell className="tm-ex-th">Activity Type</CTableHeaderCell>
                         <CTableHeaderCell className="tm-ex-th">Video</CTableHeaderCell>
                         <CTableHeaderCell className="tm-ex-th">Session</CTableHeaderCell>
                         <CTableHeaderCell className="tm-ex-th">Frequency</CTableHeaderCell>
-                        <CTableHeaderCell className="tm-ex-th">Sets</CTableHeaderCell>
-                        <CTableHeaderCell className="tm-ex-th">Reps</CTableHeaderCell>
+                        {/* <CTableHeaderCell className="tm-ex-th">Sets</CTableHeaderCell> */}
+                        {/* <CTableHeaderCell className="tm-ex-th">Reps</CTableHeaderCell> */}
                         <CTableHeaderCell className="tm-ex-th">Price</CTableHeaderCell>
                         <CTableHeaderCell className="tm-ex-th">GST</CTableHeaderCell>
                         <CTableHeaderCell className="tm-ex-th">Other Tax</CTableHeaderCell>
@@ -508,16 +508,16 @@ export default function TherapyManagement() {
                         <CTableRow key={ex.id || ex.exerciseId || i} className="tm-ex-tr">
                           <CTableDataCell className="tm-ex-td tm-td-num">{i + 1}</CTableDataCell>
                           <CTableDataCell className="tm-ex-td"><span className="tm-ex-name">{ex.name || "—"}</span></CTableDataCell>
-                          <CTableDataCell className="tm-ex-td"><SafeImage src={ex.image} alt={ex.name} /></CTableDataCell>
+                          <CTableDataCell className="tm-ex-td">{ex.activityType || "—"}</CTableDataCell>
                           <CTableDataCell className="tm-ex-td"><SafeVideoLink src={ex.video} /></CTableDataCell>
-                          <CTableDataCell className="tm-ex-td">{ex.session     || "—"}</CTableDataCell>
-                          <CTableDataCell className="tm-ex-td">{ex.frequency   || "—"}</CTableDataCell>
-                          <CTableDataCell className="tm-ex-td">{ex.sets        || "—"}</CTableDataCell>
-                          <CTableDataCell className="tm-ex-td">{ex.repetitions || "—"}</CTableDataCell>
+                          <CTableDataCell className="tm-ex-td">{ex.session || "—"}</CTableDataCell>
+                          <CTableDataCell className="tm-ex-td">{ex.frequency || "—"}</CTableDataCell>
+                          {/* <CTableDataCell className="tm-ex-td">{ex.sets        || "—"}</CTableDataCell> */}
+                          {/* <CTableDataCell className="tm-ex-td">{ex.repetitions || "—"}</CTableDataCell> */}
                           <CTableDataCell className="tm-ex-td">
                             <span className="tm-price">{ex.pricePerSession != null ? `₹${ex.pricePerSession}` : "—"}</span>
                           </CTableDataCell>
-                          <CTableDataCell className="tm-ex-td">{ex.gst      != null ? `${ex.gst}%`      : "—"}</CTableDataCell>
+                          <CTableDataCell className="tm-ex-td">{ex.gst != null ? `${ex.gst}%` : "—"}</CTableDataCell>
                           <CTableDataCell className="tm-ex-td">{ex.otherTax != null ? `${ex.otherTax}%` : "—"}</CTableDataCell>
                           <CTableDataCell className="tm-ex-td">
                             <span className="tm-total-price">{ex.totalPrice != null ? `₹${ex.totalPrice}` : "—"}</span>

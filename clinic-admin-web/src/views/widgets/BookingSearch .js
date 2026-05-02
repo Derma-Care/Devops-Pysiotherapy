@@ -27,25 +27,76 @@ const BookingSearch = ({
   const [selectedBooking, setSelectedBooking] = useState(null)
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
+  const [searchMessage, setSearchMessage] = useState('')
 
   // 🧠 Common API handler
+  const formatAddress = (address) => {
+    if (!address) return "";
+
+    const {
+      houseNo,
+      street,
+      landmark,
+      city,
+      state,
+      country,
+      postalCode,
+    } = address;
+
+    return [
+      houseNo,
+      street,
+      landmark,
+      city,
+      state,
+      country,
+      postalCode,
+    ]
+      .filter(Boolean) // remove null/undefined
+      .join(", ");
+  };
+
   const fetchBookings = async (apiFunc, searchValue) => {
     const query = searchValue?.trim();
     if (!query) return;
 
     setLoading(true);
+    setSearchMessage(''); // Reset message on new search
+    setBookingData([]); // Clear previous results immediately
     try {
       const res = await apiFunc(query);
+      const resData = res?.data;
+      const apiData = resData?.data;
 
-      const apiData = res?.data?.data;
+      // Normalize to array and filter out items that have no patientId or name
+      const rawItems = Array.isArray(apiData) ? apiData : [apiData];
+      const validItems = rawItems.filter(
+        (item) => item && item.patientId && item.name
+      );
 
-      // ✅ FIX HERE
-      setBookingData(Array.isArray(apiData) ? apiData : [apiData]);
+      if (validItems.length === 0) {
+        setBookingData([]);
+        if (visitType === 'followup') {
+          setSearchMessage('No follow-up booking found for this Booking ID.');
+        } else {
+          setSearchMessage('No patient found.');
+          showCustomToast('No patient records found.', 'info');
+        }
+      } else {
+        const formattedData = validItems.map((item) => ({
+          ...item,
+          patientAddress: formatAddress(item.patientAddress), // ✅ convert to string
+        }));
+        setBookingData(formattedData);
+      }
 
-      console.log("Final bookingData:", apiData);
+      console.log("Final bookingData count:", validItems.length);
     } catch (err) {
       console.error("Error fetching bookings:", err);
       setBookingData([]);
+      const errMsg = err.response?.data?.message || 'Something went wrong while fetching data.';
+      setSearchMessage(errMsg);
+      showCustomToast(errMsg, 'error');
     } finally {
       setLoading(false);
     }
@@ -68,6 +119,15 @@ const BookingSearch = ({
       await fetchBookings(getBookingsByPatientId, patientSearch)
 
     }
+  }
+
+  // 🧹 Clear search and results
+  const handleClear = () => {
+    setPatientSearch('')
+    setBookingData([])
+    setSearchMessage('')
+    setSelectedBooking(null)
+    setModalVisible(false)
   }
 
   // ⚡ Auto-fetch on typing (debounced)
@@ -145,17 +205,20 @@ const BookingSearch = ({
     <div>
       {/* 🔍 Search Bar */}
       <CRow className="mb-3">
-        <CCol md={10}>
+        <CCol md={9}>
           <CFormInput
             type="text"
-            placeholder={visitType === 'followup' ? "Search by Patient ID" : "Search by Name / Patient ID / Mobile"}
+            placeholder={visitType === 'followup' ? "Search by Booking Id" : "Search by Name / Patient ID / Mobile"}
             value={patientSearch.toUpperCase()}
             onChange={(e) => setPatientSearch(e.target.value)}
           />
         </CCol>
-        <CCol md={2}>
-          <CButton style={{ color: "white", backgroundColor: "var(--color-bgcolor)" }} onClick={handleSearch} disabled={loading}>
+        <CCol md={3} className="d-flex gap-2">
+          <CButton style={{ color: "white", backgroundColor: "var(--color-bgcolor)" }} onClick={handleSearch} disabled={loading} className="flex-grow-1">
             {loading ? 'Searching...' : 'Search'}
+          </CButton>
+          <CButton color="secondary" variant="outline" onClick={handleClear} disabled={loading} className="flex-grow-1">
+            Clear
           </CButton>
         </CCol>
       </CRow>
@@ -182,6 +245,15 @@ const BookingSearch = ({
             </CListGroupItem>
           ))}
         </CListGroup>
+      )}
+
+      {/* 📢 No Data Message */}
+      {!loading && bookingData.length === 0 && searchMessage && !selectedBooking && (
+        <div className="text-center py-5 mb-4 border rounded shadow-sm bg-light">
+          <h6 className="mb-0 text-muted">
+            {searchMessage}
+          </h6>
+        </div>
       )}
 
       {/* 🧾 Modal */}
