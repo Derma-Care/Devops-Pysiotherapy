@@ -783,10 +783,26 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	
 	
 		
-	public BookingResponse getBookedService(String id) {
-		Booking entity = repository.findByBookingId(id)
-				.orElseThrow(() -> new RuntimeException("Invalid Booking Id Please provide Valid Id"));
-		return toResponse(entity);
+	public BookingResponse getBookedService(String bookingId) {
+		try {
+			String[] parts = bookingId.split("-");
+
+			for (int i = 0; i < parts.length; i++) {
+				String part = parts[i];
+
+				if (!part.isEmpty()) {
+					parts[i] = part.substring(0, 1).toUpperCase() +
+							part.substring(1).toLowerCase();}}
+			String letter  =  String.join("-", parts);		
+		Booking entity = repository.findByBookingId(letter).get();	
+		if(entity != null) {
+		return toResponse(entity);}else {
+			return null;
+		}
+		}catch(Exception e) {
+			System.out.println(e.getMessage());
+			return null;
+		}
 	}
 
 	@Override
