@@ -796,11 +796,17 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 			String letter  =  String.join("-", parts);		
 		Booking entity = repository.findByBookingId(letter).get();	
 		if(entity != null) {
-		return toResponse(entity);}else {
-			return null;
-		}
-		}catch(Exception e) {
-			System.out.println(e.getMessage());
+			BookingResponse res = toResponse(entity);
+			List<Session> lst = new ArrayList<>();
+			try {
+				lst = physioDoctorFeign.getPhysioByBookingId(res.getBookingId(),res.getServiceDate()).getBody();
+				res.setSession(lst);
+			}catch(Exception e) {}
+			return res;
+		   }else{
+			return null;}
+		   }catch(Exception e) {
+			//System.out.println(e.getMessage());
 			return null;
 		}
 	}
