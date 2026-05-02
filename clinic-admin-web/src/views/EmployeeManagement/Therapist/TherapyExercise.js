@@ -36,20 +36,73 @@ import { useHospital } from "../../Usecontext/HospitalContext"
 import { useGlobalSearch } from "../../Usecontext/GlobalSearchContext"
 import Pagination from "../../../Utils/Pagination"
 
+// const emptyExercise = {
+//   name: "",
+//   video: "",
+//   session: "1",
+//   frequency: "",
+//   notes: "",
+//   image: "",
+//   imagePreview: "",
+//   pricePerSession: "",
+//   sets: "",
+//   repetitions: "",
+//   gst: "",
+//   otherTax: "",
+//   discountPercentage: "",
+// }
+// ✅ Add this inside your component (above return)
+
+// Activity Options
+const activityOptions = [
+  "Exercise",
+  "Manual",
+  "Electrotherapy",
+  "Modality",
+  "Functional Training",
+  "Supportive",
+  "Education",
+  "Assessment",
+]
+
+// update emptyExercise
 const emptyExercise = {
+  activityType: "Exercise",
   name: "",
   video: "",
   session: "1",
   frequency: "",
   notes: "",
-  image: "",
-  imagePreview: "",
   pricePerSession: "",
-  sets: "",
-  repetitions: "",
   gst: "",
   otherTax: "",
   discountPercentage: "",
+
+  // Exercise only
+  sets: "",
+  repetitions: "",
+
+  // Manual
+  technique: "",
+  duration: "",
+
+  // Electrotherapy
+  machine: "",
+  intensity: "",
+
+  // Functional
+  assistanceLevel: "",
+
+  // Supportive
+  supportType: "",
+  area: "",
+
+  // Assessment
+  metric: "",
+  value: "",
+  unit: "",
+
+  bodyPart: "",
 }
 
 
@@ -182,32 +235,147 @@ export default function ExerciseTable() {
     )
   })
 
-  const totalPages  = Math.ceil(filteredExercises.length / rowsPerPage)
+  const totalPages = Math.ceil(filteredExercises.length / rowsPerPage)
   // ✅ SORT BY DATE MODIFIED (DEFAULT)
-// ✅ SORT BY NAME (ASCENDING)
-const sortedExercises = [...filteredExercises].sort((a, b) => {
-  return (a.name || "").localeCompare(b.name || "");
-});
- const displayData = sortedExercises.slice(
-  (currentPage - 1) * rowsPerPage,
-  currentPage * rowsPerPage
-);
+  // ✅ SORT BY NAME (ASCENDING)
+  const sortedExercises = [...filteredExercises].sort((a, b) => {
+    return (a.name || "").localeCompare(b.name || "");
+  });
+  const displayData = sortedExercises.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  );
 
   // ── VALIDATION ───────────────────────────────────────
   const validate = () => {
     const err = {}
-    if (!form.name.trim()) err.name = "Name is required"
-    if (!form.frequency.trim()) err.frequency = "Frequency is required"
-    if (!form.notes.trim()) err.notes = "Notes are required"
-    if (!form.pricePerSession || Number(form.pricePerSession) <= 0)
+
+    // Common Required Fields
+    if (!form.activityType?.trim()) {
+      err.activityType = "Activity type is required"
+    }
+
+    if (!form.name?.trim()) {
+      err.name = "Name is required"
+    }
+
+    if (!form.frequency?.trim()) {
+      err.frequency = "Frequency is required"
+    }
+
+    if (!form.pricePerSession || Number(form.pricePerSession) <= 0) {
       err.pricePerSession = "Enter valid price"
-    if (!form.sets || Number(form.sets) <= 0) err.sets = "Sets is required"
-    if (!form.repetitions || Number(form.repetitions) <= 0)
-      err.repetitions = "Repetitions is required"
+    }
+
+    // Optional Fields Validation
     if (
       form.discountPercentage !== "" &&
-      (Number(form.discountPercentage) < 0 || Number(form.discountPercentage) > 100)
-    ) err.discountPercentage = "0 to 100 only"
+      (Number(form.discountPercentage) < 0 ||
+        Number(form.discountPercentage) > 100)
+    ) {
+      err.discountPercentage = "0 to 100 only"
+    }
+
+    if (
+      form.gst !== "" &&
+      Number(form.gst) < 0
+    ) {
+      err.gst = "GST must be 0 or more"
+    }
+
+    if (
+      form.otherTax !== "" &&
+      Number(form.otherTax) < 0
+    ) {
+      err.otherTax = "Other tax must be 0 or more"
+    }
+
+    // Activity Wise Validation
+    switch (form.activityType) {
+      case "Exercise":
+        if (!form.repetitions || Number(form.repetitions) <= 0) {
+          err.repetitions = "Repetitions is required"
+        }
+        if (!form.sets || Number(form.sets) <= 0) {
+          err.sets = "Sets is required"
+        }
+        if (!form.duration?.trim()) {
+          err.duration = "Duration is required"
+        }
+        break
+
+      case "Manual":
+        if (!form.technique?.trim()) {
+          err.technique = "Technique is required"
+        }
+        if (!form.duration?.trim()) {
+          err.duration = "Duration is required"
+        }
+        break
+
+      case "Electrotherapy":
+        if (!form.machine?.trim()) {
+          err.machine = "Machine is required"
+        }
+        if (!form.intensity?.trim()) {
+          err.intensity = "Intensity is required"
+        }
+        if (!form.duration?.trim()) {
+          err.duration = "Duration is required"
+        }
+        break
+
+      case "Modality":
+        if (!form.duration?.trim()) {
+          err.duration = "Duration is required"
+        }
+        break
+
+      case "Functional Training":
+        if (!form.duration?.trim()) {
+          err.duration = "Duration is required"
+        }
+        if (!form.assistanceLevel?.trim()) {
+          err.assistanceLevel = "Assistance level is required"
+        }
+        break
+
+      case "Supportive":
+        if (!form.supportType?.trim()) {
+          err.supportType = "Type is required"
+        }
+        if (!form.area?.trim()) {
+          err.area = "Area is required"
+        }
+        if (!form.duration?.trim()) {
+          err.duration = "Duration is required"
+        }
+        break
+
+
+
+      case "Assessment":
+        if (!form.metric?.trim()) {
+          err.metric = "Metric is required"
+        }
+        if (!form.value?.trim()) {
+          err.value = "Value is required"
+        }
+        if (!form.unit?.trim()) {
+          err.unit = "Unit is required"
+        }
+        break
+
+      default:
+        break
+    }
+    if (!form.bodyPart?.trim()) {
+      err.bodyPart = "Body Part is required"
+    }
+    if (!form.notes?.trim()) {
+      err.notes = "Notes are required"
+    }
+
     setErrors(err)
     return Object.keys(err).length === 0
   }
@@ -220,7 +388,8 @@ const sortedExercises = [...filteredExercises].sort((a, b) => {
 
   // ── CONFIRMED SAVE ────────────────────────────────────
   const handleConfirmedSave = async () => {
-    const payload = { ...form, clinicId, branchId }
+    const payload = { ...form, activityDuration: form.duration, clinicId, branchId }
+    console.log(payload)
     try {
       setIsSaveConfirming(true)
       setSaveLoading(true)
@@ -322,7 +491,7 @@ const sortedExercises = [...filteredExercises].sort((a, b) => {
             <Dumbbell size={20} />
           </div>
           <div>
-            <h4 className="ex-page-title">Exercise Management</h4>
+            <h4 className="ex-page-title">Activity Management</h4>
             <p className="ex-page-sub">
               {filteredExercises.length} exercise{filteredExercises.length !== 1 ? "s" : ""} found
             </p>
@@ -331,7 +500,7 @@ const sortedExercises = [...filteredExercises].sort((a, b) => {
         {can("Exercise Management", "create") && (
           <button className="ex-add-btn" onClick={() => setModal(true)}>
             <PlusCircle size={15} />
-            Add Exercise
+            Add Activity
           </button>
         )}
       </div>
@@ -342,9 +511,10 @@ const sortedExercises = [...filteredExercises].sort((a, b) => {
           <CTableHead>
             <CTableRow>
               <CTableHeaderCell className="ex-th" style={{ width: 56 }}>S.No</CTableHeaderCell>
-              <CTableHeaderCell className="ex-th">Name</CTableHeaderCell>
-              <CTableHeaderCell className="ex-th">Sets</CTableHeaderCell>
-              <CTableHeaderCell className="ex-th">Reps</CTableHeaderCell>
+              <CTableHeaderCell className="ex-th">Activity Name</CTableHeaderCell>
+              <CTableHeaderCell className="ex-th">Activity Type</CTableHeaderCell>
+              {/* <CTableHeaderCell className="ex-th">Sets</CTableHeaderCell>
+              <CTableHeaderCell className="ex-th">Reps</CTableHeaderCell> */}
               <CTableHeaderCell className="ex-th">Frequency</CTableHeaderCell>
               <CTableHeaderCell className="ex-th">Discount (%)</CTableHeaderCell>
               <CTableHeaderCell className="ex-th">Discount Amt</CTableHeaderCell>
@@ -373,11 +543,14 @@ const sortedExercises = [...filteredExercises].sort((a, b) => {
                     <span className="ex-name">{ex.name}</span>
                   </CTableDataCell>
                   <CTableDataCell className="ex-td">
+                    <span className="ex-name">{ex.activityType}</span>
+                  </CTableDataCell>
+                  {/* <CTableDataCell className="ex-td">
                     <span className="ex-badge-blue">{ex.sets || "—"}</span>
-                  </CTableDataCell>
-                  <CTableDataCell className="ex-td">
+                  </CTableDataCell> */}
+                  {/* <CTableDataCell className="ex-td">
                     <span className="ex-badge-blue">{ex.repetitions || "—"}</span>
-                  </CTableDataCell>
+                  </CTableDataCell> */}
                   <CTableDataCell className="ex-td">{ex.frequency || "—"}</CTableDataCell>
                   <CTableDataCell className="ex-td">
                     <span className="ex-count-badge">{ex.discountPercentage || 0}%</span>
@@ -436,9 +609,9 @@ const sortedExercises = [...filteredExercises].sort((a, b) => {
         className="ex-custom-modal"
         size="lg"
       >
-        <CModalHeader className="ex-modal-header">
+        <CModalHeader className="ex-modal-header custom-modal"  >
           <CModalTitle className="ex-modal-title">
-            {editId ? "Edit" : "Add"} Exercise
+            {editId ? "Edit" : "Add"} Activity
           </CModalTitle>
         </CModalHeader>
 
@@ -456,34 +629,87 @@ const sortedExercises = [...filteredExercises].sort((a, b) => {
             )}
 
             <CRow className="g-3">
-              {/* Name */}
+
+              {/* Row 1 */}
               <CCol md={6}>
                 <div className="ex-field">
-                  <CFormLabel className="ex-label">Name <span className="ex-req">*</span></CFormLabel>
+                  <CFormLabel className="ex-label">
+                    Activity Type <span className="ex-req">*</span>
+                  </CFormLabel>
+                  <select
+                    className="ex-input"
+                    value={form.activityType}
+                    onChange={(e) =>
+                      setForm({
+                        ...emptyExercise,
+                        activityType: e.target.value,
+                        name: form.name,
+                      })
+                    }
+                  >
+                    {activityOptions.map((item) => (
+                      <option key={item}>{item}</option>
+                    ))}
+                  </select>
+                </div>
+              </CCol>
+
+              <CCol md={6}>
+                <div className="ex-field">
+                  <CFormLabel className="ex-label">
+                    Name <span className="ex-req">*</span>
+                  </CFormLabel>
                   <CFormInput
                     className={`ex-input${errors.name ? " is-invalid" : ""}`}
-                    placeholder="e.g. Knee Extension"
+                    placeholder="Enter Activity name"
                     value={form.name}
-                    onChange={(e) => { setForm({ ...form, name: e.target.value }); setErrors({ ...errors, name: "" }) }}
+                    onChange={(e) => {
+                      setForm({ ...form, name: e.target.value })
+                      setErrors({ ...errors, name: "" })
+                    }}
                   />
                   <CFormText className="ex-err-msg">{errors.name}</CFormText>
                 </div>
               </CCol>
 
-              {/* Video URL */}
-              <CCol md={6}>
+              {/* Row 2 */}
+              <CCol md={4}>
                 <div className="ex-field">
-                  <CFormLabel className="ex-label">Video URL</CFormLabel>
+                  <CFormLabel className="ex-label">
+                    Price <span className="ex-req">*</span>
+                  </CFormLabel>
                   <CFormInput
-                    className="ex-input"
-                    placeholder="https://..."
-                    value={form.video}
-                    onChange={(e) => setForm({ ...form, video: e.target.value })}
+                    type="number"
+                    placeholder="Enter Price"
+                    className={`ex-input${errors.pricePerSession ? " is-invalid" : ""}`}
+                    value={form.pricePerSession}
+                    onChange={(e) => {
+                      setForm({ ...form, pricePerSession: e.target.value })
+                      setErrors({ ...errors, pricePerSession: "" })
+                    }}
                   />
+                  <CFormText className="ex-err-msg">{errors.pricePerSession}</CFormText>
                 </div>
               </CCol>
 
-              {/* Session */}
+              <CCol md={4}>
+                <div className="ex-field">
+                  <CFormLabel className="ex-label">
+                    Frequency <span className="ex-req">*</span>
+                  </CFormLabel>
+                  <CFormInput
+                    className={`ex-input${errors.frequency ? " is-invalid" : ""}`}
+                    placeholder="2/day"
+                    value={form.frequency}
+                    onChange={(e) => {
+                      setForm({ ...form, frequency: e.target.value })
+                      setErrors({ ...errors, frequency: "" })
+                    }}
+                  />
+                  <CFormText className="ex-err-msg">{errors.frequency}</CFormText>
+                </div>
+              </CCol>
+
               <CCol md={4}>
                 <div className="ex-field">
                   <CFormLabel className="ex-label">Session</CFormLabel>
@@ -491,147 +717,470 @@ const sortedExercises = [...filteredExercises].sort((a, b) => {
                 </div>
               </CCol>
 
-              {/* Price */}
-              <CCol md={4}>
-                <div className="ex-field">
-                  <CFormLabel className="ex-label">Price <span className="ex-req">*</span></CFormLabel>
-                  <CFormInput
-                    className={`ex-input${errors.pricePerSession ? " is-invalid" : ""}`}
-                    type="number"
-                    placeholder="0.00"
-                    value={form.pricePerSession}
-                    onChange={(e) => { setForm({ ...form, pricePerSession: e.target.value }); setErrors({ ...errors, pricePerSession: "" }) }}
-                  />
-                  <CFormText className="ex-err-msg">{errors.pricePerSession}</CFormText>
-                </div>
-              </CCol>
+              {/* Dynamic Fields */}
+              {/* ───────────────── Dynamic Activity Fields ───────────────── */}
 
-              {/* GST */}
-              <CCol md={4}>
-                <div className="ex-field">
-                  <CFormLabel className="ex-label">GST (%)</CFormLabel>
-                  <CFormInput
-                    className="ex-input"
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    value={form.gst}
-                    onChange={(e) => setForm({ ...form, gst: Math.max(0, e.target.value) })}
-                  />
-                </div>
-              </CCol>
+              {/* Exercise */}
+              {form.activityType === "Exercise" && (
+                <>
+                  <CCol md={4}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        Repetitions <span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        placeholder="Enter Repetitions"
+                        type="number"
+                        className={`ex-input ${errors.repetitions ? "is-invalid" : ""}`}
+                        value={form.repetitions}
+                        onChange={(e) => {
+                          setForm({ ...form, repetitions: e.target.value })
+                          setErrors((prev) => ({ ...prev, repetitions: "" }))
+                        }}
+                      />
+                      <CFormText className="ex-err-msg">{errors.repetitions}</CFormText>
+                    </div>
+                  </CCol>
 
-              {/* Other Tax */}
-              <CCol md={4}>
-                <div className="ex-field">
-                  <CFormLabel className="ex-label">Other Tax (%)</CFormLabel>
-                  <CFormInput
-                    className="ex-input"
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    value={form.otherTax}
-                    onChange={(e) => setForm({ ...form, otherTax: Math.max(0, e.target.value) })}
-                  />
-                </div>
-              </CCol>
+                  <CCol md={4}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        No. of Sets <span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        type="number"
+                        placeholder="Enter No. of Sets"
+                        className={`ex-input ${errors.sets ? "is-invalid" : ""}`}
+                        value={form.sets}
+                        onChange={(e) => {
+                          setForm({ ...form, sets: e.target.value })
+                          setErrors((prev) => ({ ...prev, sets: "" }))
+                        }}
+                      />
+                      <CFormText className="ex-err-msg">{errors.sets}</CFormText>
+                    </div>
+                  </CCol>
 
-              {/* Discount */}
-              <CCol md={4}>
-                <div className="ex-field">
-                  <CFormLabel className="ex-label">Discount (%)</CFormLabel>
-                  <CFormInput
-                    className={`ex-input${errors.discountPercentage ? " is-invalid" : ""}`}
-                    type="number"
-                    min="0"
-                    max="100"
-                    placeholder="0"
-                    value={form.discountPercentage}
-                    onChange={(e) => { setForm({ ...form, discountPercentage: Math.max(0, e.target.value) }); setErrors({ ...errors, discountPercentage: "" }) }}
-                  />
-                  <CFormText className="ex-err-msg">{errors.discountPercentage}</CFormText>
-                </div>
-              </CCol>
+                  <CCol md={4}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        Duration<span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        className={`ex-input ${errors.duration ? "is-invalid" : ""}`}
+                        value={form.duration}
+                        placeholder="Enter duration (mins)"
+                        onChange={(e) => {
+                          setForm({ ...form, duration: e.target.value })
+                          setErrors((prev) => ({ ...prev, duration: "" }))
+                        }}
+                      />
+                      <CFormText className="ex-err-msg">{errors.duration}</CFormText>
+                    </div>
+                  </CCol>
+                </>
+              )}
 
-              {/* Sets */}
-              <CCol md={4}>
-                <div className="ex-field">
-                  <CFormLabel className="ex-label">No. of Sets <span className="ex-req">*</span></CFormLabel>
-                  <CFormInput
-                    className={`ex-input${errors.sets ? " is-invalid" : ""}`}
-                    type="number"
-                    min="1"
-                    placeholder="e.g. 3"
-                    value={form.sets}
-                    onChange={(e) => { setForm({ ...form, sets: e.target.value }); setErrors({ ...errors, sets: "" }) }}
-                  />
-                  <CFormText className="ex-err-msg">{errors.sets}</CFormText>
-                </div>
-              </CCol>
+              {/* Manual */}
+              {form.activityType === "Manual" && (
+                <>
+                  <CCol md={6}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        Technique <span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        className={`ex-input${errors.technique ? " is-invalid" : ""}`}
+                        placeholder="Enter technique"
+                        value={form.technique}
+                        onChange={(e) => {
+                          setForm({ ...form, technique: e.target.value })
+                          setErrors({ ...errors, technique: "" })
+                        }
+                        }
+                      />
+                      <CFormText className="ex-err-msg">{errors.technique}</CFormText>
+                    </div>
+                  </CCol>
 
-              {/* Repetitions */}
-              <CCol md={4}>
-                <div className="ex-field">
-                  <CFormLabel className="ex-label">Repetitions <span className="ex-req">*</span></CFormLabel>
-                  <CFormInput
-                    className={`ex-input${errors.repetitions ? " is-invalid" : ""}`}
-                    type="number"
-                    min="1"
-                    placeholder="e.g. 10"
-                    value={form.repetitions}
-                    onChange={(e) => { setForm({ ...form, repetitions: e.target.value }); setErrors({ ...errors, repetitions: "" }) }}
-                  />
-                  <CFormText className="ex-err-msg">{errors.repetitions}</CFormText>
-                </div>
-              </CCol>
+                  <CCol md={6}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        Duration <span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        className={`ex-input${errors.duration ? " is-invalid" : ""}`}
+                        placeholder="Enter duration (mins)"
+                        value={form.duration}
+                        onChange={(e) => {
+                          setForm({ ...form, duration: e.target.value })
+                          setErrors({ ...errors, duration: "" })
+                        }
+                        }
+                      />
+                      <CFormText className="ex-err-msg">{errors.duration}</CFormText>
+                    </div>
+                  </CCol>
+                </>
+              )}
 
-              {/* Frequency */}
-              <CCol md={4}>
-                <div className="ex-field">
-                  <CFormLabel className="ex-label">Frequency <span className="ex-req">*</span></CFormLabel>
-                  <CFormInput
-                    className={`ex-input${errors.frequency ? " is-invalid" : ""}`}
-                    placeholder="e.g. Daily"
-                    value={form.frequency}
-                    onChange={(e) => { setForm({ ...form, frequency: e.target.value }); setErrors({ ...errors, frequency: "" }) }}
-                  />
-                  <CFormText className="ex-err-msg">{errors.frequency}</CFormText>
-                </div>
-              </CCol>
+              {/* Electrotherapy */}
+              {form.activityType === "Electrotherapy" && (
+                <>
+                  <CCol md={4}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        Machine <span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        className={`ex-input${errors.machine ? " is-invalid" : ""}`}
+                        placeholder="Enter machine name"
+                        value={form.machine}
+                        onChange={(e) => {
+                          setForm({ ...form, machine: e.target.value })
+                          setErrors({ ...errors, machine: "" })
+                        }
+                        }
+                      />
+                      <CFormText className="ex-err-msg">{errors.machine}</CFormText>
+                    </div>
+                  </CCol>
+
+                  <CCol md={4}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        Intensity <span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        className={`ex-input${errors.intensity ? " is-invalid" : ""}`}
+                        placeholder="Enter intensity"
+                        value={form.intensity}
+                        onChange={(e) => {
+                          setForm({ ...form, intensity: e.target.value })
+
+                          setErrors({ ...errors, intensity: "" })
+                        }
+                        }
+                      />
+                      <CFormText className="ex-err-msg">{errors.intensity}</CFormText>
+                    </div>
+                  </CCol>
+
+                  <CCol md={4}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        Duration <span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        className={`ex-input${errors.duration ? " is-invalid" : ""}`}
+                        placeholder="Enter duration (mins)"
+                        value={form.duration}
+                        onChange={(e) => {
+                          setForm({ ...form, duration: e.target.value })
+                          setErrors({ ...errors, duration: "" })
+                        }}
+                      />
+                      <CFormText className="ex-err-msg">{errors.duration}</CFormText>
+                    </div>
+                  </CCol>
+                </>
+              )}
+
+              {/* Modality */}
+              {form.activityType === "Modality" && (
+                <CCol md={12}>
+                  <div className="ex-field">
+                    <CFormLabel className="ex-label">
+                      Duration <span className="ex-req">*</span>
+                    </CFormLabel>
+                    <CFormInput
+                      className={`ex-input${errors.duration ? " is-invalid" : ""}`}
+                      placeholder="Enter duration (mins)"
+                      value={form.duration}
+                      onChange={(e) => {
+                        setForm({ ...form, duration: e.target.value })
+                        setErrors({ ...errors, duration: "" })
+                      }}
+                    />
+                    <CFormText className="ex-err-msg">{errors.duration}</CFormText>
+                  </div>
+                </CCol>
+              )}
+
+              {/* Functional Training */}
+              {form.activityType === "Functional Training" && (
+                <>
+                  <CCol md={6}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        Duration <span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        className={`ex-input${errors.duration ? " is-invalid" : ""}`}
+                        placeholder="Enter duration (mins)"
+                        value={form.duration}
+                        onChange={(e) => {
+                          setForm({ ...form, duration: e.target.value })
+                          setErrors({ ...errors, duration: "" })
+                        }}
+                      />
+                      <CFormText className="ex-err-msg">{errors.duration}</CFormText>
+                    </div>
+                  </CCol>
+
+                  <CCol md={6}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        Assistance Level <span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        className={`ex-input${errors.assistanceLevel ? " is-invalid" : ""}`}
+                        placeholder="Enter assistance level"
+                        value={form.assistanceLevel}
+                        onChange={(e) => {
+                          setForm({ ...form, assistanceLevel: e.target.value })
+                          setErrors({ ...errors, assistanceLevel: "" })
+                        }}
+                      />
+                      <CFormText className="ex-err-msg">{errors.assistanceLevel}</CFormText>
+                    </div>
+                  </CCol>
+                </>
+              )}
+
+              {/* Supportive */}
+              {form.activityType === "Supportive" && (
+                <>
+                  <CCol md={4}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        Type <span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        className={`ex-input${errors.supportType ? " is-invalid" : ""}`}
+                        placeholder="Enter support type"
+                        value={form.supportType}
+                        onChange={(e) => {
+                          setForm({ ...form, supportType: e.target.value })
+                          setErrors({ ...errors, supportType: "" })
+                        }}
+                      />
+                      <CFormText className="ex-err-msg">{errors.supportType}</CFormText>
+                    </div>
+                  </CCol>
+
+                  <CCol md={4}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        Area <span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        className={`ex-input${errors.area ? " is-invalid" : ""}`}
+                        placeholder="Enter area"
+                        value={form.area}
+                        onChange={(e) => {
+                          setForm({ ...form, area: e.target.value })
+                          setErrors({ ...errors, area: "" })
+                        }}
+                      />
+                      <CFormText className="ex-err-msg">{errors.area}</CFormText>
+                    </div>
+                  </CCol>
+
+                  <CCol md={4}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        Duration <span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        className={`ex-input${errors.duration ? " is-invalid" : ""}`}
+                        placeholder="Enter duration (mins)"
+                        value={form.duration}
+                        onChange={(e) => {
+                          setForm({ ...form, duration: e.target.value })
+                          setErrors({ ...errors, duration: "" })
+                        }}
+                      />
+                      <CFormText className="ex-err-msg">{errors.duration}</CFormText>
+                    </div>
+                  </CCol>
+                </>
+              )}
+
+              {/* Education */}
+              {/* {form.activityType === "Education" && (
+                <CCol md={12}>
+                  <div className="ex-field">
+                    <CFormLabel className="ex-label">
+                      Notes <span className="ex-req">*</span>
+                    </CFormLabel>
+                    <CFormInput
+                      className="ex-input"
+                      placeholder="Enter notes"
+                      value={form.notes}
+                      onChange={(e) =>
+                        setForm({ ...form, notes: e.target.value })
+                      }
+                    />
+                  </div>
+                </CCol>
+              )} */}
+
+              {/* Assessment */}
+              {form.activityType === "Assessment" && (
+                <>
+                  <CCol md={4}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        Metric <span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        className={`ex-input${errors.metric ? " is-invalid" : ""}`}
+                        placeholder="Enter metric"
+                        value={form.metric}
+                        onChange={(e) => {
+                          setForm({ ...form, metric: e.target.value })
+                          setErrors({ ...errors, metric: "" })
+                        }}
+                      />
+                      <CFormText className="ex-err-msg">{errors.metric}</CFormText>
+                    </div>
+                  </CCol>
+
+                  <CCol md={4}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        Value <span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        className={`ex-input${errors.value ? " is-invalid" : ""}`}
+                        placeholder="Enter value"
+                        value={form.value}
+                        onChange={(e) => {
+                          setForm({ ...form, value: e.target.value })
+                          setErrors({ ...errors, value: "" })
+                        }}
+                      />
+                      <CFormText className="ex-err-msg">{errors.value}</CFormText>
+                    </div>
+                  </CCol>
+
+                  <CCol md={4}>
+                    <div className="ex-field">
+                      <CFormLabel className="ex-label">
+                        Unit <span className="ex-req">*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        className={`ex-input${errors.unit ? " is-invalid" : ""}`}
+                        placeholder="Enter unit"
+                        value={form.unit}
+                        onChange={(e) => {
+                          setForm({ ...form, unit: e.target.value })
+                          setErrors({ ...errors, unit: "" })
+                        }}
+                      />
+                      <CFormText className="ex-err-msg">{errors.unit}</CFormText>
+                    </div>
+                  </CCol>
+                </>
+              )}
 
               {/* Notes */}
               <CCol md={12}>
                 <div className="ex-field">
-                  <CFormLabel className="ex-label">Notes <span className="ex-req">*</span></CFormLabel>
-                  <CFormInput
-                    className={`ex-input${errors.notes ? " is-invalid" : ""}`}
-                    placeholder="Special instructions..."
+                  <CFormLabel className="ex-label">
+                    Notes <span className="ex-req">*</span>
+                  </CFormLabel>
+
+                  <textarea
+                    rows={4}
+                    className={`form-control ex-input ${errors.notes ? "is-invalid" : ""}`}
+                    placeholder="Enter notes"
                     value={form.notes}
-                    onChange={(e) => { setForm({ ...form, notes: e.target.value }); setErrors({ ...errors, notes: "" }) }}
+                    onChange={(e) => {
+                      setForm({ ...form, notes: e.target.value })
+                      setErrors({ ...errors, notes: "" })
+                    }}
+                    style={{
+                      height: "auto",
+                      resize: "vertical",
+                      paddingTop: "10px",
+                    }}
                   />
+
                   <CFormText className="ex-err-msg">{errors.notes}</CFormText>
                 </div>
+                <CCol md={4}>
+                  <div className="ex-field">
+                    <CFormLabel className="ex-label">
+                      Body Part <span className="ex-req">*</span>
+                    </CFormLabel>
+                    <CFormInput
+                      className={`form-control ex-input ${errors.bodyPart ? "is-invalid" : ""}`}
+                      placeholder="Enter Body Part"
+                      value={form.bodyPart}
+                      onChange={(e) => {
+                        setForm({ ...form, bodyPart: e.target.value })
+                        setErrors({ ...errors, bodyPart: "" })
+
+                      }
+                      }
+                    />
+                    <CFormText className="ex-err-msg">{errors.bodyPart}</CFormText>
+                  </div>
+                </CCol>
               </CCol>
 
-              {/* Image upload */}
-              {/* <CCol md={12}>
-                <div className="ex-field">
-                  <CFormLabel className="ex-label">Image</CFormLabel>
-                  <CFormInput
-                    className="ex-input"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => e.target.files[0] && handleImage(e.target.files[0])}
-                  />
-                  {form.imagePreview && (
-                    <img
-                      src={form.imagePreview}
-                      alt="Preview"
-                      style={{ marginTop: 8, width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: "0.5px solid #d0dce9" }}
-                    />
-                  )}
-                </div>
-              </CCol> */}
+              {/* Optional Section */}
+              <CCol md={12}>
+                <hr />
+                <h6 style={{ color: "#6b7280", fontSize: "12px" }}>
+                  Optional Details
+                </h6>
+              </CCol>
+
+              <CCol md={3}>
+                <CFormInput
+                  type="number"
+                  className="ex-input"
+                  placeholder="GST %"
+                  value={form.gst}
+                  onChange={(e) => setForm({ ...form, gst: e.target.value })}
+                />
+              </CCol>
+
+              <CCol md={3}>
+                <CFormInput
+                  type="number"
+                  className="ex-input"
+                  placeholder="Other Tax %"
+                  value={form.otherTax}
+                  onChange={(e) => setForm({ ...form, otherTax: e.target.value })}
+                />
+              </CCol>
+
+              <CCol md={3}>
+<CFormInput
+                  type="number"
+                  className="ex-input"
+                  placeholder="Discount %"
+                  value={form.discountPercentage}
+                  onChange={(e) =>
+                    setForm({ ...form, discountPercentage: e.target.value })
+                  }
+                />
+              </CCol>
+
+              <CCol md={3}>
+                <CFormInput
+
+                  className="ex-input"
+                  placeholder="Video/Image URL"
+                  value={form.video}
+                  onChange={(e) => setForm({ ...form, video: e.target.value })}
+                />
+              </CCol>
+
             </CRow>
 
             <div className="ex-modal-footer">
@@ -654,12 +1203,13 @@ const sortedExercises = [...filteredExercises].sort((a, b) => {
             </div>
           </CForm>
         </CModalBody>
-      </CModal>
+      </CModal >
 
       {/* ── VIEW MODAL ───────────────────────────────── */}
-      <CModal
+      < CModal
         visible={viewModal}
-        onClose={() => setViewModal(false)}
+        onClose={() => setViewModal(false)
+        }
         size="lg"
         backdrop="static"
         alignment="center"
@@ -672,90 +1222,186 @@ const sortedExercises = [...filteredExercises].sort((a, b) => {
         <CModalBody className="ex-modal-body ex-view-body">
           {viewData ? (
             <>
-              {/* {viewData.image && (
-                <div style={{ textAlign: "center", marginBottom: 16 }}>
-                  <CImage
-                    src={viewData.image}
-                    width={100}
-                    height={100}
-                    style={{ objectFit: "cover", borderRadius: 10, border: "0.5px solid #d0dce9" }}
-                  />
-                </div>
-              )} */}
-
+              {/* ── Basic Info ── */}
               <div className="ex-summary-grid">
-                <div className="ex-summary-card">
-                  <span className="ex-summary-label">Name</span>
-                  <span className="ex-summary-value">{viewData.name}</span>
-                </div>
-                <div className="ex-summary-card">
-                  <span className="ex-summary-label">Exercise ID</span>
-                  <span className="ex-summary-value ex-id-pill">{viewData.therapyExercisesId}</span>
-                </div>
-                <div className="ex-summary-card">
-                  <span className="ex-summary-label">Session</span>
-                  <span className="ex-summary-value">{viewData.session}</span>
-                </div>
-                <div className="ex-summary-card">
-                  <span className="ex-summary-label">Frequency</span>
-                  <span className="ex-summary-value">{viewData.frequency}</span>
-                </div>
-                <div className="ex-summary-card">
-                  <span className="ex-summary-label">Sets</span>
-                  <span className="ex-summary-value">{viewData.sets}</span>
-                </div>
-                <div className="ex-summary-card">
-                  <span className="ex-summary-label">Repetitions</span>
-                  <span className="ex-summary-value">{viewData.repetitions}</span>
-                </div>
+                {viewData.name && (
+                  <div className="ex-summary-card">
+                    <span className="ex-summary-label">Name</span>
+                    <span className="ex-summary-value">{viewData.name}</span>
+                  </div>
+                )}
+                {viewData.therapyExercisesId && (
+                  <div className="ex-summary-card">
+                    <span className="ex-summary-label">Activity ID</span>
+                    <span className="ex-summary-value ex-id-pill">{viewData.therapyExercisesId}</span>
+                  </div>
+                )}
+                {viewData.activityType && (
+                  <div className="ex-summary-card">
+                    <span className="ex-summary-label">Type</span>
+                    <span className="ex-summary-value">{viewData.activityType}</span>
+                  </div>
+                )}
+                {viewData.bodyPart && (
+                  <div className="ex-summary-card">
+                    <span className="ex-summary-label">Body Part</span>
+                    <span className="ex-summary-value">{viewData.bodyPart}</span>
+                  </div>
+                )}
+                {viewData.session && viewData.session !== "0" && (
+                  <div className="ex-summary-card">
+                    <span className="ex-summary-label">Session</span>
+                    <span className="ex-summary-value">{viewData.session}</span>
+                  </div>
+                )}
+                {viewData.frequency && (
+                  <div className="ex-summary-card">
+                    <span className="ex-summary-label">Frequency</span>
+                    <span className="ex-summary-value">{viewData.frequency}</span>
+                  </div>
+                )}
+                {viewData.duration && (
+                  <div className="ex-summary-card">
+                    <span className="ex-summary-label">Duration</span>
+                    <span className="ex-summary-value">{viewData.duration} mins</span>
+                  </div>
+                )}
+                {viewData.sets && viewData.sets !== "0" && viewData.sets !== 0 && (
+                  <div className="ex-summary-card">
+                    <span className="ex-summary-label">Sets</span>
+                    <span className="ex-summary-value">{viewData.sets}</span>
+                  </div>
+                )}
+                {viewData.repetitions && viewData.repetitions !== "0" && viewData.repetitions !== 0 && (
+                  <div className="ex-summary-card">
+                    <span className="ex-summary-label">Repetitions</span>
+                    <span className="ex-summary-value">{viewData.repetitions}</span>
+                  </div>
+                )}
               </div>
 
-              <div className="ex-section-label">Pricing</div>
+              {/* ── Dynamic Details ── */}
+              {(viewData.technique || viewData.machine || viewData.intensity || viewData.assistanceLevel || viewData.supportType || viewData.area || viewData.metric) && (
+                <>
+                  <div className="ex-section-label">Additional Details</div>
+                  <div className="ex-summary-grid">
+                    {viewData.technique && (
+                      <div className="ex-summary-card" style={{ gridColumn: "span 2" }}>
+                        <span className="ex-summary-label">Technique</span>
+                        <span className="ex-summary-value">{viewData.technique}</span>
+                      </div>
+                    )}
+                    {viewData.machine && (
+                      <div className="ex-summary-card">
+                        <span className="ex-summary-label">Machine</span>
+                        <span className="ex-summary-value">{viewData.machine}</span>
+                      </div>
+                    )}
+                    {viewData.intensity && (
+                      <div className="ex-summary-card">
+                        <span className="ex-summary-label">Intensity</span>
+                        <span className="ex-summary-value">{viewData.intensity}</span>
+                      </div>
+                    )}
+                    {viewData.assistanceLevel && (
+                      <div className="ex-summary-card">
+                        <span className="ex-summary-label">Assistance</span>
+                        <span className="ex-summary-value">{viewData.assistanceLevel}</span>
+                      </div>
+                    )}
+                    {viewData.supportType && (
+                      <div className="ex-summary-card">
+                        <span className="ex-summary-label">Support Type</span>
+                        <span className="ex-summary-value">{viewData.supportType}</span>
+                      </div>
+                    )}
+                    {viewData.area && (
+                      <div className="ex-summary-card">
+                        <span className="ex-summary-label">Area</span>
+                        <span className="ex-summary-value">{viewData.area}</span>
+                      </div>
+                    )}
+                    {viewData.metric && (
+                      <div className="ex-summary-card">
+                        <span className="ex-summary-label">Metric</span>
+                        <span className="ex-summary-value">{viewData.metric}</span>
+                      </div>
+                    )}
+                    {viewData.value && (
+                      <div className="ex-summary-card">
+                        <span className="ex-summary-label">Value</span>
+                        <span className="ex-summary-value">{viewData.value}</span>
+                      </div>
+                    )}
+                    {viewData.unit && (
+                      <div className="ex-summary-card">
+                        <span className="ex-summary-label">Unit</span>
+                        <span className="ex-summary-value">{viewData.unit}</span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* ── Pricing ── */}
+              <div className="ex-section-label">Pricing & Tax</div>
               <div className="ex-summary-grid">
                 <div className="ex-summary-card">
                   <span className="ex-summary-label">Price / Session</span>
-                  <span className="ex-summary-value">₹{viewData.pricePerSession}</span>
+                  <span className="ex-summary-value">₹{viewData.pricePerSession || 0}</span>
                 </div>
-                <div className="ex-summary-card">
-                  <span className="ex-summary-label">GST</span>
-                  <span className="ex-summary-value">{viewData.gst}%</span>
-                </div>
-                <div className="ex-summary-card">
-                  <span className="ex-summary-label">Other Tax</span>
-                  <span className="ex-summary-value">{viewData.otherTax}%</span>
-                </div>
-                <div className="ex-summary-card">
-                  <span className="ex-summary-label">Discount</span>
-                  <span className="ex-summary-value">{viewData.discountPercentage}%</span>
-                </div>
-                <div className="ex-summary-card">
-                  <span className="ex-summary-label">Discount Amt</span>
-                  <span className="ex-summary-value">₹{viewData.discountAmount?.toFixed(2) || "0.00"}</span>
-                </div>
+                {viewData.gst && viewData.gst !== "0" && (
+                  <div className="ex-summary-card">
+                    <span className="ex-summary-label">GST</span>
+                    <span className="ex-summary-value">{viewData.gst}%</span>
+                  </div>
+                )}
+                {viewData.otherTax && viewData.otherTax !== "0" && (
+                  <div className="ex-summary-card">
+                    <span className="ex-summary-label">Other Tax</span>
+                    <span className="ex-summary-value">{viewData.otherTax}%</span>
+                  </div>
+                )}
+                {viewData.discountPercentage && viewData.discountPercentage !== "0" && (
+                  <div className="ex-summary-card">
+                    <span className="ex-summary-label">Discount</span>
+                    <span className="ex-summary-value">{viewData.discountPercentage}%</span>
+                  </div>
+                )}
+                {viewData.discountAmount > 0 && (
+                  <div className="ex-summary-card">
+                    <span className="ex-summary-label">Discount Amt</span>
+                    <span className="ex-summary-value">₹{viewData.discountAmount?.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="ex-summary-card" style={{ borderColor: "#b5d4f4", background: "#e6f1fb" }}>
-                  <span className="ex-summary-label">Total</span>
+                  <span className="ex-summary-label">Total Cost</span>
                   <span className="ex-summary-value" style={{ color: "#0c447c", fontSize: 16 }}>₹{calcTotal(viewData)}</span>
                 </div>
               </div>
 
-              <div className="ex-section-label">Notes</div>
-              <div className="ex-notes-box">{viewData.notes || "—"}</div>
+              {viewData.notes && (
+                <>
+                  <div className="ex-section-label">Clinical Notes</div>
+                  <div className="ex-notes-box">{viewData.notes}</div>
+                </>
+              )}
 
-              <div className="ex-section-label" style={{ marginTop: 12 }}>Video</div>
-              <div style={{ marginBottom: 16 }}>
-                {viewData.video ? (
-                  <a
-                    href={viewData.video}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="ex-video-link"
-                  >
-                    ▶ Watch Video
-                  </a>
-                ) : (
-                  <span style={{ color: "#9ca3af", fontSize: 13 }}>No video attached</span>
-                )}
-              </div>
+              {viewData.video && (
+                <>
+                  <div className="ex-section-label" style={{ marginTop: 12 }}>Video Reference</div>
+                  <div style={{ marginBottom: 16 }}>
+                    <a
+                      href={viewData.video}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="ex-video-link"
+                    >
+                      ▶ Watch Exercise Video
+                    </a>
+                  </div>
+                </>
+              )}
 
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
                 <button className="ex-btn-secondary" onClick={() => setViewModal(false)}>
@@ -770,10 +1416,10 @@ const sortedExercises = [...filteredExercises].sort((a, b) => {
             </div>
           )}
         </CModalBody>
-      </CModal>
+      </CModal >
 
       {/* ── SAVE / UPDATE CONFIRMATION ───────────────── */}
-      <ConfirmationModal
+      < ConfirmationModal
         isVisible={saveConfirmVisible}
         title={editId ? "Update Exercise" : "Save Exercise"}
         message={saveConfirmMessage}
