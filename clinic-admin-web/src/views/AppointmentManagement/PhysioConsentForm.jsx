@@ -12,6 +12,7 @@ import CIcon from "@coreui/icons-react";
 import UploadButton from "../ConsentForms/UploadButton";
 import { bookingUpdate } from "./appointmentAPI";
 import { showCustomToast } from "../../Utils/Toaster";
+import { COLORS } from "../../Constant/Themes";
 
 const ConsentForm = () => {
   const location = useLocation();
@@ -384,8 +385,8 @@ const ConsentForm = () => {
                 <div className="d-flex flex-wrap gap-2 justify-content-center">
                   <CButton
                     style={{
-                      backgroundColor: "var(--color-bgcolor)",
-                      color: "var(--color-black)",
+                      backgroundColor: COLORS.primary,
+                      color: COLORS.white,
                     }}
                     onClick={() => window.print()}
                   >
@@ -393,8 +394,8 @@ const ConsentForm = () => {
                   </CButton>
                   <CButton
                     style={{
-                      backgroundColor: "var(--color-bgcolor)",
-                      color: "var(--color-black)",
+                      backgroundColor: COLORS.primary,
+                      color: COLORS.white,
                     }}
                     onClick={downloadPDF}
                   >
@@ -402,8 +403,8 @@ const ConsentForm = () => {
                   </CButton>
                   <CButton
                     style={{
-                      backgroundColor: "var(--color-bgcolor)",
-                      color: "var(--color-black)",
+                      backgroundColor: COLORS.primary,
+                      color: COLORS.white,
                     }}
                     onClick={upload}
                     disabled={!patientSign}
@@ -442,6 +443,11 @@ const ConsentForm = () => {
           box-shadow: 0 2px 8px rgba(0,0,0,0.15);
           overflow: hidden;
           page-break-after: always;
+          color: #000 !important;
+        }
+
+        .a4-page * {
+          color: #000 !important;
         }
 
         body { font-size: 14px; }

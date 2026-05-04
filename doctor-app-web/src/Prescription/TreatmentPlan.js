@@ -1505,14 +1505,14 @@ const TherapySession = ({ seed = {}, onNext, patientData }) => {
         id, therapyExercisesId, therapyExerciseId, therapyId, theraphyId, therapy_id,
         _checked,
         // Billing / pricing
-        discountAmount, discountPercentage, discountPercentageValue,
-        gst, otherTax,
+        discountPercentageValue,
+
         // Clinic / branch info
         clinicId, branchId,
         // Raw session / frequency fields (we re-map these below)
         session, sessions, frequencyCount, frequencyUnit,
         // Raw video / duration (empty strings)
-        video, duration,
+        duration,
         // Raw name (we re-map as exerciseName)
         name,
         // eslint-disable-next-line no-unused-vars
