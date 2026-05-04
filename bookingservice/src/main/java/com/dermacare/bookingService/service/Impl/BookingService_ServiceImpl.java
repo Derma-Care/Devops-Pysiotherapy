@@ -2897,7 +2897,7 @@ public ResponseEntity<Response> getTodayAllBookings(String clinicId, String bran
 		// ✅ Enrich with session details (Feign call)
 		try {
 			res = res.stream().map(n -> {
-				n.setVisitType("follow-up");
+				n.setVisitType("session");
 
 				List<Session> lst = physioDoctorFeign
 						.getPhysioByBookingId(n.getBookingId(), n.getServiceDate())
@@ -2990,7 +2990,7 @@ public ResponseEntity<Response> getUpcomingBookings(String clinicId,
 		// ✅ Enrich with session details
 		try {
 			res = res.stream().map(n -> {
-				n.setVisitType("follow-up");
+				n.setVisitType("session");
 
 				List<Session> lst = physioDoctorFeign
 						.getPhysioByBookingId(n.getBookingId(), n.getServiceDate())
@@ -3069,7 +3069,7 @@ public ResponseEntity<Response> getUpcomingBookings(String clinicId,
 			// ✅ Enrich with session details
 			try {
 				res = res.stream().map(n -> {
-					n.setVisitType("follow-up");
+					n.setVisitType("session");
 
 					List<Session> lst = physioDoctorFeign
 							.getPhysioByBookingId(n.getBookingId(), n.getServiceDate())
@@ -3149,7 +3149,7 @@ public ResponseEntity<Response> getBookingByCustomRange(String clinicId,
                 );
         List<BookingResponse> res = toResponses(bookings);
         try {
-        	 res = res.stream().map(n->{n.setVisitType("follow-up"); List<Session> lst = physioDoctorFeign.getPhysioByBookingId(n.getBookingId(), n.getServiceDate()).getBody();
+        	 res = res.stream().map(n->{n.setVisitType("session"); List<Session> lst = physioDoctorFeign.getPhysioByBookingId(n.getBookingId(), n.getServiceDate()).getBody();
         	n.setSession(lst);return n;}).toList();
         }catch(Exception e) {}
         // ✅ Filter valid statuses
