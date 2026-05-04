@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import {
   CContainer,
   CHeader,
@@ -9,27 +11,31 @@ import { cilBell } from '@coreui/icons'
 import { useHospital } from '../Context/HospitalContext'
 import AppHeaderDropdown from './AppHeaderDropdown'
 
-const PRIMARY      = '#1B4F8A'
+const PRIMARY = '#1B4F8A'
 const PRIMARY_DARK = '#143d6e'
 
 const AppHeader = () => {
-  const headerRef  = useRef()
+  const headerRef = useRef()
   const [scrolled, setScrolled] = useState(false)
   const [bellHover, setBellHover] = useState(false)
-
+  const navigate = useNavigate()
+  const location = useLocation()
   const { selectedHospital } = useHospital()
 
-  const storedData   = localStorage.getItem('therapistData')
+  // Hide back button on dashboard
+  const isDashboard = location.pathname === '/therapist' || location.pathname === '/'
+
+  const storedData = localStorage.getItem('therapistData')
   const storedClinic = localStorage.getItem('selectedClinic')
-  const data         = storedData   ? JSON.parse(storedData)   : {}
-  const clinicData   = storedClinic ? JSON.parse(storedClinic) : {}
+  const data = storedData ? JSON.parse(storedData) : {}
+  const clinicData = storedClinic ? JSON.parse(storedClinic) : {}
 
   const therapistName = data?.therapistName
-  const branch        = data?.branchName
-  const therapistId   = data?.therapistId
+  const branch = data?.branchName
+  const therapistId = data?.therapistId
 
-  const clinicName  = selectedHospital?.name        || clinicData.name        || 'Clinic Name'
-  const ClinicLogo  = selectedHospital?.hospitalLogo || clinicData.hospitalLogo
+  const clinicName = selectedHospital?.name || clinicData.name || 'Clinic Name'
+  const ClinicLogo = selectedHospital?.hospitalLogo || clinicData.hospitalLogo
 
   const initials = therapistName
     ? therapistName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
@@ -123,6 +129,18 @@ const AppHeader = () => {
           font-size: 13px; font-weight: 700; color: #fff;
           border: 1.5px solid rgba(255,255,255,0.35); flex-shrink: 0;
         }
+        .back-btn {
+          width: 38px; height: 38px; border-radius: 10px;
+          border: 1.5px solid rgba(255,255,255,0.60);
+          background: rgba(255,255,255,0.22);
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer; transition: all .15s; margin-right: 14px;
+          color: white; outline: none;
+        }
+        .back-btn:hover {
+          background: rgba(255,255,255,0.30);
+          border-color: #ffffff;
+        }
         /* mobile */
         @media (max-width: 767px) {
           .clinic-name { font-size: 13px; }
@@ -139,16 +157,22 @@ const AppHeader = () => {
 
           {/* ── DESKTOP ── */}
           <div className="d-none d-md-flex align-items-center w-100" style={{ gap: 0 }}>
+            
+            {!isDashboard && (
+              <button className="back-btn" onClick={() => navigate(-1)} title="Back">
+                <ArrowLeft size={18} />
+              </button>
+            )}
 
             {/* Logo + Clinic Info */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              {ClinicLogo ? (
+              {/* {ClinicLogo ? (
                 <div className="clinic-logo-wrap">
                   <img src={`data:image/png;base64,${ClinicLogo}`} alt="Clinic Logo" />
                 </div>
               ) : (
                 <div className="clinic-logo-fallback">🏥</div>
-              )}
+              )} */}
               <div>
                 <div className="clinic-name">{clinicName}</div>
                 {branch && (
@@ -195,14 +219,11 @@ const AppHeader = () => {
           {/* ── MOBILE ── */}
           <div className="d-flex d-md-none align-items-center justify-content-between w-100">
 
-            {/* Left — logo + clinic */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-              {ClinicLogo ? (
-                <div className="clinic-logo-wrap" style={{ width: 38, height: 38 }}>
-                  <img src={`data:image/png;base64,${ClinicLogo}`} alt="Clinic Logo" />
-                </div>
-              ) : (
-                <div className="clinic-logo-fallback" style={{ width: 38, height: 38, fontSize: 16 }}>🏥</div>
+              {!isDashboard && (
+                <button className="back-btn" style={{ width: 34, height: 34, marginRight: 8 }} onClick={() => navigate(-1)}>
+                  <ArrowLeft size={16} />
+                </button>
               )}
               <div style={{ minWidth: 0 }}>
                 <div className="clinic-name" style={{
