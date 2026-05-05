@@ -52,6 +52,7 @@ public interface PhysiotherapyService {
 	Response getVisitHistory(String patientId, String bookingId);
 
 	Response getPatientHistory(String patientId);
+	public List<String> getTodayFollowUpBookingIds();
 
 
 

@@ -2890,20 +2890,29 @@ public ResponseEntity<Response> getTodayAllBookings(String clinicId, String bran
 						branchId,
 						today
 				);
-
+    List<String> followup = physioDoctorFeign.getTodayFollowUpBookingIds();
+    List<Booking> bkngs = followup.stream()
+            .map(id -> repository.findById(id).orElse(null))
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+    if(!bkngs.isEmpty()) {
+    	bookings.addAll(bkngs);}
 		// ✅ Convert to response DTO
 		List<BookingResponse> res = toResponses(bookings);
 
 		// ✅ Enrich with session details (Feign call)
 		try {
 			res = res.stream().map(n -> {
-				n.setVisitType("session");
-
-				List<Session> lst = physioDoctorFeign
+						List<Session> lst = physioDoctorFeign
 						.getPhysioByBookingId(n.getBookingId(), n.getServiceDate())
 						.getBody();
-
-				n.setSession(lst != null ? lst : Collections.emptyList());
+			 // System.out.println(n.getBookingId());
+			  // System.out.println(lst);
+                if(lst != null ) {
+				n.setSession(lst);
+				n.setVisitType("session");
+				}else {
+				n.setSession(null);}
 				return n;
 			}).toList();
 
@@ -2952,6 +2961,7 @@ public ResponseEntity<Response> getTodayAllBookings(String clinicId, String bran
 						500, null, null));
 	}
 }
+
 // ✅ API 2 → UPCOMING BOOKINGS (3 or 7 days)
 @Override
 public ResponseEntity<Response> getUpcomingBookings(String clinicId,
@@ -2983,20 +2993,21 @@ public ResponseEntity<Response> getUpcomingBookings(String clinicId,
 						startDate.format(FORMATTER),
 						endDate.format(FORMATTER)
 				);
-		System.out.println(bookings);
+		//System.out.println(bookings);
 		// ✅ Convert to response DTO
 		List<BookingResponse> res = toResponses(bookings);
-		System.out.println(res);
+		//System.out.println(res);
 		// ✅ Enrich with session details
 		try {
-			res = res.stream().map(n -> {
-				n.setVisitType("session");
-
+			res = res.stream().map(n -> {			
 				List<Session> lst = physioDoctorFeign
 						.getPhysioByBookingId(n.getBookingId(), n.getServiceDate())
-						.getBody();
-
-				n.setSession(lst != null ? lst : Collections.emptyList());
+						.getBody();				
+                if(lst != null ) {
+				n.setSession(lst);
+				n.setVisitType("session");
+				}else {
+				n.setSession(null);}				
 				return n;
 			}).toList();
 //System.out.println(bookings);
@@ -3069,13 +3080,14 @@ public ResponseEntity<Response> getUpcomingBookings(String clinicId,
 			// ✅ Enrich with session details
 			try {
 				res = res.stream().map(n -> {
-					n.setVisitType("session");
-
-					List<Session> lst = physioDoctorFeign
+							List<Session> lst = physioDoctorFeign
 							.getPhysioByBookingId(n.getBookingId(), n.getServiceDate())
 							.getBody();
-
-					n.setSession(lst != null ? lst : Collections.emptyList());
+							 if(lst != null ) {
+									n.setSession(lst);
+									n.setVisitType("session");
+									}else {
+									n.setSession(null);}				
 					return n;
 				}).toList();
 
@@ -3149,14 +3161,14 @@ public ResponseEntity<Response> getBookingByCustomRange(String clinicId,
                 );
         List<BookingResponse> res = toResponses(bookings);
         try {
-        	 res = res.stream().map(n->{n.setVisitType("session"); List<Session> lst = physioDoctorFeign.getPhysioByBookingId(n.getBookingId(), n.getServiceDate()).getBody();
-        	n.setSession(lst);return n;}).toList();
+        	 res = res.stream().map(n->{List<Session> lst = physioDoctorFeign.getPhysioByBookingId(n.getBookingId(), n.getServiceDate()).getBody();
+        	 if(lst != null ) {
+ 				n.setSession(lst);
+ 				n.setVisitType("session");
+ 				}else {
+ 				n.setSession(null);
+ 				}return n;}).toList();
         }catch(Exception e) {}
-        // ✅ Filter valid statuses
-        bookings = bookings.stream()
-                .filter(b -> VALID_WEEK_STATUS.contains(b.getFollowupStatus()))
-                .toList();
-
         // ✅ Total count
         long totalCount = bookings.size();
 

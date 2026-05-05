@@ -176,4 +176,12 @@ public class PhysiotherapyController {
 	             .status(response.getStatus())
 	             .body(response);
 	 }
+	 
+	  @GetMapping("/followups/today/booking-ids")
+	    public List<String> getTodayFollowUpBookingIds() {
+
+	        List<String> bookingIds = service.getTodayFollowUpBookingIds();
+
+	        return bookingIds;
+	    }
 }
