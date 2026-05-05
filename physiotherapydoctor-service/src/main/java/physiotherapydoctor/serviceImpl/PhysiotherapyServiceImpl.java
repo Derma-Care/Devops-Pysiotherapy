@@ -4,13 +4,16 @@
 	import java.time.LocalDateTime;
 	import java.time.format.DateTimeFormatter;
 	import java.util.ArrayList;
-	import java.util.LinkedHashMap;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 	import java.util.List;
 	import java.util.Map;
 	import java.util.Objects;
 	import java.util.Optional;
-	
-	import org.springframework.beans.factory.annotation.Autowired;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
 	import org.springframework.http.HttpStatus;
 	import org.springframework.http.ResponseEntity;
 	import org.springframework.stereotype.Service;
@@ -2002,6 +2005,7 @@ public ResponseEntity<List<Session>> getSessionsByBookingIdAndDate(String bookin
         }
 
         PaymentRecord record = optional.get();
+        //System.out.println(record); 
         List<Session> matchedSessions = new ArrayList<>();
 
         if (record.getTherapyWithSessions() == null) {
@@ -2017,7 +2021,7 @@ public ResponseEntity<List<Session>> getSessionsByBookingIdAndDate(String bookin
                 : ResponseEntity.ok(matchedSessions);
 
     } catch (Exception e) {
-        System.out.println(e.getMessage());
+        //System.out.println(e.getMessage());
         return ResponseEntity.status(500).body(null);
     }
 }
@@ -2143,7 +2147,25 @@ public  ResponseEntity<?> getTodaysAppointments(String clinicId, String doctorId
     }
 }
 
+
+private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+public List<String> getTodayFollowUpBookingIds() {
+
+    String todayDate = LocalDate.now().format(FORMATTER);
+
+    List<PhysiotherapyRecord> records =
+            repository.findByFollowUpNextVisitDate(todayDate);
+    //System.out.println(records);
+if(!records.isEmpty()) {
+    return records.stream()
+            .map(PhysiotherapyRecord::getBookingId)
+            .collect(Collectors.toList());
+}else {
+	return Collections.emptyList();
 }
+
+}}
 
 	
 	
