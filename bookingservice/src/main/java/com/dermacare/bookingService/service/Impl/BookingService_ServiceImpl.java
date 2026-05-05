@@ -2891,10 +2891,8 @@ public ResponseEntity<Response> getTodayAllBookings(String clinicId, String bran
 						today
 				);
     List<String> followup = physioDoctorFeign.getTodayFollowUpBookingIds();
-    List<Booking> bkngs = followup.stream()
-            .map(id -> repository.findById(id).orElse(null))
-            .filter(Objects::nonNull)
-            .collect(Collectors.toList());
+    List<Booking> bkngs = repository.findByBookingIdIn(followup);
+    ///System.out.println(bkngs);
     if(!bkngs.isEmpty()) {
     	bookings.addAll(bkngs);}
 		// ✅ Convert to response DTO
