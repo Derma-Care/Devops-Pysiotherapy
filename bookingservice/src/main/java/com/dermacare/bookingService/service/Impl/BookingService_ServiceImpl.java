@@ -2890,17 +2890,44 @@ public ResponseEntity<Response> getTodayAllBookings(String clinicId, String bran
 						branchId,
 						today
 				);
-    List<String> followup = physioDoctorFeign.getTodayFollowUpBookingIds();
-    List<Booking> bkngs = repository.findByBookingIdIn(followup);
-    ///System.out.println(bkngs);
-    if(!bkngs.isEmpty()) {
-    	bookings.addAll(bkngs);}
-		// ✅ Convert to response DTO
-		List<BookingResponse> res = toResponses(bookings);
+		List<String> followup = physioDoctorFeign.getTodayFollowUpBookingIds();
 
+		List<Booking> bkngs = repository.findByBookingIdIn(followup);
+		  List<Booking> modifiedBookings = null;
+		if (!bkngs.isEmpty()) {
+
+		      modifiedBookings = bkngs.stream().map(n -> {
+
+		        n.setStatus("follow-up");
+
+		        List<Status> statusList = n.getCurrentStatus();
+
+		        if (statusList == null || statusList.isEmpty()) {
+		            statusList = new ArrayList<>();
+		        }
+
+		        Status status = new Status();
+
+		        status.setDATE_TIME(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
+		        status.setStatus("follow-up");
+
+		        statusList.add(status);
+
+		        n.setCurrentStatus(statusList);
+		        bookings.add(n);
+		        return n;
+
+		    }).toList();		  
+		    repository.saveAll(modifiedBookings);
+		}
+		// ✅ Convert to response DTO
+		List<BookingResponse> bookingres = toResponses(bookings);
+		List<BookingResponse> res = toResponses(modifiedBookings);
+		bookingres.addAll(res);
+		//System.out.println(res.get(1));
 		// ✅ Enrich with session details (Feign call)
-		try {
-			res = res.stream().map(n -> {
+		    try {
+			bookingres = bookingres.stream().map(n -> {
 						List<Session> lst = physioDoctorFeign
 						.getPhysioByBookingId(n.getBookingId(), n.getServiceDate())
 						.getBody();
