@@ -36,6 +36,7 @@ import com.dermaCare.customerService.dto.CustomerRatingDomain;
 import com.dermaCare.customerService.dto.DoctorSaveDetailsDTO;
 import com.dermaCare.customerService.dto.DoctorsDTO;
 import com.dermaCare.customerService.dto.FavouriteDoctorsDTO;
+import com.dermaCare.customerService.dto.FirstVisitHistoryRequest;
 import com.dermaCare.customerService.dto.LoginDTO;
 import com.dermaCare.customerService.dto.NotificationToCustomer;
 import com.dermaCare.customerService.dto.QuestionsDTO;
@@ -46,6 +47,8 @@ import com.dermaCare.customerService.dto.SubServicesDetailsDto;
 import com.dermaCare.customerService.dto.SubServicesDto;
 import com.dermaCare.customerService.dto.TempBlockingSlot;
 import com.dermaCare.customerService.dto.TheraphyAnswersDTO;
+import com.dermaCare.customerService.dto.TherapistRecordRequest;
+import com.dermaCare.customerService.dto.VisitHistoryRequest;
 import com.dermaCare.customerService.entity.ConsultationEntity;
 import com.dermaCare.customerService.entity.Customer;
 import com.dermaCare.customerService.entity.CustomerRating;
@@ -58,6 +61,7 @@ import com.dermaCare.customerService.feignClient.CategoryServicesFeign;
 import com.dermaCare.customerService.feignClient.ClinicAdminFeign;
 import com.dermaCare.customerService.feignClient.DoctorServiceFeign;
 import com.dermaCare.customerService.feignClient.NotificationFeign;
+import com.dermaCare.customerService.feignClient.PhysioFeign;
 import com.dermaCare.customerService.repository.ConsultationRep;
 import com.dermaCare.customerService.repository.CustomerFavouriteDoctors;
 import com.dermaCare.customerService.repository.CustomerRatingRepository;
@@ -116,6 +120,9 @@ public class CustomerServiceImpl implements CustomerService {
     
     @Autowired
     private DoctorServiceFeign doctorServiceFeign;
+    
+    @Autowired
+    private PhysioFeign physioFeign;
     
     
     private static final Logger log = LoggerFactory.getLogger(CustomerServiceImpl.class);
@@ -2533,6 +2540,42 @@ public CustomerDTO getCustomerByToken(String token) {
     }
 }
 
+@Override
+public ResponseEntity<Response> getTherapistSessionDetails(TherapistRecordRequest request) {
+    Response response = new Response();
+    try {
+    	return clinicAdminFeign.getTherapistSessionDetails(request);  
+    } catch (FeignException e) {      
+        response.setStatus(e.status());
+        response.setMessage(ExtractFeignMessage.clearMessage(e));
+        response.setSuccess(false);
+    } return ResponseEntity.status(response.getStatus()).body(response);}
+
+@Override
+public ResponseEntity<Response> getVisitHistoryByDoctor(VisitHistoryRequest request) {
+    Response response = new Response();
+    try {
+    	return physioFeign.getVisitHistoryByDoctor(request);  
+    } catch (FeignException e) {      
+        response.setStatus(e.status());
+        response.setMessage(ExtractFeignMessage.clearMessage(e));
+        response.setSuccess(false);
+    } return ResponseEntity.status(response.getStatus()).body(response);}
+
+@Override
+public ResponseEntity<Response> getFirstVisitHistory(FirstVisitHistoryRequest request) {
+    Response response = new Response();
+    try {
+    	return physioFeign.getFirstVisitHistory(request);  
+    } catch (FeignException e) {      
+        response.setStatus(e.status());
+        response.setMessage(ExtractFeignMessage.clearMessage(e));
+        response.setSuccess(false);
+    } return ResponseEntity.status(response.getStatus()).body(response);}
+
+
+
+
 public ResponseEntity<ResBody<List<NotificationToCustomer>>> notificationToCustomer(
         String customerMobileNumber) {
 
@@ -2552,5 +2595,6 @@ public ResponseEntity<ResBody<List<NotificationToCustomer>>> notificationToCusto
         return ResponseEntity.status(e.status()).body(res);
     }
 }
+
 
 }

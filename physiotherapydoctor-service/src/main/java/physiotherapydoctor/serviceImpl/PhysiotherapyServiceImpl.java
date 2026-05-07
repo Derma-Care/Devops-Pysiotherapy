@@ -1,61 +1,65 @@
-	package physiotherapydoctor.serviceImpl;
+package physiotherapydoctor.serviceImpl;
 	
-	import java.time.LocalDate;
-	import java.time.LocalDateTime;
-	import java.time.format.DateTimeFormatter;
-	import java.util.ArrayList;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-	import java.util.List;
-	import java.util.Map;
-	import java.util.Objects;
-	import java.util.Optional;
 import java.util.stream.Collectors;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
-	import org.springframework.http.HttpStatus;
-	import org.springframework.http.ResponseEntity;
-	import org.springframework.stereotype.Service;
-	
-	import com.fasterxml.jackson.annotation.JsonInclude;
-	import com.fasterxml.jackson.core.type.TypeReference;
-	import com.fasterxml.jackson.databind.ObjectMapper;
-	
-	import feign.FeignException;
-	import lombok.RequiredArgsConstructor;
-	import physiotherapydoctor.dto.AssignTherapistPatientListDTO;
-	import physiotherapydoctor.dto.BookingResponse;
-	import physiotherapydoctor.dto.Exercise;
-	import physiotherapydoctor.dto.ExerciseCalculations;
-	import physiotherapydoctor.dto.PackageCalculation;
-	import physiotherapydoctor.dto.PatientHistoryResponse;
-	import physiotherapydoctor.dto.PhysiotherapyRecordDTO;
-	import physiotherapydoctor.dto.Program;
-	import physiotherapydoctor.dto.ProgramAndTherophyAndExcercisesInfo;
-	import physiotherapydoctor.dto.ProgramCalculations;
-	import physiotherapydoctor.dto.ProgramDataForPackage;
-	import physiotherapydoctor.dto.Response;
-	import physiotherapydoctor.dto.ResponseStructure;
-	import physiotherapydoctor.dto.Session;
-	import physiotherapydoctor.dto.TheraphyInfo;
-	import physiotherapydoctor.dto.TherapistRecordDTO;
-	import physiotherapydoctor.dto.TherapistRecordDetails;
-	import physiotherapydoctor.dto.TherapyCalculations;
-	import physiotherapydoctor.dto.TherapyData;
-	import physiotherapydoctor.dto.TherapyExercise;
-	import physiotherapydoctor.dto.TherapySession;
-	import physiotherapydoctor.dto.TherapyWithSessions;
-	import physiotherapydoctor.dto.TherapyinfoForPackage;
-	import physiotherapydoctor.dto.TherophyDataDto;
-	import physiotherapydoctor.dto.TreatmentPlan;
-	import physiotherapydoctor.entity.PaymentRecord;
-	import physiotherapydoctor.entity.PhysiotherapyRecord;
-	import physiotherapydoctor.feign.BookingFeign;
-	import physiotherapydoctor.feign.ClinicAdminFeign;
-	import physiotherapydoctor.repository.PaymentRepository;
-	import physiotherapydoctor.repository.PhysiotherapydoctorRespository;
-	import physiotherapydoctor.service.PhysiotherapyService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import feign.FeignException;
+import lombok.RequiredArgsConstructor;
+import physiotherapydoctor.dto.AssignTherapistPatientListDTO;
+import physiotherapydoctor.dto.BookingResponse;
+import physiotherapydoctor.dto.ChangeDoctorPasswordDTO;
+import physiotherapydoctor.dto.DoctorAvailabilityStatusDTO;
+import physiotherapydoctor.dto.DoctorLoginDTO;
+import physiotherapydoctor.dto.Exercise;
+import physiotherapydoctor.dto.ExerciseCalculations;
+import physiotherapydoctor.dto.PackageCalculation;
+import physiotherapydoctor.dto.PatientHistoryResponse;
+import physiotherapydoctor.dto.PhysiotherapyRecordDTO;
+import physiotherapydoctor.dto.Program;
+import physiotherapydoctor.dto.ProgramAndTherophyAndExcercisesInfo;
+import physiotherapydoctor.dto.ProgramCalculations;
+import physiotherapydoctor.dto.ProgramDataForPackage;
+import physiotherapydoctor.dto.Response;
+import physiotherapydoctor.dto.ResponseStructure;
+import physiotherapydoctor.dto.Session;
+import physiotherapydoctor.dto.TheraphyInfo;
+import physiotherapydoctor.dto.TherapistRecordDetails;
+import physiotherapydoctor.dto.TherapyCalculations;
+import physiotherapydoctor.dto.TherapyData;
+import physiotherapydoctor.dto.TherapyExercise;
+import physiotherapydoctor.dto.TherapySession;
+import physiotherapydoctor.dto.TherapyWithSessions;
+import physiotherapydoctor.dto.TherapyinfoForPackage;
+import physiotherapydoctor.dto.TherophyDataDto;
+import physiotherapydoctor.dto.TreatmentPlan;
+import physiotherapydoctor.entity.PaymentRecord;
+import physiotherapydoctor.entity.PhysiotherapyRecord;
+import physiotherapydoctor.feign.BookingFeign;
+import physiotherapydoctor.feign.ClinicAdminFeign;
+import physiotherapydoctor.repository.PaymentRepository;
+import physiotherapydoctor.repository.PhysiotherapydoctorRespository;
+import physiotherapydoctor.service.PhysiotherapyService;
+
 	
 	@Service
 	@RequiredArgsConstructor
@@ -71,6 +75,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 		
 		@Autowired
 		private PaymentRepository paymentRepository;
+		
+		@Autowired 
+		 private ObjectMapper objectMapper;
 		
 	
 		@Override
@@ -2138,6 +2145,155 @@ result.add(session);
             return response;
         }
     }
+    
+   
+    public Response getFirstVisitHistory(String doctorId,
+                                         String patientId,
+                                         String bookingId,
+                                         String clinicId,
+                                         String branchId) {
+
+        Response response = new Response();
+
+        try {
+
+            List<PhysiotherapyRecord> records =
+                    repository.findByTreatmentPlanDoctorIdAndPatientInfoPatientIdAndBookingIdAndClinicIdAndBranchId(
+                            doctorId,
+                            patientId,
+                            bookingId,
+                            clinicId,
+                            branchId
+                    );
+
+            if (records == null || records.isEmpty()) {
+
+                response.setSuccess(true);
+                response.setData(null);
+                response.setMessage("No visit history found");
+                response.setStatus(200);
+
+                return response;
+            }
+
+            // Getting only 0th index record
+            PhysiotherapyRecord record = records.get(0);
+
+            ObjectMapper mapper = new ObjectMapper();
+
+            mapper.setDefaultPropertyInclusion(
+                    JsonInclude.Value.construct(
+                            JsonInclude.Include.NON_NULL,
+                            JsonInclude.Include.NON_NULL
+                    )
+            );
+
+            Map<String, Object> result = new LinkedHashMap<>();
+
+            result.put("visitNumber", "Visit 1");
+            result.put("visitDate", record.getCreatedAt());
+            result.put("visitTime", record.getCreatedTime());
+
+            result.put("physiotherapyDoctorData",
+                    mapper.convertValue(
+                            record,
+                            new TypeReference<Map<String, Object>>() {
+                            }));
+
+            response.setSuccess(true);
+            response.setData(result);
+            response.setMessage("First visit history fetched successfully");
+            response.setStatus(200);
+
+            return response;
+
+        } catch (Exception e) {
+
+            response.setSuccess(false);
+            response.setData(null);
+            response.setMessage("Something went wrong");
+            response.setStatus(500);
+
+            return response;
+        }
+    }
+    
+    
+   
+    public Response getVisitHistoryByDoctor(String doctorId,
+                                            String patientId,
+                                            String bookingId) {
+
+        Response response = new Response();
+
+        try {
+
+            List<PhysiotherapyRecord> records =
+                    repository
+                    .findByTreatmentPlanDoctorIdAndPatientInfoPatientIdAndBookingIdOrderByCreatedAtAsc(
+                            doctorId,
+                            patientId,
+                            bookingId
+                    );
+
+            if (records == null || records.isEmpty()) {
+
+                response.setSuccess(true);
+                response.setData(null);
+                response.setMessage("No visit history found");
+                response.setStatus(200);
+
+                return response;
+            }
+
+            ObjectMapper mapper = new ObjectMapper();
+
+            mapper.setDefaultPropertyInclusion(
+                    JsonInclude.Value.construct(
+                            JsonInclude.Include.NON_NULL,
+                            JsonInclude.Include.NON_NULL
+                    )
+            );
+
+            List<Map<String, Object>> result = new ArrayList<>();
+
+            for (int i = 0; i < records.size(); i++) {
+
+                PhysiotherapyRecord record = records.get(i);
+
+                Map<String, Object> map = new LinkedHashMap<>();
+
+                map.put("visitNumber", "Visit " + (i + 1));
+                map.put("visitDate", record.getCreatedAt());
+                map.put("visitTime", record.getCreatedTime());
+
+                map.put("physiotherapyDoctorData",
+                        mapper.convertValue(
+                                record,
+                                new TypeReference<Map<String, Object>>() {
+                                }));
+
+                result.add(map);
+            }
+
+            response.setSuccess(true);
+            response.setData(result);
+            response.setMessage("Visit history fetched successfully");
+            response.setStatus(200);
+
+            return response;
+
+        } catch (Exception e) {
+
+            response.setSuccess(false);
+            response.setData(null);
+            response.setMessage("Something went wrong");
+            response.setStatus(500);
+
+            return response;
+        }
+    }
+    
 @Override
 public  ResponseEntity<?> getTodaysAppointments(String clinicId, String doctorId) {
     try {
@@ -2145,6 +2301,39 @@ public  ResponseEntity<?> getTodaysAppointments(String clinicId, String doctorId
     } catch (FeignException ex) {
         return ResponseEntity.status(ex.status()).body(ex.contentUTF8());
     }
+ }
+
+//---------------------------------------Doctor Login apis---------------------------------------
+private Response validateChangePasswordRequest(String username, ChangeDoctorPasswordDTO updateDTO) {
+    if (username == null || username.isBlank()) {
+   return Response.builder().success(false).status(400).message("Username must not be empty").build();
+    }
+
+    if (updateDTO == null) {
+    return Response.builder().success(false).status(400) .message("Request body is missing").build();
+    }
+
+    if (updateDTO.getCurrentPassword() == null || updateDTO.getCurrentPassword().isBlank()) {
+        return Response.builder().success(false).status(400).message("Current password must not be empty").build();
+    }
+
+    if (updateDTO.getNewPassword() == null || updateDTO.getNewPassword().isBlank()) {
+      return Response.builder().success(false).status(400).message("New password must not be empty").build();
+    }
+
+    if (updateDTO.getConfirmPassword() == null || updateDTO.getConfirmPassword().isBlank()) {
+     return Response.builder().success(false).status(400).message("Confirm password must not be empty").build();
+    }
+
+    if (!updateDTO.getNewPassword().equals(updateDTO.getConfirmPassword())) {
+     return Response.builder().success(false).status(400).message("New password and confirm password do not match").build();
+    }
+
+    if (updateDTO.getNewPassword().length() < 6) {
+     return Response.builder().success(false).status(400).message("Password must be at least 6 characters").build();
+    }
+
+    return null; 
 }
 
 
@@ -2163,9 +2352,70 @@ if(!records.isEmpty()) {
             .collect(Collectors.toList());
 }else {
 	return Collections.emptyList();
+}}
+
+@Override
+public Response changePassword(String username, ChangeDoctorPasswordDTO updateDTO) {
+    Response validationResponse = validateChangePasswordRequest(username, updateDTO);
+    if (validationResponse != null) {
+        return validationResponse;
+    }
+
+    try {
+        
+        return clinicAdminFeign.changePassword(username, updateDTO);
+
+    } catch (Exception ex) {
+
+        return Response.builder().success(false).status(500).message("Failed to change password " ).build();
+    }
 }
 
-}}
+
+@Override
+public Response login(DoctorLoginDTO loginDTO) {
+	try {
+	Response response=clinicAdminFeign.login(loginDTO);
+	return response;
+	}catch (FeignException fe) {
+	    try {
+	        String errorJson = fe.contentUTF8(); 
+	        Response errorResponse = objectMapper.readValue(errorJson, Response.class);
+            Response response = new Response();
+	        response.setSuccess(false);
+	        response.setData(null);
+	        response.setMessage(errorResponse.getMessage()); 
+	        response.setStatus(errorResponse.getStatus());   
+	        return response;
+	    } catch (Exception ex) {
+	    	Response response = new Response();
+	        response.setSuccess(false);
+	        response.setData(null);
+	        response.setMessage("Admin Service error: " + fe.getMessage());
+	        response.setStatus(fe.status());
+	        return response;
+	        }
+	}
+}
+@Override
+public Response updateDoctorAvailability(String doctorId, DoctorAvailabilityStatusDTO availabilityDTO) {
+    if(doctorId==null || doctorId.isBlank()) {
+    	return Response.builder().success(false).status(400) .message("Doctor ID must not be empty").build();
+    }
+
+	if(availabilityDTO == null) {
+		return Response.builder().success(false).status(400).message("Availability status is missing").build();
+	}
+	try {
+		return clinicAdminFeign.updateDoctorAvailability(doctorId, availabilityDTO);
+	}
+	catch (Exception ex) {
+		return Response.builder().success(false).status(500).message("Failed to update doctor availability status").build();
+				
+	}
+}
+
+}
 
 	
 	
