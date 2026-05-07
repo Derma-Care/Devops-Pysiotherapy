@@ -2921,12 +2921,18 @@ public ResponseEntity<Response> getTodayAllBookings(String clinicId, String bran
 		    repository.saveAll(modifiedBookings);
 		}
 		// ✅ Convert to response DTO
-		List<BookingResponse> bookingres = toResponses(bookings);
-		List<BookingResponse> res = toResponses(modifiedBookings);
-		bookingres.addAll(res);
+		List<BookingResponse> res = null;
+		List<BookingResponse> bookingres = null;
+		try {
+		if(!bookings.isEmpty()) {
+	    bookingres = toResponses(bookings);}
+	    if(modifiedBookings != null || !modifiedBookings.isEmpty()) {
+		res = toResponses(modifiedBookings);
+		bookingres.addAll(res);}}catch(Exception e) {}
 		//System.out.println(res.get(1));
 		// ✅ Enrich with session details (Feign call)
 		    try {
+		    if(bookingres != null) {
 			bookingres = bookingres.stream().map(n -> {
 						List<Session> lst = physioDoctorFeign
 						.getPhysioByBookingId(n.getBookingId(), n.getServiceDate())
@@ -2939,45 +2945,48 @@ public ResponseEntity<Response> getTodayAllBookings(String clinicId, String bran
 				}else {
 				n.setSession(null);}
 				return n;
-			}).toList();
+			}).toList();}
 
 		} catch (Exception e) {
 			// log error instead of silent ignore
 			System.out.println("Error while fetching session details: " + e.getMessage());
 		}
-
+		Map<String, Object> summary = null;
 		// ✅ Total count
+		if(bookingres != null) {
 		long totalCount = bookings.size();
 
 		// ✅ Status counts (case-insensitive + null safe)
-		long pendingCount = bookings.stream()
+		long pendingCount = bookingres.stream()
 				.filter(b -> "PENDING".equalsIgnoreCase(
 						Optional.ofNullable(b.getFollowupStatus()).orElse("")
 				))
 				.count();
 
-		long confirmedCount = bookings.stream()
+		long confirmedCount = bookingres.stream()
 				.filter(b -> "CONFIRMED".equalsIgnoreCase(
 						Optional.ofNullable(b.getFollowupStatus()).orElse("")
 				))
 				.count();
 
-		long inProgressCount = bookings.stream()
+		long inProgressCount = bookingres.stream()
 				.filter(b -> "IN-PROGRESS".equalsIgnoreCase(
 						Optional.ofNullable(b.getFollowupStatus()).orElse("")
 				))
 				.count();
 
 		// ✅ Summary response
-		Map<String, Object> summary = new HashMap<>();
+		summary = new HashMap<>();
 		summary.put("totalAppointments", totalCount);
 		summary.put("pending", pendingCount);
 		summary.put("confirmed", confirmedCount);
 		summary.put("inProgress", inProgressCount);
-
 		return ResponseEntity.ok(
-				new Response(true, res, summary, "Today bookings fetched", 200, null, null)
-		);
+				new Response(true, bookingres, summary, "Today bookings fetched", 200, null, null)
+		);}
+		else {
+			return ResponseEntity.ok(
+					new Response(true, bookingres, summary, "Today bookings not found", 200, null, null));}
 
 	} catch (Exception e) {
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
