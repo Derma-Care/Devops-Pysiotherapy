@@ -909,10 +909,10 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 
 	        	        String key = entry.getKey(); // e.g., "back"
 	        	        List<TheraphyAnswersDTO> answersList = entry.getValue();
-
-	        	        // 🔍 Fetch DB data based on key
-	        	        QuestionsByPartEntity entity = getByKey.getByKey(key);
-
+	        	        QuestionsByPartEntity entity = null;
+	        	        try {
+	        	        entity = getByKey.getByKey(key);
+	        	        }catch(Exception e) {}
 	        	        if (entity == null || entity.getQuestionsByPart() == null) {
 	        	            continue;
 	        	        }
@@ -978,6 +978,9 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 
 	    return response;
 	}
+	
+	
+	
 
 	  	   
 	public Response deleteBookedService(String id) {
@@ -2573,6 +2576,70 @@ public ResponseEntity<Response> getFirstVisitHistory(FirstVisitHistoryRequest re
         response.setSuccess(false);
     } return ResponseEntity.status(response.getStatus()).body(response);}
 
+
+@Override
+public ResponseEntity<?> bookPhysioAppointment(BookingRequset req) {   	
+        Response response = new Response();
+        try {
+        	 if(req.getTheraphyAnswers()!= null) {
+     	        
+    	        	if (req.getTheraphyAnswers() != null && !req.getTheraphyAnswers().isEmpty()) {
+
+    	        	    Map<String, List<TheraphyAnswersDTO>> map = req.getTheraphyAnswers();
+
+    	        	    for (Map.Entry<String, List<TheraphyAnswersDTO>> entry : map.entrySet()) {
+
+    	        	        String key = entry.getKey(); // e.g., "back"
+    	        	        List<TheraphyAnswersDTO> answersList = entry.getValue();
+
+    	        	        // 🔍 Fetch DB data based on key
+    	        	        QuestionsByPartEntity entity = null;
+    	        	        try {
+    		        	        entity = getByKey.getByKey(key);
+    		        	        }catch(Exception e) {}
+    	        	        if (entity == null || entity.getQuestionsByPart() == null) {
+    	        	            continue;
+    	        	        }	        	       
+    	        	        List<QuestionsEntity> questionsList = entity.getQuestionsByPart().get(key);
+
+    	        	        if (questionsList == null || questionsList.isEmpty()  ) {
+    	        	            continue;
+    	        	        }
+
+    	        	        // 🔁 Match questionId and set question
+    	        	        for (TheraphyAnswersDTO dto : answersList) {
+
+    	        	            for (QuestionsEntity q : questionsList) {
+
+    	        	                if (q.getQuestionId() == dto.getQuestionId()) {
+    	        	                    dto.setQuestion(q.getQuestion());
+    	        	                    break; // stop once matched
+    	        	                }
+    	        	            }
+    	        	        }
+    	        	    }
+    	        	} if(req!= null) {
+    	        		 clinicAdminFeign.updateDoctorSlotWhileBooking(         
+    	        				 req.getDoctorId(),
+    	    	                    req.getBranchId(),
+    	    	                    req.getServiceDate(),
+    	    	                    req.getServicetime()
+    	    	            );} 
+    	        return bookingFeign.bookPhysioAppointment(req);
+    	        }else {
+    	        	 if(req!= null) {
+    	        		 clinicAdminFeign.updateDoctorSlotWhileBooking(         
+    	        				 req.getDoctorId(),
+    	    	                    req.getBranchId(),
+    	    	                    req.getServiceDate(),
+    	    	                    req.getServicetime()
+    	    	            );} 
+        	    return bookingFeign.bookPhysioAppointment(req);}        	       	
+    } catch (FeignException e) {      
+        response.setStatus(e.status());
+        response.setMessage(ExtractFeignMessage.clearMessage(e));
+        response.setSuccess(false);
+    } return ResponseEntity.status(response.getStatus()).body(response);}
 
 
 

@@ -784,17 +784,9 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	
 		
 	public BookingResponse getBookedService(String bookingId) {
-		try {
-			String[] parts = bookingId.split("-");
-
-			for (int i = 0; i < parts.length; i++) {
-				String part = parts[i];
-
-				if (!part.isEmpty()) {
-					parts[i] = part.substring(0, 1).toUpperCase() +
-							part.substring(1).toLowerCase();}}
-			String letter  =  String.join("-", parts);		
-		Booking entity = repository.findByBookingId(letter).get();	
+		try {		
+		Booking entity = repository.findByBookingIdIgnoreCase(bookingId).get();	
+		System.out.println(entity);
 		if(entity != null) {
 			BookingResponse res = toResponse(entity);
 			List<Session> lst = new ArrayList<>();
@@ -806,11 +798,28 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 		   }else{
 			return null;}
 		   }catch(Exception e) {
-			//System.out.println(e.getMessage());
+			System.out.println(e.getMessage());
 			return null;
 		}
 	}
 
+	
+	public void deleteBookedServiceReports(String bookingId,String index) {
+		try {
+		Booking entity = repository.findByBookingIdIgnoreCase(bookingId).get();	
+		if(entity != null && index.equalsIgnoreCase("null")) {
+			try {
+				entity.getReports().clear();
+				repository.save(entity);
+			}catch(Exception e) {}
+		}else{
+			if(entity != null && index != null) {
+				entity.getReports().remove(Integer.valueOf(index).intValue());
+				repository.save(entity);
+			}}}catch(Exception e) {}
+		}
+
+	
 	@Override
 	public BookingResponse deleteService(String id) {
 		Booking entity = repository.findByBookingId(id)
@@ -2343,7 +2352,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 			public ResponseEntity<ResponseStructure<BookingResponse>> updateAppointmentBasedOnBookingId(BookingResponse dto) {
 				Booking updated = null;
 				try {
-			        Booking entity = repository.findByBookingId(dto.getBookingId())
+			        Booking entity = repository.findByBookingIdIgnoreCase(dto.getBookingId())
 			                .orElseThrow(() -> new RuntimeException("Invalid Booking Id"));
 
 			        // -------- BASIC --------
@@ -3239,17 +3248,8 @@ public ResponseEntity<Response> getBookingByCustomRange(String clinicId,
 
 
 	public ResponseEntity<Response> getBookingById(String bookingId) {
-		try {
-			String[] parts = bookingId.split("-");
-
-			for (int i = 0; i < parts.length; i++) {
-				String part = parts[i];
-
-				if (!part.isEmpty()) {
-					parts[i] = part.substring(0, 1).toUpperCase() +
-							part.substring(1).toLowerCase();}}
-			String letter  =  String.join("-", parts);
-			Optional<Booking> booking = repository.findByBookingId(letter);
+		try {			
+			Optional<Booking> booking = repository.findByBookingIdIgnoreCase(bookingId);
 			if(booking.isPresent()) {
 				if(!booking.get().getFollwupBookings().isEmpty()) {
 					ObjectMapper mapper = new ObjectMapper();
@@ -3300,7 +3300,7 @@ public ResponseEntity<Response> getBookingByCustomRange(String clinicId,
 
 private Booking updateForFollowup(BookingResponse dto) {
 try {
-    Booking entity = repository.findByBookingId(dto.getBookingId())
+    Booking entity = repository.findByBookingIdIgnoreCase(dto.getBookingId())
             .orElseThrow(() -> new RuntimeException("Invalid Booking Id"));
 
     // -------- BASIC --------
