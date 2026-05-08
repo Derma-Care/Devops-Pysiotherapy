@@ -206,17 +206,17 @@ export const getNavigation = (permissions = {}) => {
 
   ]
 
-  // Only include items if permission exists
+
   if (!permissions || typeof permissions !== 'object') return []
 
   // return allNav.filter((item) => permissions[item.name])
   return allNav.filter(
     (item) =>
       permissions[item.name] ||
-      item.name === 'Patient Management' ||
-      item.name === 'Package Management' ||
-      item.name === 'Patient Feedback' ||
-      item.name === 'Equipment Management',
+
+
+      item.name === 'Patient Feedback'
+    // item.name === 'Equipment Management',
   )
 }
 
