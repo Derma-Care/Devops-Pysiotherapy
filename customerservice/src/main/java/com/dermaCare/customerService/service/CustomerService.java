@@ -146,6 +146,7 @@ public interface CustomerService {
 	public ResponseEntity<Response> getVisitHistoryByDoctor(VisitHistoryRequest request);
 	
 	public ResponseEntity<Response> getFirstVisitHistory(FirstVisitHistoryRequest request);
+	public ResponseEntity<?> bookPhysioAppointment(BookingRequset req);
 
 
 }

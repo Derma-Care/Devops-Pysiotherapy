@@ -628,5 +628,13 @@ public ResponseEntity<Response> getAverageRatingByDoctorId( @PathVariable String
        return customerService.getFirstVisitHistory(request);
    }
    
+   @PostMapping("/bookPhysioAppointment")
+   public ResponseEntity<?> bookPhysioAppointment(
+		   @RequestBody BookingRequset req) {
+
+       return customerService.bookPhysioAppointment(req);
+   }
+
+   
 
 }
