@@ -265,6 +265,21 @@ services:
       - apigateway
     restart: always
 
+  patientphysio-web:
+    build: ./patientphysio-web
+    container_name: patientphysio-web-container
+    ports:
+      - "5002:80"
+    environment:
+      - HOST=3.111.28.174
+      - PORT=5002
+      - JAVA_TOOL_OPTIONS=-XX:-UseContainerSupport
+    networks:
+      - app-network
+    depends_on:
+      - apigateway
+    restart: always
+
 
 
 networks:
