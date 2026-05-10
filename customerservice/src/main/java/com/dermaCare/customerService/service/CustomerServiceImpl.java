@@ -39,7 +39,6 @@ import com.dermaCare.customerService.dto.FavouriteDoctorsDTO;
 import com.dermaCare.customerService.dto.FirstVisitHistoryRequest;
 import com.dermaCare.customerService.dto.LoginDTO;
 import com.dermaCare.customerService.dto.NotificationToCustomer;
-import com.dermaCare.customerService.dto.QuestionsDTO;
 import com.dermaCare.customerService.dto.ReportsAndDoctorSaveDetailsDto;
 import com.dermaCare.customerService.dto.ReportsDtoList;
 import com.dermaCare.customerService.dto.ServicesDto;
@@ -96,8 +95,6 @@ public class CustomerServiceImpl implements CustomerService {
     @Autowired
     private BookingFeign bookingFeign;
     
-    @Autowired
-    private PhysiotherapyRepo physiotherapyRepo;
     private GetByKey getByKey;
     
     @Autowired

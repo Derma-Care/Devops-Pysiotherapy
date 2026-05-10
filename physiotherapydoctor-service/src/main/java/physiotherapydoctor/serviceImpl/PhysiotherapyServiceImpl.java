@@ -1,28 +1,23 @@
 package physiotherapydoctor.serviceImpl;
 	
 import java.time.LocalDate;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.stream.Collectors;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import physiotherapydoctor.dto.AssignTherapistPatientListDTO;
@@ -60,7 +55,6 @@ import physiotherapydoctor.repository.PaymentRepository;
 import physiotherapydoctor.repository.PhysiotherapydoctorRespository;
 import physiotherapydoctor.service.PhysiotherapyService;
 
-	
 	@Service
 	@RequiredArgsConstructor
 	public class PhysiotherapyServiceImpl implements PhysiotherapyService {
@@ -1797,74 +1791,7 @@ private ExerciseCalculations handleExercise(PhysiotherapyRecord record, TherapyS
     return dto;
 }
 
-private List<Exercise> mapExercises(List<TherapyExercise> source) {
 
-    if (source == null) return new ArrayList<>();
-
-    return source.stream().map(te -> {
-        Exercise ex = new Exercise();
-
-        // ✅ Basic Info
-        ex.setExerciseId(te.getExerciseId());
-        ex.setExerciseName(te.getExerciseName());
-
-        // ✅ Session & Frequency
-        ex.setNoOfSessions(te.getNoOfSessions());
-        ex.setFrequency(te.getFrequency()); // FIX spelling (was frequancy)
-
-        ex.setSets(te.getSets());
-        ex.setRepetitions(te.getRepetitions());
-
-        // ✅ Media & Notes
-        ex.setYoutubeUrl(te.getYoutubeUrl());
-        ex.setNotes(te.getNotes());
-
-        // ✅ Pricing
-        ex.setPricePerSession(te.getPricePerSession() != null 
-                ? te.getPricePerSession().intValue()
-                : 0);
-
-        ex.setDiscountPercentage(te.getDiscountPercentage());
-        ex.setDiscountAmount(te.getDiscountAmount());
-        ex.setGst(te.getGst());
-        ex.setOtherTax(te.getOtherTax());
-
-        ex.setTotalExercisePrice(te.getTotalExercisePrice());
-        ex.setTotalPrice(te.getTotalPrice());
-
-        // ✅ Payment
-        ex.setPaymentStatus(te.getPaymentStatus());
-
-        // ✅ New Fields
-        ex.setTechnique(te.getTechnique());
-        ex.setMachine(te.getMachine());
-        ex.setIntensity(te.getIntensity());
-        ex.setAssistanceLevel(te.getAssistanceLevel());
-        ex.setType(te.getType());
-        ex.setArea(te.getArea());
-        ex.setMetric(te.getMetric());
-        ex.setValue(te.getValue());
-        ex.setUnit(te.getUnit());
-        ex.setBodyPart(te.getBodyPart());
-
-        // ✅ Activity Fields
-        ex.setActivityType(te.getActivityType());
-        ex.setActivityDuration(te.getActivityDuration());
-
-        // ✅ Sessions Mapping (IMPORTANT)
-      //  ex.setSessions(mapSessions(te.getSessions()));
-
-        return ex;
-    }).toList();
-}
-
-private double calculateExerciseCost(Exercise ex) {
-
-    int sessions = ex.getNoOfSessions() != null ? ex.getNoOfSessions() : 0;
-    int price = ex.getTotalPrice() != 0.0 ?(int)ex.getTotalPrice() : 0;
-
-    return sessions * price;
-}
 
 //private Integer parseInteger(String value) {
 //    try {
@@ -2381,8 +2308,7 @@ if(!records.isEmpty()) {
             .map(PhysiotherapyRecord::getBookingId)
             .collect(Collectors.toList());
 }else {
-	return Collections.emptyList();
-}}
+	return Collections.emptyList();}}
 
 @Override
 public Response changePassword(String username, ChangeDoctorPasswordDTO updateDTO) {
@@ -2445,7 +2371,78 @@ public Response updateDoctorAvailability(String doctorId, DoctorAvailabilityStat
 	}
 }
 
+
+private List<Exercise> mapExercises(List<TherapyExercise> source) {
+
+    if (source == null) return new ArrayList<>();
+
+    return source.stream().map(te -> {
+        Exercise ex = new Exercise();
+
+        // ✅ Basic Info
+        ex.setExerciseId(te.getExerciseId());
+        ex.setExerciseName(te.getExerciseName());
+
+        // ✅ Session & Frequency
+        ex.setNoOfSessions(te.getNoOfSessions());
+        ex.setFrequency(te.getFrequency()); // FIX spelling (was frequancy)
+
+        ex.setSets(te.getSets());
+        ex.setRepetitions(te.getRepetitions());
+
+        // ✅ Media & Notes
+        ex.setYoutubeUrl(te.getYoutubeUrl());
+        ex.setNotes(te.getNotes());
+
+        // ✅ Pricing
+        ex.setPricePerSession(te.getPricePerSession() != null 
+                ? te.getPricePerSession().intValue()
+                : 0);
+
+        ex.setDiscountPercentage(te.getDiscountPercentage());
+        ex.setDiscountAmount(te.getDiscountAmount());
+        ex.setGst(te.getGst());
+        ex.setOtherTax(te.getOtherTax());
+
+        ex.setTotalExercisePrice(te.getTotalExercisePrice());
+        ex.setTotalPrice(te.getTotalPrice());
+
+        // ✅ Payment
+        ex.setPaymentStatus(te.getPaymentStatus());
+
+        // ✅ New Fields
+        ex.setTechnique(te.getTechnique());
+        ex.setMachine(te.getMachine());
+        ex.setIntensity(te.getIntensity());
+        ex.setAssistanceLevel(te.getAssistanceLevel());
+        ex.setType(te.getType());
+        ex.setArea(te.getArea());
+        ex.setMetric(te.getMetric());
+        ex.setValue(te.getValue());
+        ex.setUnit(te.getUnit());
+        ex.setBodyPart(te.getBodyPart());
+
+        // ✅ Activity Fields
+        ex.setActivityType(te.getActivityType());
+        ex.setActivityDuration(te.getActivityDuration());
+
+        // ✅ Sessions Mapping (IMPORTANT)
+      //  ex.setSessions(mapSessions(te.getSessions()));
+
+        return ex;
+    }).toList();
 }
+
+private double calculateExerciseCost(Exercise ex) {
+
+    int sessions = ex.getNoOfSessions() != null ? ex.getNoOfSessions() : 0;
+    int price = ex.getTotalPrice() != 0.0 ?(int)ex.getTotalPrice() : 0;
+
+    return sessions * price;
+}
+
+}
+
 
 	
 	
