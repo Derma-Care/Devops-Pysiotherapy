@@ -181,6 +181,7 @@ public class PhysiotherapyController {
 	             .body(response);
 	 }
 	 
+
 	  @GetMapping("/followups/today/booking-ids")
 	    public List<String> getTodayFollowUpBookingIds() {
 
@@ -216,6 +217,7 @@ public class PhysiotherapyController {
 	        );
 
 	        return ResponseEntity.status(response.getStatus()).body(response);}
+
 //-----------------------------------------Doctor Apis-------------------------------------------	 
 	 
 	    @PutMapping("/update-PhysioDoctorpassword/{username}")
