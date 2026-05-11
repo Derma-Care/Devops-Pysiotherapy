@@ -384,9 +384,10 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 			    }
 
 
-			    if (request.getMobileNumber() == null || request.getMobileNumber().trim().isEmpty()) {
-			        throw new RuntimeException("Mobile Number is mandatory");
-			    }
+			    if (request.getPatientMobileNumber() == null || request.getPatientMobileNumber().trim().isEmpty()) {
+			    	if(request.getMobileNumber() == null  || request.getMobileNumber().trim().isEmpty()) {
+			        throw new RuntimeException("patientmobilenumber or Mobile Number is mandatory");
+			    }}
 
 			    if (request.getConsultationExpiration() == null
 			            || request.getConsultationExpiration().trim().isEmpty()) {
