@@ -381,7 +381,8 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 			    }	 
 			 if (request.getFreeFollowUps() == null) {
 			        throw new RuntimeException("Free FollowUps is mandatory");
-			    }		   
+			    }
+
 
 			    if (request.getMobileNumber() == null || request.getMobileNumber().trim().isEmpty()) {
 			        throw new RuntimeException("Mobile Number is mandatory");
@@ -392,7 +393,8 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 
 			        throw new RuntimeException("Consultation Expiration is mandatory");
 			    }
-			   
+		    
+
 			    if (request.getClinicId() == null || request.getClinicId().trim().isEmpty()) {
 			        throw new RuntimeException("Clinic Id is mandatory");
 			    }
@@ -486,7 +488,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	}
 	
 	
-
+///  getTodayDoctorAppointmentsByDoctorId  /////
 public ResponseEntity<?> getTodayDoctorAppointmentsByDoctorId(String clinicId,
             String doctorId) {
 

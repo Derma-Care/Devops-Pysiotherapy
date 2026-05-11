@@ -353,7 +353,6 @@ public class DoctorSaveDetailsServiceImpl implements DoctorSaveDetailsService {
             // ✅ Include the full treatment details
             bookingData.setTreatments(treatmentResponseDTO);
 
-            // ✅ Update the booking service
             bookingData.setCurrentStatus(null);
             bookingData.setListOfConsultationFee(null);
             bookingFeignClient.updateAppointmentBasedOnBookingId(bookingData);
