@@ -208,26 +208,13 @@ public class TherophyProgramServiceImpl implements TherophyProgramService {
                                             therapy.getExercises()) {
 
                                         if (ex != null) {
-
-                                            int session = 0;
-
-                                            try {
-                                                session = Integer.parseInt(
-                                                        ex.getSession() != null
-                                                                ? ex.getSession()
-                                                                : "0");
-                                            } catch (NumberFormatException nfe) {
-                                                session = 0;
-                                            }
-
+                                          try {                                        
                                             double exerciseAmount =
-                                                    session * ex.getTotalPrice();
+                                                    ex.getTotalPrice();
 
                                             therapyTotalAmount += exerciseAmount;
-                                        }
-                                    }
-                                }
-
+                                          }catch(Exception exception) {}
+                                        }}}
                                 // Add therapy total to program total
                                 totalProgramAmount += therapyTotalAmount;
 

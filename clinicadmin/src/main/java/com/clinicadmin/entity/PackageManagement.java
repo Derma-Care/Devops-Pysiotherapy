@@ -29,12 +29,10 @@ public class PackageManagement {
     private String clinicId;
     
     private String branchId;
-
-    private String packageName;
     private String discountAmount;
     private String packageAmount;
+    private String packageName;
     private String finalAmount;
-
     private List<String> programIds;
 
     private double discountPercentage;
