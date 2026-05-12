@@ -54,5 +54,10 @@ public interface  BookingFeignClient {
 	@PostMapping("/api/v1/bookService")
 	ResponseEntity<?> bookService(@RequestBody BookingRequset bookingRequest);
 	
+	@GetMapping("/api/v1/in-progress/appointments/{patientId}/{bookingId}")
+	public ResponseEntity<?> getInProgressAppointmentByPatientIdAndBookingId(@PathVariable String patientId,@PathVariable String bookingId);
+	
+	@PutMapping("/api/v1/update/bookingId")
+	public ResponseEntity<?> updateAppointmentBasedOnBookingId(@RequestBody BookingResponse bookingResponse );
 	
 }

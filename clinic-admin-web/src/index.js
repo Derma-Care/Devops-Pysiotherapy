@@ -23,13 +23,15 @@ import BodyAssessment from './views/AppointmentManagement/BodyAssessment'
 import TherapistDashboard from './views/EmployeeManagement/Therapist/TherapistDashboard'
 import TherapyExercisesForm from './views/EmployeeManagement/Therapist/TherapyExercise'
 import ExerciseTable from './views/EmployeeManagement/Therapist/TherapyExercise'
+import { COLORS } from './Constant/Themes'
+import EquipmentManagement from './views/EquipmentManagement/EquipmentManagement'
 function Root() {
   // attach interceptors once when app mounts
   // useEffect(() => {
   //   const detach = attachInterceptors(() => localStorage.getItem('token'))
   //   return () => detach()
   // }, [])
-  
+
   useEffect(() => {
     const detach = attachInterceptors()
     return () => detach()
@@ -48,17 +50,17 @@ function Root() {
                   limit={3}
                   theme="dark" // base dark theme
                   toastStyle={{
-                    backgroundColor: 'var(--color-black)',
+                    backgroundColor: COLORS.primary,
                     color: 'white',
                   }}
                 />
                 <App />
-                
-                
-                      {/* <BodyAssessment   /> */}
-                
-                     
-                
+
+
+                {/* <EquipmentManagement /> */}
+
+
+
                 {/* <ExerciseTable /> */}
                 {/* <TherapistDashboard /> */}
               </MedicineProvider>

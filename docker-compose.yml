@@ -125,6 +125,22 @@ services:
     networks:
       - app-network
   
+  physiotherapydoctor-service:
+    build: ./physiotherapydoctor-service
+    container_name: physiotherapydoctor_service
+    ports:
+      - "8888:8888"
+    environment:
+      - JAVA_TOOL_OPTIONS=-XX:-UseContainerSupport
+      - SPRING_APPLICATION_NAME=physiotherapydoctor-service
+      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/physiotherapydoctorservice
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      - mongodb
+      - eureka-server
+    networks:
+      - app-network
+  
   customerservice:
     build: ./customerservice
     container_name: customer_service
@@ -195,7 +211,7 @@ services:
     ports:
       - "3000:80"
     environment:
-      - HOST=52.66.144.177
+      - HOST=3.111.28.174
       - PORT=3000
       - JAVA_TOOL_OPTIONS=-XX:-UseContainerSupport
     networks:
@@ -210,7 +226,7 @@ services:
     ports:
       - "4000:80"
     environment:
-      - HOST=52.66.144.177
+      - HOST=3.111.28.174
       - PORT=4000
       - JAVA_TOOL_OPTIONS=-XX:-UseContainerSupport
     networks:
@@ -225,15 +241,29 @@ services:
     ports:
       - "5000:80"
     environment:
-      - HOST=52.66.144.177
+      - HOST=3.111.28.174
       - PORT=5000
       - JAVA_TOOL_OPTIONS=-XX:-UseContainerSupport
     networks:
       - app-network
     depends_on:
       - apigateway
-    restart: always
+    restart: always 
 
+  therapy-report:
+    build: ./therapy-report
+    container_name: therapyreport-container
+    ports:
+      - "5001:80"
+    environment:
+      - HOST=3.111.28.174
+      - PORT=5001
+      - JAVA_TOOL_OPTIONS=-XX:-UseContainerSupport
+    networks:
+      - app-network
+    depends_on:
+      - apigateway
+    restart: always
 networks:
   app-network:
     driver: bridge

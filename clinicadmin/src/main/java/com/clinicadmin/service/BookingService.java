@@ -22,15 +22,38 @@ public interface BookingService {
 	
 	public ResponseEntity<?> updateAppointmentBasedOnBookingId(BookingResponse bookingResponse);
  
-	public ResponseEntity<?> retrieveAppointnmentsByInput(String input, String clinicId);
+	//public ResponseEntity<?> retrieveAppointnmentsByInput(String input, String clinicId);
 
 	ResponseEntity<?> retrieveAppointnmentsByPatientId(String patientId);
 
-	Response bookService(BookingRequset req) throws JsonProcessingException;
+	Response bookService(BookingResponse req) throws JsonProcessingException;
 
 	ResponseEntity<?> getInprogressBookingsByPatientId(String patientId);
 	
 	ResponseEntity<?> getInprogressBookingsByPatientIdAndClinicId(String patientId, String clinicId);
 		
+	public ResponseEntity<?> getReprts(String clinicId,
+			String branchId,
+			Integer number,
+		    String startDate,
+			String endDate);
+
+	public ResponseEntity<?> physioAppointment(BookingRequset bookingResponse);
+
+	public ResponseEntity<?> getTodayPhysioBookings(String clinicId,
+			String branchId);
+	public ResponseEntity<?> getUpcomingBookings(String clinicId,
+			String branchId,int option);
+	public ResponseEntity<?> getBookingsByDate(String clinicId,
+			String branchId,String date);
+	public ResponseEntity<?> getBookingsByDateRange(String clinicId,
+			String branchId,String start, String end);
+	public ResponseEntity<?> getBookingById(String bookingId);
+	public ResponseEntity<?> getTodayBookingsByClinicIdAndBranchId(String clinicId,String branchId);
+	public ResponseEntity<?> getInProgressBookingsByIds(String patientId,
+			String bookingId);
+	public ResponseEntity<?> getReportsByPatientId(String patientId);
+	public ResponseEntity<?> getBookedServiceById(String bookingId);
+
 
 }

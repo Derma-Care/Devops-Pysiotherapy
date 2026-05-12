@@ -18,8 +18,8 @@ import './header/sidebar.css'
 import navigation from '../_nav'
 import { COLORS, SIZES } from '../Themes'
 import doctor from '../assets/images/doctor.jpg'
-import male from '../assets/images/male.png'
-import female from '../assets/images/female.png'
+import male from '../assets/images/male1.png'
+import female from '../assets/images/female1.png'
 import { useDoctorContext } from '../Context/DoctorContext'
 import { getClinicDetails, getDoctorDetails, averageRatings, getPatientVitals } from '../Auth/Auth'
 import { capitalizeEachWord, capitalizeFirst, capitalizeWords } from '../utils/CaptalZeWord'
@@ -64,19 +64,37 @@ const AppSidebar = () => {
 
   // Load patient vitals whenever patientData changes
   useEffect(() => {
-    let isMounted = true; // flag to prevent state update if unmounted
+    let isMounted = true;
 
     const fetchVitals = async () => {
       if (hasPatient && patientData?.bookingId && patientData?.patientId) {
-        const data = await getPatientVitals(patientData.bookingId, patientData.patientId);
-        if (data && isMounted) setVitals(data);
+        try {
+          const res = await getPatientVitals(
+            patientData.bookingId,
+            patientData.patientId
+          );
+
+          console.log("Vitals FINAL:", res);
+
+          if (isMounted) {
+            setVitals(res || {
+              height: null,
+              weight: null,
+              bloodPressure: null,
+              temperature: null,
+              bmi: null,
+            });
+          }
+        } catch (err) {
+          console.error("Vitals API Error:", err);
+        }
       }
     };
 
     fetchVitals();
 
     return () => {
-      isMounted = false; // cleanup to prevent memory leaks
+      isMounted = false;
     };
   }, [hasPatient, patientData]);
 
@@ -88,7 +106,7 @@ const AppSidebar = () => {
     name: patientData?.name || '—',
     age: patientData?.age || '—',
     gender: patientData?.gender || '—',
-    mobile: patientData?.mobileNumber || '—',
+    mobile: patientData?.patientMobileNumber || '—',
     visitType: patientData?.visitType === null
       ? 0
       : patientData?.visitType ?? '—',
@@ -230,19 +248,19 @@ const AppSidebar = () => {
                     Vitals
                   </h4>
                   <h6 className="mb-1" style={{ color: COLORS.black, fontSize: SIZES.small }}>
-                    <strong>Height:</strong> <span>{display.vitals.height === '—' ? 0 : display.vitals.height} cm</span>
+                    <strong >Height:</strong> <span>{display.vitals?.height ? display.vitals.height : 0} cm</span>
                   </h6>
                   <h6 className="mb-1" style={{ color: COLORS.black, fontSize: SIZES.small }}>
-                    <strong>Weight:</strong> <span>{display.vitals.weight === '—' ? 0 : display.vitals.weight} kg</span>
+                    <strong>Weight:</strong> <span>{display.vitals?.weight ? display.vitals.weight : 0} kg</span>
                   </h6>
                   <h6 className="mb-1" style={{ color: COLORS.black, fontSize: SIZES.small }}>
-                    <strong>Blood Pressure:</strong> <span>{display.vitals.bloodPressure === '—' ? 0 : display.vitals.bloodPressure} mmHg</span>
+                    <strong>Blood Pressure:</strong> <span>{display.vitals?.bloodPressure ? display.vitals.bloodPressure : 0} mmHg</span>
                   </h6>
                   <h6 className="mb-1" style={{ color: COLORS.black, fontSize: SIZES.small }}>
-                    <strong>Temperature:</strong> <span>{display.vitals.temperature === '—' ? 0 : display.vitals.temperature} °C</span>
+                    <strong>Temperature:</strong> <span>{display.vitals?.temperature ? display.vitals.temperature : 0} °C</span>
                   </h6>
                   <h6 className="mb-1" style={{ color: COLORS.black, fontSize: SIZES.small }}>
-                    <strong>BMI:</strong> <span>{display.vitals.bmi === '—' ? 0 : display.vitals.bmi} kg/m²</span>
+                    <strong>BMI:</strong> <span>{display.vitals?.bmi ? display.vitals.bmi : 0} kg/m²</span>
                   </h6>
                 </div>
 

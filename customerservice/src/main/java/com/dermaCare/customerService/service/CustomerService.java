@@ -11,9 +11,12 @@ import com.dermaCare.customerService.dto.CustomerDTO;
 import com.dermaCare.customerService.dto.CustomerLoginDTO;
 import com.dermaCare.customerService.dto.CustomerRatingDomain;
 import com.dermaCare.customerService.dto.FavouriteDoctorsDTO;
+import com.dermaCare.customerService.dto.FirstVisitHistoryRequest;
 import com.dermaCare.customerService.dto.LoginDTO;
 import com.dermaCare.customerService.dto.NotificationToCustomer;
 import com.dermaCare.customerService.dto.TempBlockingSlot;
+import com.dermaCare.customerService.dto.TherapistRecordRequest;
+import com.dermaCare.customerService.dto.VisitHistoryRequest;
 import com.dermaCare.customerService.util.ResBody;
 import com.dermaCare.customerService.util.Response;
 import com.dermaCare.customerService.util.ResponseStructure;
@@ -50,6 +53,7 @@ public interface CustomerService {
 	
     //BOOKING MANAGENET
     
+   // public Response bookService(BookingRequset req) throws JsonProcessingException ;
    public Response bookService(BookingRequset req) throws JsonProcessingException ;
     
     public Response deleteBookedService(String id);
@@ -136,4 +140,13 @@ public interface CustomerService {
 
 	Response getDoctorsByHospitalBranchAndSubService(String hospitalId, String branchId, String subServiceId,
 			int consultationType) throws JsonProcessingException;
+	
+	public ResponseEntity<Response> getTherapistSessionDetails(TherapistRecordRequest request);
+
+	public ResponseEntity<Response> getVisitHistoryByDoctor(VisitHistoryRequest request);
+	
+	public ResponseEntity<Response> getFirstVisitHistory(FirstVisitHistoryRequest request);
+	public ResponseEntity<?> bookPhysioAppointment(BookingRequset req);
+
+
 }

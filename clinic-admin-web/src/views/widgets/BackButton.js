@@ -2,37 +2,66 @@ import React, { useState } from 'react'
 import { CButton } from '@coreui/react'
 import { useNavigation } from '../Usecontext/NavigationProvider'
 import { useNavigate } from 'react-router-dom'
+import { COLORS } from '../../Constant/Themes'
 
 const BackButton = () => {
   const { goBack } = useNavigation()
   const [isHovered, setIsHovered] = useState(false)
   const [isAHovered, setIsAHovered] = useState(false)
   const navigate = useNavigate()
+  const istheraphist = localStorage.getItem('role')
+
+
+  const goBackTherapist = () => {
+    if (window.history.length > 1) {
+      navigate(-1) // go back
+    } else {
+      navigate("/therapist") // fallback route
+    }
+  }
+
   return (
     <>
-    <CButton
-      variant="outline"
-      onClick={goBack} // go back one step in stack
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      style={{
+      {istheraphist === 'physiotherapist' || "intern" ?
+        <CButton
+          variant="outline"
+          onClick={goBackTherapist}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          style={{
+            borderColor: COLORS.primary,
+            color: isHovered ? COLORS.primary : 'var(--color-white)',
+            backgroundColor: isHovered ? COLORS.white : 'transparent',
+            transition: 'all 0.3s ease',
+            marginRight: '10px'
+          }}
+        >
+          Back
+        </CButton> :
+        <CButton
+          variant="outline"
+          onClick={goBack} // go back one step in stack
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          style={{
+            borderColor: 'var(--color-black)',
+            color: isHovered ? 'var(--color-bgcolor)' : 'var(--color-white)',
+            backgroundColor: isHovered ? 'var(--color-white)' : 'transparent',
+            transition: 'all 0.3s ease', marginRight: '10px'
+          }}
+        >
+          Back
+        </CButton>
+      }
+      {/* <CButton variant="outline" style={{
         borderColor: 'var(--color-black)',
-        color: isHovered ? 'white' : 'var(--color-black)',
-        backgroundColor: isHovered ? 'var(--color-black)' : 'transparent',
+        color: isAHovered ? 'var(--color-bgcolor)' : 'var(--color-white)',
+        backgroundColor: isAHovered ? 'var(--color-white)' : 'transparent',
         transition: 'all 0.3s ease', marginRight: '10px'
-      }}
-    >
-      Back
-    </CButton>
-     <CButton variant="outline" style={{
-        borderColor: 'var(--color-black)',
-        color: isAHovered ? 'white' : 'var(--color-black)',
-        backgroundColor: isAHovered ? 'var(--color-black)' : 'transparent',
-        transition: 'all 0.3s ease', marginRight: '10px'
-      }}  onClick={() => navigate('/attendance')}  onMouseEnter={() => setIsAHovered(true)}
-      onMouseLeave={() => setIsAHovered(false)}>
-                   Attendance
-                 </CButton>
+      }} onClick={() => navigate('/attendance')} onMouseEnter={() => setIsAHovered(true)}
+        onMouseLeave={() => setIsAHovered(false)}>
+        Attendance
+      </CButton> */}
     </>
   )
 }

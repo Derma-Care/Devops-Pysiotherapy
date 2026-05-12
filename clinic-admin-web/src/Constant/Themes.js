@@ -1,18 +1,13 @@
 // src/styles/constants.ts
 
 export const COLORS = {
-  primary: '#0061c2',
+  primary: '#1B4F8A',
   secondary: '#0196ee',
   danger: '#ff4d4f',
   success: '#28a745',
   white: '#fff',
-  black: '#7e3a93',
-  gray: '#6c757d',
-  lowgray: '#6c757d3e',
-  teal: '#16a085',
-  orange: '#f39c12',
-  theme: '#f3f4f7',
-  bgcolor: '#a5c4d4ff',
+  bgcolor: '#1B4F8A',
+  black: '#F0F6FF',
   logocolor: '#000',
 }
 

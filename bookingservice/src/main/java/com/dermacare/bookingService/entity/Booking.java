@@ -16,11 +16,13 @@ import lombok.NoArgsConstructor;
 @Document(collection = "Appointments")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Booking  {
-    @Id
+    
+	@Id
     private String bookingId;
     private String bookingFor;
     private String relation;
     private String patientMobileNumber;
+    private String dob;
     private String patientAddress;
     private String patientId;
     private Integer freeFollowUpsLeft;
@@ -49,13 +51,15 @@ public class Booking  {
     private String serviceDate;
     private String servicetime;
     private String consultationType;
+    private List<ConsultationFees> listOfConsultationFee;
     private double consultationFee;
     private String reasonForCancel;
     private String notes;
+    private List<Status> currentStatus;
+	private String status;
     private List<ReportsList> reports;
     private String channelId;
     private String bookedAt;
-    private String status;
     private Integer visitCount;
     private List<byte[]> attachments;
     private byte[] consentFormPdf;
@@ -80,6 +84,28 @@ public class Booking  {
    	private List<String> parts;
    	private double partAmount;
    	private double dueAmount;
+   	private String referredByType;
+	private String referredByName;
+	private String paymentStatus;
+	private String previousInjuries;
+	private String currentMedications;
+	private String allergies;
+	private String occupation;
+	private String insuranceProvider;
+	private String policyNumber;
+	private List<String> activityLevels;
+	private String reasonforVisit;
+	private boolean isFollowupStatus;
+	private List<FollowupBooking> follwupBookings;
+	
+	public void setIsFollowupStatus(boolean followupStatus) {
+	    isFollowupStatus = followupStatus;
+	}
+	
+	public boolean getIsFollowupStatus() {
+	    return isFollowupStatus;
+	}
+   	
 
     public Booking(Booking booking) {
         this.bookingId = booking.getBookingId();

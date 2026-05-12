@@ -1,203 +1,23 @@
 import React, { useEffect, useState } from 'react'
 import {
-  CButton,
   CTable,
   CTableHead,
   CTableRow,
   CTableHeaderCell,
   CTableBody,
   CTableDataCell,
-  CModal ,
-  CModalHeader ,
-  CModalTitle ,
-  CModalBody,
-  CModalFooter ,
 } from '@coreui/react'
-import { Edit2, Eye, Trash2 } from 'lucide-react'
-
+import { Edit2, Eye, Trash2, UserCog } from 'lucide-react'
 import PhysioForm from './NurseForm'
 import { getAllPhysios, addPhysio, updatePhysio, deletePhysio } from './NurseAPI'
-// const dummyPhysios = [
-//   {
-//     id: 1,
-//     fullName: 'Dr. Priya Sharma',
-//     contactNumber: '9876543210',
-//     gender: 'female',
-//     dateOfBirth: '1995-06-10',
+import { useHospital } from '../../Usecontext/HospitalContext'
+import ConfirmationModal from '../../../components/ConfirmationModal'
+import Pagination from '../../../Utils/Pagination'  // ← same Pagination used in CustomerManagement
+import { showCustomToast } from '../../../Utils/Toaster'
+import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
+import LoadingIndicator from '../../../Utils/loader'
 
-//     qualification: 'BPT',
-//     yearsOfExperience: 2,
-
-//     services: ['home', 'clinic'],
-
-//     specializations: ['orthopedic'],
-//     expertiseAreas: ['knee', 'shoulder'],
-//     treatmentTypes: ['exercise_therapy', 'manual_therapy'],
-
-//     availability: {
-//       startDay: 'monday',
-//       endDay: 'friday',
-//       startTime: '09:00',
-//       endTime: '18:00',
-//     },
-
-//     bio: 'Physiotherapist specializing in knee rehabilitation.',
-
-//     documents: {
-//       licenseCertificate: '',
-//       degreeCertificate: '',
-//       profilePhoto: '',
-//     },
-
-//     languages: ['english', 'telugu'],
-//     role: 'physiotherapist',
-//     physioType: 'therapist',
-//   },
-
-//   {
-//     id: 2,
-//     fullName: 'Dr. Rahul Verma',
-//     contactNumber: '9123456780',
-//     gender: 'male',
-//     dateOfBirth: '1990-03-15',
-
-//     qualification: 'MPT',
-//     yearsOfExperience: 5,
-
-//     services: ['clinic'],
-
-//     specializations: ['neurological'],
-//     expertiseAreas: ['back'],
-//     treatmentTypes: ['manual_therapy'],
-
-//     availability: {
-//       startDay: 'tuesday',
-//       endDay: 'saturday',
-//       startTime: '10:00',
-//       endTime: '19:00',
-//     },
-
-//     bio: 'Expert in neurological physiotherapy.',
-
-//     documents: {
-//       licenseCertificate: '',
-//       degreeCertificate: '',
-//       profilePhoto: '',
-//     },
-
-//     languages: ['english', 'hindi'],
-//     role: 'physiotherapist',
-//     physioType: 'consultant',
-//   },
-
-//   {
-//     id: 3,
-//     fullName: 'Dr. Sneha Reddy',
-//     contactNumber: '9988776655',
-//     gender: 'female',
-//     dateOfBirth: '1993-11-22',
-
-//     qualification: 'BPT',
-//     yearsOfExperience: 3,
-
-//     services: ['home'],
-
-//     specializations: ['sports'],
-//     expertiseAreas: ['shoulder', 'back'],
-//     treatmentTypes: ['exercise_therapy'],
-
-//     availability: {
-//       startDay: 'monday',
-//       endDay: 'thursday',
-//       startTime: '08:00',
-//       endTime: '16:00',
-//     },
-
-//     bio: 'Sports physiotherapist with focus on recovery.',
-
-//     documents: {
-//       licenseCertificate: '',
-//       degreeCertificate: '',
-//       profilePhoto: '',
-//     },
-
-//     languages: ['english', 'telugu'],
-//     role: 'physiotherapist',
-//     physioType: 'therapist',
-//   },
-
-//   {
-//     id: 4,
-//     fullName: 'Dr. Arjun Kumar',
-//     contactNumber: '9001122334',
-//     gender: 'male',
-//     dateOfBirth: '1988-07-05',
-
-//     qualification: 'MPT',
-//     yearsOfExperience: 7,
-
-//     services: ['clinic', 'home'],
-
-//     specializations: ['orthopedic'],
-//     expertiseAreas: ['knee', 'back'],
-//     treatmentTypes: ['manual_therapy', 'electrotherapy'],
-
-//     availability: {
-//       startDay: 'wednesday',
-//       endDay: 'sunday',
-//       startTime: '11:00',
-//       endTime: '20:00',
-//     },
-
-//     bio: 'Senior physiotherapist with 7+ years experience.',
-
-//     documents: {
-//       licenseCertificate: '',
-//       degreeCertificate: '',
-//       profilePhoto: '',
-//     },
-
-//     languages: ['english', 'hindi'],
-//     role: 'physiotherapist',
-//     physioType: 'consultant',
-//   },
-
-//   {
-//     id: 5,
-//     fullName: 'Dr. Kavya Nair',
-//     contactNumber: '9012345678',
-//     gender: 'female',
-//     dateOfBirth: '1996-02-18',
-
-//     qualification: 'BPT',
-//     yearsOfExperience: 1,
-
-//     services: ['home'],
-
-//     specializations: ['neurological'],
-//     expertiseAreas: ['shoulder'],
-//     treatmentTypes: ['exercise_therapy'],
-
-//     availability: {
-//       startDay: 'monday',
-//       endDay: 'friday',
-//       startTime: '09:30',
-//       endTime: '17:30',
-//     },
-
-//     bio: 'Junior physiotherapist passionate about care.',
-
-//     documents: {
-//       licenseCertificate: '',
-//       degreeCertificate: '',
-//       profilePhoto: '',
-//     },
-
-//     languages: ['english'],
-//     role: 'physiotherapist',
-//     physioType: 'therapist',
-//   },
-// ]
 
 const PhysioManagement = () => {
   const [physios, setPhysios] = useState([])
@@ -205,179 +25,324 @@ const PhysioManagement = () => {
   const [selectedPhysio, setSelectedPhysio] = useState(null)
   const [viewMode, setViewMode] = useState(false)
   const [deleteModalVisible, setDeleteModalVisible] = useState(false)
-const [physioToDelete, setPhysioToDelete] = useState(null)
+  const [physioToDelete, setPhysioToDelete] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  // ── Pagination state (mirrors CustomerManagement) ─────────────────────────
+  const [currentPage, setCurrentPage] = useState(1)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
 
   const hospitalId = localStorage.getItem('HospitalId')
   const branchId = localStorage.getItem('branchId')
 
- const fetchPhysios = async () => {
-  try {
-    const res = await getAllPhysios(hospitalId, branchId)
+  const { user } = useHospital()
+  const can = (feature, action) => user?.permissions?.[feature]?.includes(action)
 
-    console.log("API Response:", res.data)
-
-    // ensure array
-    setPhysios(Array.isArray(res.data?.data) ? res.data.data : [])
-  } catch (err) {
-    console.error(err)
+  const fetchPhysios = async () => {
+    try {
+      setLoading(true)
+      const res = await getAllPhysios(hospitalId, branchId)
+      setPhysios(Array.isArray(res.data?.data) ? res.data.data : [])
+      setCurrentPage(1) // reset to first page on fresh fetch
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
   }
-}
 
-  useEffect(() => {
-    fetchPhysios()
-  }, [])
+  useEffect(() => { fetchPhysios() }, [])
 
   const handleSave = async (data) => {
-  try {
-    if (selectedPhysio) {
-      console.log("Updating:", selectedPhysio.therapistId)
-
-      await updatePhysio(selectedPhysio.therapistId, data)
-
-      // 🔥 ALWAYS refetch (correct data from backend)
-      await fetchPhysios()
-    } else {
-      const res = await addPhysio(data)
-      setPhysios(prev => [...prev, res.data.data])
-    }
-
-    setModalVisible(false)
-    setSelectedPhysio(null)
-  } catch (err) {
-    console.error("Update failed:", err)
-  }
-}
-
- const confirmDelete = async () => {
-  try {
-    await deletePhysio(physioToDelete.therapistId)  // ✅ FIXED
-
-    setDeleteModalVisible(false)
-    setPhysioToDelete(null)
-
-    fetchPhysios() // refresh list
-  } catch (error) {
-    console.error('Delete failed:', error)
-  }
-}
-
-  return (
-    <div>
-     <div className="d-flex justify-content-end mb-3">
-  <CButton onClick={() => setModalVisible(true)}
-     style={{
-              color: 'var(--color-black)',
-              backgroundColor: 'var(--color-bgcolor)',
-            }}>
-    Add Therapist
-  </CButton>
-</div>
-
-      <CTable striped className='pink-table'>
-        <CTableHead>
-          <CTableRow>
-            <CTableHeaderCell>Name</CTableHeaderCell>
-            <CTableHeaderCell>Contact</CTableHeaderCell>
-            <CTableHeaderCell>Qualification</CTableHeaderCell>
-            <CTableHeaderCell>Experience</CTableHeaderCell>
-            <CTableHeaderCell>Actions</CTableHeaderCell>
-          </CTableRow>
-        </CTableHead>
-
-        <CTableBody>
-          {physios.map((p) => (
-            <CTableRow key={p.id}>
-              <CTableDataCell>{p.fullName}</CTableDataCell>
-              <CTableDataCell>{p.contactNumber}</CTableDataCell>
-              <CTableDataCell>{p.qualification}</CTableDataCell>
-              <CTableDataCell>{p.yearsOfExperience}</CTableDataCell>
-
-             <CTableDataCell>
-  <div className="d-flex gap-2 align-items-center">
-
-    {/* VIEW */}
-    <div
-       className="actionBtn"
-      onClick={() => {
-        setSelectedPhysio(p)
-        setViewMode(true)
-        setModalVisible(true)
-      }}
-      title="View"
-    >
-      <Eye size={16} />
-    </div>
-
-    {/* EDIT */}
-    <div
-        className="actionBtn"
-      onClick={() => {
-        setSelectedPhysio(p)
-        setViewMode(false)
-        setModalVisible(true)
-      }}
-      title="Edit"
-    >
-      <Edit2 size={16} />
-    </div>
-
-    {/* DELETE */}
-    <div
-       className="actionBtn"
-    onClick={() => {
-  setPhysioToDelete(p)
-  setDeleteModalVisible(true)
-}}
-      title="Delete"
-    >
-      <Trash2 size={16} />
-    </div>
-
-  </div>
-</CTableDataCell>
-            </CTableRow>
-          ))}
-        </CTableBody>
-      </CTable>
-
-      <PhysioForm
-        visible={modalVisible}
-        onClose={() => {
+    try {
+      setLoading(true)
+      let res
+      if (selectedPhysio) {
+        res = await updatePhysio(selectedPhysio.therapistId, data)
+        if (res.status === 200 || res.status === 201 || res.data?.success) {
+          showCustomToast('Therapist updated successfully', 'success')
           setModalVisible(false)
           setSelectedPhysio(null)
-          setViewMode(false)
-        }}
+          await fetchPhysios()
+        } else {
+          throw new Error(res.data?.message || 'Failed to update therapist')
+        }
+      } else {
+        res = await addPhysio(data)
+        if (res.status === 200 || res.status === 201 || res.data?.success) {
+          showCustomToast('Therapist added successfully', 'success')
+          setModalVisible(false)
+          setSelectedPhysio(null)
+          await fetchPhysios()
+        } else {
+          throw new Error(res.data?.message || 'Failed to add therapist')
+        }
+      }
+    } catch (err) {
+      console.error('Save failed:', err)
+      const msg = err.response?.data?.message || err.message || 'Failed to save therapist details'
+      showCustomToast(msg, 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    try {
+      setIsDeleting(true)
+      await deletePhysio(physioToDelete.therapistId)
+      setDeleteModalVisible(false)
+      setPhysioToDelete(null)
+      showCustomToast('Therapist deleted successfully', 'success')
+      fetchPhysios()
+    } catch (error) {
+      console.error('Delete failed:', error)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  // ── Pagination slice ───────────────────────────────────────────────────────
+  const totalPages = Math.ceil(physios.length / rowsPerPage)
+  const displayData = physios.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
+
+  return (
+    <>
+      {/* <ToastContainer /> */}
+      {/* ── Page Header ── */}
+      <div className="pm-page-header">
+        <div className="pm-title-group">
+          <div className="pm-page-icon">
+            <UserCog size={20} />
+          </div>
+          <div>
+            <h4 className="pm-page-title">Therapist Management</h4>
+            <p className="pm-page-sub">
+              {physios.length} therapist{physios.length !== 1 ? 's' : ''} registered
+            </p>
+          </div>
+        </div>
+
+        {can('Therapist', 'create') && (
+          <button
+            className="pm-add-btn"
+            onClick={() => { setSelectedPhysio(null); setViewMode(false); setModalVisible(true) }}
+          >
+            + Add Therapist
+          </button>
+        )}
+      </div>
+
+      {/* ── Table ── */}
+      {loading ? (
+        <LoadingIndicator message="Loading therapists..." />
+      ) : (
+        <div className="pm-table-wrapper">
+          <CTable className="pm-table">
+            <CTableHead>
+              <CTableRow>
+                <CTableHeaderCell className="pm-th" style={{ width: 56 }}>S.No</CTableHeaderCell>
+                <CTableHeaderCell className="pm-th" style={{ width: 64 }}>Photo</CTableHeaderCell>
+                <CTableHeaderCell className="pm-th">Name</CTableHeaderCell>
+                <CTableHeaderCell className="pm-th">Contact</CTableHeaderCell>
+                <CTableHeaderCell className="pm-th">Qualification</CTableHeaderCell>
+                <CTableHeaderCell className="pm-th">Experience</CTableHeaderCell>
+                <CTableHeaderCell className="pm-th" style={{ width: 120 }}>Actions</CTableHeaderCell>
+              </CTableRow>
+            </CTableHead>
+
+            <CTableBody>
+              {physios.length === 0 ? (
+                <CTableRow>
+                  <CTableDataCell colSpan={7}>
+                    <div className="pm-empty">
+                      <UserCog size={40} className="pm-empty-icon" />
+                      <p>No therapists found.</p>
+                    </div>
+                  </CTableDataCell>
+                </CTableRow>
+              ) : (
+                displayData.map((p, index) => (
+                  <CTableRow key={p.id} className="pm-tr">
+                    {/* S.No respects pagination offset */}
+                    <CTableDataCell className="pm-td pm-td-num">
+                      {(currentPage - 1) * rowsPerPage + index + 1}
+                    </CTableDataCell>
+
+                    <CTableDataCell className="pm-td">
+                      <img
+                        src={
+                          p.documents?.profilePhoto
+                            ? `data:image/jpeg;base64,${p.documents.profilePhoto}`
+                            : '/assets/images/default-avatar.png'
+                        }
+                        alt={p.fullName}
+                        width="36"
+                        height="36"
+                        style={{ borderRadius: '50%', objectFit: 'cover', border: '2px solid #b5d4f4' }}
+                      />
+                    </CTableDataCell>
+
+                    <CTableDataCell className="pm-td">
+                      <span className="pm-name">{p.fullName}</span>
+                    </CTableDataCell>
+
+                    <CTableDataCell className="pm-td pm-muted">{p.contactNumber}</CTableDataCell>
+                    <CTableDataCell className="pm-td pm-muted">{p.qualification}</CTableDataCell>
+                    <CTableDataCell className="pm-td pm-muted">{p.yearsOfExperience} yrs</CTableDataCell>
+
+                    <CTableDataCell className="pm-td">
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {can('Therapist', 'read') && (
+                          <button
+                            className="pm-action-btn pm-view-btn"
+                            title="View"
+                            onClick={() => {
+                              setSelectedPhysio(p)
+                              setViewMode(true)
+                              setModalVisible(true)
+                            }}
+                          >
+                            <Eye size={14} />
+                          </button>
+                        )}
+                        {can('Therapist', 'update') && (
+                          <button
+                            className="pm-action-btn pm-edit-btn"
+                            title="Edit"
+                            onClick={() => {
+                              setSelectedPhysio(p)
+                              setViewMode(false)
+                              setModalVisible(true)
+                            }}
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                        )}
+                        {can('Therapist', 'delete') && (
+                          <button
+                            className="pm-action-btn pm-delete-btn"
+                            title="Delete"
+                            onClick={() => {
+                              setPhysioToDelete(p)
+                              setDeleteModalVisible(true)
+                            }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </CTableDataCell>
+                  </CTableRow>
+                ))
+              )}
+            </CTableBody>
+          </CTable>
+        </div>
+      )}
+
+      {/* ── Pagination (same component + same pattern as CustomerManagement) ── */}
+      {physios.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={rowsPerPage}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => { setRowsPerPage(size); setCurrentPage(1) }}
+        />
+      )}
+
+      {/* ── Form Modal ── */}
+      <PhysioForm
+        visible={modalVisible}
+        onClose={() => { setModalVisible(false); setSelectedPhysio(null); setViewMode(false) }}
         onSave={handleSave}
         initialData={selectedPhysio}
         viewMode={viewMode}
       />
-      <CModal
-  visible={deleteModalVisible}
-  onClose={() => setDeleteModalVisible(false)}
->
-  <CModalHeader>
-    <CModalTitle>Confirm Delete</CModalTitle>
-  </CModalHeader>
 
-  <CModalBody>
-    Are you sure you want to delete{' '}
-    <strong>{physioToDelete?.fullName}</strong>?
-  </CModalBody>
+      {/* ── Delete Confirmation Modal ── */}
+      <ConfirmationModal
+        isVisible={deleteModalVisible}
+        title="Delete Therapist"
+        message={
+          <>
+            This therapist is assigned to sessions. Removing will affect treatment plans.
+          </>
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmColor="danger"
+        cancelColor="secondary"
+        isLoading={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          if (!isDeleting) {
+            setDeleteModalVisible(false)
+            setPhysioToDelete(null)
+          }
+        }}
+      />
 
-  <CModalFooter>
-    <CButton
-      color="secondary"
-      onClick={() => setDeleteModalVisible(false)}
-    >
-      Cancel
-    </CButton>
-
-    <CButton color="danger" onClick={confirmDelete}>
-      Delete
-    </CButton>
-  </CModalFooter>
-</CModal>
-    </div>
+      {/* ── STYLES ── */}
+      <style>{`
+        .pm-page-header {
+          display: flex; align-items: center; justify-content: space-between;
+          flex-wrap: wrap; gap: 12px; margin-bottom: 18px;
+          padding-bottom: 14px; border-bottom: 0.5px solid #d0dce9;
+        }
+        .pm-title-group { display: flex; align-items: center; gap: 12px; }
+        .pm-page-icon {
+          width: 42px; height: 42px; border-radius: 10px;
+          background: #e6f1fb; display: flex; align-items: center;
+          justify-content: center; color: #185fa5; flex-shrink: 0;
+        }
+        .pm-page-title { font-size: 17px; font-weight: 600; color: #0c447c; margin: 0; }
+        .pm-page-sub   { font-size: 12px; color: #6b7280; margin: 0; }
+        .pm-add-btn {
+          background: #185fa5; color: #fff; border: none; border-radius: 8px;
+          padding: 8px 18px; font-size: 12px; font-weight: 600;
+          cursor: pointer; transition: filter 0.15s; white-space: nowrap;
+        }
+        .pm-add-btn:hover { filter: brightness(0.9); }
+        .pm-table-wrapper {
+          border: 0.5px solid #d0dce9; border-radius: 10px;
+          overflow: hidden; overflow-x: auto; margin-bottom: 12px;
+        }
+        .pm-table { margin-bottom: 0 !important; font-size: 13px; }
+        .pm-th {
+          background: #185fa5 !important; color: #fff !important;
+          font-size: 12px !important; font-weight: 600 !important;
+          padding: 11px 14px !important; white-space: nowrap; border: none !important;
+        }
+        .pm-tr { transition: background 0.12s; }
+        .pm-tr:hover { background: #f0f5fb !important; }
+        .pm-td {
+          padding: 11px 14px !important; vertical-align: middle !important;
+          font-size: 13px; color: #374151;
+          border-bottom: 0.5px solid #eef2f7 !important; border-top: none !important;
+        }
+        .pm-td-num { color: #9ca3af; font-size: 12px; }
+        .pm-muted  { color: #6b7280; }
+        .pm-name   { font-weight: 600; font-size: 13px; color: #0c447c; }
+        .pm-action-btn {
+          display: inline-flex; align-items: center; justify-content: center;
+          width: 30px; height: 30px; border: none; border-radius: 7px;
+          cursor: pointer; transition: filter 0.12s, transform 0.1s; flex-shrink: 0;
+        }
+        .pm-action-btn:hover  { filter: brightness(0.88); transform: scale(1.07); }
+        .pm-action-btn:active { transform: scale(0.95); }
+        .pm-view-btn   { background: #e6f1fb; color: #185fa5; }
+        .pm-edit-btn   { background: #eaf3de; color: #3b6d11; }
+        .pm-delete-btn { background: #fcebeb; color: #a32d2d; }
+        .pm-empty {
+          display: flex; flex-direction: column; align-items: center;
+          gap: 10px; padding: 40px 0; color: #9ca3af; font-size: 14px;
+        }
+        .pm-empty-icon { color: #d0dce9; }
+      `}</style>
+    </>
   )
 }
 

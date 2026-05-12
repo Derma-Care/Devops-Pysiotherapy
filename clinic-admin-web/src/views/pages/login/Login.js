@@ -33,7 +33,7 @@ import DermaLogo from 'src/assets/images/DermaCare.png' // adjust path if needed
 import { COLORS } from '../../../Constant/Themes'
 import { toast, ToastContainer } from 'react-toastify'
 import { showCustomToast } from '../../../Utils/Toaster'
-import { getFCMToken } from '../../../firebase'
+// import { getFCMToken } from '../../../firebase'
 
 const Login = () => {
   const [activeTab, setActiveTab] = useState('clinic') // clinic | doctor
@@ -74,14 +74,14 @@ const Login = () => {
     try {
       // ✅ get FCM token first
       await Notification.requestPermission()
-      const fcmToken = await getFCMToken()
-      console.log(fcmToken)
+      // const fcmToken = await getFCMToken()
+      // console.log(fcmToken)
       let res
       const loginBody = {
         userName,
         password,
         role,
-        fcmToken: fcmToken || '',
+        // fcmToken: fcmToken || '',
         deviceType: 'web',
       }
 
@@ -92,7 +92,7 @@ const Login = () => {
         })
         res = resposnse
       } else {
-        const resposnse = await http.post(`/login`, loginBody, {
+        const resposnse = await http.post(`/loginUsingRoles`, loginBody, {
           headers: { 'Content-Type': 'application/json' },
         })
         res = resposnse.data
@@ -179,43 +179,36 @@ const Login = () => {
           localStorage.setItem('HospitalId', HospitalId)
           await fetchAllData(HospitalId)
           showCustomToast(res.data?.message || 'Login successful!', 'success')
-          // const physioType = res.data.physioType
-          // const therapistId = res.data.therapistId
-          // const therapistName = res.data.therapistName
-          // const permissions = res.data.permissions
-          // const theraphPayload = {
-          //   therapistId,
-          //   therapistName,
-          //   physioType,
-          //   permissions,
-          // }
-      if (
-  role.toLowerCase() === "therapist" ||
-  role.toLowerCase() === "intern"
-) {
 
-  const theraphPayload = {
-    therapistId: payload.therapistId,
-    therapistName: payload.therapistName,
-    physioType: payload.physioType,
-    permissions: payload.permissions,
-    branchId: payload.branchId,
-    clinicId: payload.clinicId,
-  }
+          if (
+            role.toLowerCase() === "physiotherapist" ||
+            role.toLowerCase() === "intern"
+          ) {
 
-  // save also in localStorage
-  localStorage.setItem(
-    "therapistData",
-    JSON.stringify(theraphPayload)
-  )
+            const theraphPayload = {
+              therapistId: payload.staffId,
+              therapistName: payload.staffName,
+              // physioType: payload.physioType,
+              permissions: payload.permissions,
+              branchId: payload.branchId,
+              clinicId: payload.hospitalId,
+              role: role,
+              branchName: branchName
+            }
 
-  navigate("/therapist", {
-    state: theraphPayload,
-  })
+            // save also in localStorage
+            localStorage.setItem(
+              "therapistData",
+              JSON.stringify(theraphPayload)
+            )
 
-} else {
-  navigate("/dashboard")
-}
+            navigate("/therapist", {
+              state: theraphPayload,
+            })
+
+          } else {
+            navigate("/dashboard")
+          }
         }
       }
     } catch (err) {
@@ -246,7 +239,7 @@ const Login = () => {
   return (
     // Outer container uses flex column and full viewport height to allow sticky footer without overflow
     <>
-      <ToastContainer />
+      {/* <ToastContainer /> */}
       <div className="d-flex flex-column min-vh-100 derma-bg">
         {/* Main content - will grow and keep footer at bottom */}
         <div className="flex-grow-1 d-flex justify-content-center align-content-center align-items-center ">
@@ -267,22 +260,24 @@ const Login = () => {
                     style={{ width: 120, height: 'auto' }}
                   />
                   <h2 className="fw-bold mb-3" style={{ color: COLORS.primary }}>
-                    Welcome to Derma Care
+                    Welcome to CCMS
                   </h2>
                   <p className="lead mb-4" style={{ opacity: 0.95, color: COLORS.primary }}>
-                    Manage dermatology operations seamlessly — appointments, records, billing &
-                    more.
+                    Chiselon Clinic Management System
                   </p>
 
                   <div className="d-flex justify-content-center gap-3 flex-wrap">
-                    <span className="badge" style={{ color: COLORS.primary }}>
+                    {/* <span className="badge" style={{ color: COLORS.primary }}>
                       HIPAA-ready
+                    </span> */}
+                    <span className="badge" style={{ color: COLORS.primary }}>
+                      AI Enablement
                     </span>
                     <span className="badge" style={{ color: COLORS.primary }}>
-                      e-Prescriptions
+                      Security
                     </span>
                     <span className="badge" style={{ color: COLORS.primary }}>
-                      Smart Scheduling
+                      Analytics
                     </span>
                   </div>
                 </div>
@@ -293,124 +288,74 @@ const Login = () => {
                 <CCard className="shadow-lg border-0 glass-card w-100" style={{ maxWidth: 460 }}>
                   <CCardBody className="p-4 p-md-5">
                     <h3 className="text-center fw-bold mb-3" style={{ color: COLORS.primary }}>
-                      Derma Portal
+                      CCMS Portal
                     </h3>
                     <p className="text-center mb-4" style={{ color: COLORS.primary }}>
                       Please choose your workspace to continue
                     </p>
 
-                    {/* Tabs */}
-                    <CNav variant="pills" className="justify-content-center gap-2 mb-4">
-                      <CNavItem>
-                        <CNavLink
-                          active={activeTab === 'clinic'}
-                          onClick={() => setActiveTab('clinic')}
-                          style={{
-                            backgroundColor: activeTab === 'clinic' ? COLORS.primary : COLORS.white,
-                            color: activeTab === 'clinic' ? COLORS.white : COLORS.primary,
-                            border: `1px solid ${COLORS.primary}`,
-                            borderRadius: '8px',
-                            fontWeight: '500',
-                            padding: '8px 16px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Clinic
-                        </CNavLink>
-                      </CNavItem>
-
-                      <CNavItem>
-                        <CNavLink
-                          active={activeTab === 'doctor'}
-                          onClick={() =>
-                            (window.location.href = 'https://doctorweb.aesthetech.life')
-                          }
-                          style={{
-                            backgroundColor: activeTab === 'doctor' ? COLORS.primary : COLORS.white,
-                            color: activeTab === 'doctor' ? COLORS.white : COLORS.primary,
-                            border: `1px solid ${COLORS.primary}`,
-                            borderRadius: '8px',
-                            fontWeight: '500',
-                            padding: '8px 16px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Doctor
-                        </CNavLink>
-                      </CNavItem>
-                    </CNav>
 
                     {/* Error message */}
                     {errorMessage && (
                       <div className="alert alert-danger text-center py-2 mb-3">{errorMessage}</div>
                     )}
-
+                    {/* <h6 className='text-center'>{role === "admin" ? "Admin Login" : "Receptionist Login"}</h6> */}
                     {/* CLINIC TAB */}
-                    {activeTab === 'clinic' && (
+                    {['clinic', 'doctor', 'administrator', 'receptionist'].includes(activeTab) && (
                       <CForm onSubmit={handleClinicLogin} noValidate>
-                        {/* Role */}
                         <CFormSelect
-                          className="mb-3"
-                          value={role}
-                          onChange={(e) => setRole(e.target.value)}
-                        >
-                          <option value="admin">Admin</option>
-                          <option value="receptionist">Receptionist</option>
-                          <option value="therapist">Therapist</option>
-                          <option value="intern">Intern</option>
-                          {/* <option value="lab_technician">Lab Technician</option>
-                          <option value="pharmacist">Pharmacist</option> */}
-                          {/* <option value="wardBoy">Ward Boy / Attendant</option>
-                        <option value="security">Security Staff</option> */}
-                        </CFormSelect>
+                          value={activeTab}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            setActiveTab(value)
 
-                        {/* Username */}
+                            let newRole = value
+                            if (value === "clinic") {
+                              newRole = "admin"
+                            } else if (value === "receptionist") {
+                              newRole = "receptionist"
+                            } else if (value === "administrator") {
+                              newRole = "administrator"
+                            }
+
+                            setRole(newRole)
+                            // Note: state updates are async, so logging 'role' directly here shows the previous value.
+                            // We log newRole instead to see what is actually being set.
+                            console.log("Role to send:", newRole)
+                          }}
+                          className="mb-3" style={{ color: COLORS.primary }}
+                        >
+                          <option value="clinic">Super Admin</option>
+                          <option value="administrator">Clinic Admin</option>
+                          <option value="receptionist">Receptionist</option>
+                        </CFormSelect>
                         <CInputGroup className="mb-2">
                           <CInputGroupText>
                             <CIcon icon={cilUser} />
                           </CInputGroupText>
+
                           <CFormInput
                             placeholder="Username"
                             value={userName}
-                            onChange={(e) => {
-                              setUserName(e.target.value)
-                              if (fieldErrors.userName)
-                                setFieldErrors((p) => ({ ...p, userName: '' }))
-                            }}
-                            aria-invalid={!!fieldErrors.userName}
-                            autoComplete="username"
+                            onChange={(e) => setUserName(e.target.value)}
                           />
                         </CInputGroup>
-                        {fieldErrors.userName && (
-                          <small className="text-danger">{fieldErrors.userName}</small>
-                        )}
 
-                        {/* Password */}
                         <CInputGroup className="mt-3 mb-2">
                           <CInputGroupText
                             onClick={() => setShowPassword((s) => !s)}
-                            style={{ cursor: 'pointer' }}
-                            title={showPassword ? 'Hide password' : 'Show password'}
+                            style={{ cursor: "pointer" }}
                           >
                             <CIcon icon={showPassword ? cilLockUnlocked : cilLockLocked} />
                           </CInputGroupText>
+
                           <CFormInput
-                            type={showPassword ? 'text' : 'password'}
+                            type={showPassword ? "text" : "password"}
                             placeholder="Password"
                             value={password}
-                            onChange={(e) => {
-                              setPassword(e.target.value)
-                              if (fieldErrors.password)
-                                setFieldErrors((p) => ({ ...p, password: '' }))
-                            }}
-                            aria-invalid={!!fieldErrors.password}
-                            autoComplete="current-password"
+                            onChange={(e) => setPassword(e.target.value)}
                           />
                         </CInputGroup>
-                        {fieldErrors.password && (
-                          <small className="text-danger">{fieldErrors.password}</small>
-                        )}
-
                         <div
                           className="d-flex justify-content-between mt-2"
                           style={{ color: COLORS.primary }}
@@ -424,17 +369,18 @@ const Login = () => {
                               setShowResetModal(true)
                             }}
                           >
-                            Forgot password?
+                            Reset password?
                           </a>
                         </div>
+
 
                         <CButton
                           type="submit"
                           disabled={isLoading}
-                          className="w-100 mt-4 derma-btn"
-                          style={{ backgroundColor: COLORS.primary, color: 'white' }}
+                          className="w-100 mt-4"
+                          style={{ backgroundColor: COLORS.primary, color: "white" }}
                         >
-                          {isLoading ? <CSpinner size="sm" /> : 'Login'}
+                          {isLoading ? <CSpinner size="sm" style={{ color: "white" }} /> : "Login"}
                         </CButton>
                       </CForm>
                     )}

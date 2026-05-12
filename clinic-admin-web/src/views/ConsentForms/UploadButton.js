@@ -1,9 +1,11 @@
 import { CButton } from '@coreui/react'
 import { Upload } from 'lucide-react'
 import React, { useRef } from 'react'
-import { updateAppointmentBasedOnBookingId } from './consentService'
+
 import { useNavigate } from 'react-router-dom'
 import { showCustomToast } from '../../Utils/Toaster'
+import { bookingUpdate } from '../AppointmentManagement/appointmentAPI'
+import { COLORS } from '../../Constant/Themes'
 
 function UploadButton({ bookingId }) {
   const navigate = useNavigate()
@@ -29,13 +31,13 @@ function UploadButton({ bookingId }) {
         console.log('Final payload:', payload)
 
         try {
-          const res = await updateAppointmentBasedOnBookingId(payload)
+          const res = await bookingUpdate(payload)
           console.log(res)
           if (res) {
-            showCustomToast('Consent form uploaded successfully', 'success')
-            navigate('/dashboard')
+            showCustomToast(res.message || 'Consent form uploaded successfully', 'success')
+            navigate('/dashboard', { replace: true })
           } else {
-            showCustomToast('Consent form not uploaded successfully', 'error')
+            showCustomToast(res.message || 'Consent form not uploaded successfully', 'error')
           }
           // console.log('Consent form uploaded successfully');
         } catch (error) {
@@ -51,8 +53,8 @@ function UploadButton({ bookingId }) {
     <>
       <CButton
         style={{
-          backgroundColor: 'var(--color-bgcolor)',
-          color: 'var(--color-black)',
+          backgroundColor: COLORS.primary,
+          color: COLORS.white,
         }}
         onClick={handleUpload}
         className="d-flex align-items-center gap-1"

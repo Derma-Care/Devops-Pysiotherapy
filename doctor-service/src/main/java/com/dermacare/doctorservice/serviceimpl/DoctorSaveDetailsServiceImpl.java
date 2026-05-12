@@ -353,8 +353,9 @@ public class DoctorSaveDetailsServiceImpl implements DoctorSaveDetailsService {
             // ✅ Include the full treatment details
             bookingData.setTreatments(treatmentResponseDTO);
 
-            // ✅ Update the booking service
-            bookingFeignClient.updateAppointment(bookingData);
+            bookingData.setCurrentStatus(null);
+            bookingData.setListOfConsultationFee(null);
+            bookingFeignClient.updateAppointmentBasedOnBookingId(bookingData);
 
             // ----------------------- Step 12: Build Response -----------------------
             DoctorSaveDetailsDTO savedDto = convertToDto(savedVisit);
@@ -560,7 +561,7 @@ public class DoctorSaveDetailsServiceImpl implements DoctorSaveDetailsService {
             ), "All visit history fetched successfully", HttpStatus.OK.value());
 
         } catch (Exception e) {
-            return buildResponse(false, null, "Error fetching visit history: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR.value());
+            return buildResponse(true, null, "Error fetching visit history: " + e.getMessage(), HttpStatus.OK.value());
         }
     }
 
@@ -948,8 +949,8 @@ public class DoctorSaveDetailsServiceImpl implements DoctorSaveDetailsService {
     
     @Override
     public Response getDoctorDetailsByBookingId(String bookingId) {
-    	try {
-        DoctorSaveDetails optional = repository.findByBookingId(bookingId);
+    	try {   		
+        DoctorSaveDetails optional = repository.findByBookingIdIgnoreCase(bookingId);
         if(optional != null) {
         	ObjectMapper mapper = new ObjectMapper();
 	        mapper.registerModule(new JavaTimeModule());

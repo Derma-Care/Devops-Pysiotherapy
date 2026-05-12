@@ -11,9 +11,12 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.dermaCare.customerService.dto.MutiplePartsDto;
 import com.dermaCare.customerService.dto.QuestionsByPartDTO;
 import com.dermaCare.customerService.dto.QuestionsDTO;
 import com.dermaCare.customerService.service.PhysiotherapyService;
+import com.dermaCare.customerService.util.PysioQuestionsRes;
 import com.dermaCare.customerService.util.Response;
 
 @RestController
@@ -29,7 +32,7 @@ public class PhysiotherapyController {
     }
 
     @GetMapping("/getAll")
-    public ResponseEntity<Response> getAll() {
+    public ResponseEntity<PysioQuestionsRes> getAll() {
         return service.getAll();
     }
 
@@ -44,8 +47,8 @@ public class PhysiotherapyController {
         return service.deleteQuestionByKeyAndId(key, qId );
     }
 
-    @GetMapping("/getByKey")
-    public ResponseEntity<Response> getByKey(@RequestBody List<String> keys) {
+    @PostMapping("/getByKey")
+    public ResponseEntity<Response> getByKey(@RequestBody MutiplePartsDto keys) {
         return service.getByKeys(keys);
     }
   }

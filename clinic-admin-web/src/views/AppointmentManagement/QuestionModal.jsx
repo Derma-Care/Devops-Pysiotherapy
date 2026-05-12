@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   CModal,
   CModalHeader,
@@ -9,21 +9,50 @@ import {
   CButton,
   CFormInput,
   CFormCheck,
+  CSpinner,
 } from "@coreui/react";
+import axios from "axios";
+import { getQuestionsByKey } from "../EmployeeManagement/Therapist/TheraphyApi";
+import { COLORS } from "../../Constant/Themes";
 
-import { questionsByPart } from "./questions";
+
+
+// import { questionsByPart } from "./questions";
 
 export default function QuestionModal({
   visible,
   partId,
   onClose,
   onSave,
+  initialAnswers = {}
 }) {
 
   const partIds = Array.isArray(partId) ? partId : [partId];
 
   const [answers, setAnswers] = useState({});
+  
+  useEffect(() => {
+    if (initialAnswers && Object.keys(initialAnswers).length > 0) {
+      const flatAnswers = {};
+      Object.keys(initialAnswers).forEach(part => {
+        const arr = initialAnswers[part];
+        if (Array.isArray(arr)) {
+          arr.forEach(q => {
+            // For multi-select, answer might be a string separated by commas.
+            // But state expects an array for multi-select. We handle that in mapping if needed,
+            // or just split it. Actually the value in Select checkbox is checked with `.includes(opt)`,
+            // so if it's a string from backend, we should convert it to an array.
+            flatAnswers[`${part}_${q.questionId}`] = q.answer && q.answer.includes(',') ? q.answer.split(', ').map(s=>s.trim()) : q.answer;
+          });
+        }
+      });
+      setAnswers(flatAnswers);
+    }
+  }, [initialAnswers]);
 
+  console.log(partIds)
+  const [loadingQuestions, setLoadingQuestions] = useState(false)
+  const [questionsByPart, setQuestionsByPart] = useState({});
   const handleChange = (key, value) => {
     setAnswers((prev) => ({
       ...prev,
@@ -31,138 +60,260 @@ export default function QuestionModal({
     }));
   };
 
-const handleSave = () => {
 
-  const therapyQuestion = partIds.map((part) => {
+  const fetchQuestions = async () => {
+    if (!partIds || partIds.length === 0) return;
 
-    const questions = questionsByPart[part] || [];
+    try {
+      setLoadingQuestions(true)
 
-    const ans = questions.map((q) => {
+      const res = await getQuestionsByKey(partIds)
 
-      const key = part + "_" + q.questionId;
+      if (res?.data) {
+        setQuestionsByPart(res.data)
+      }
+    } catch (err) {
+      console.log(err)
+    } finally {
+      setLoadingQuestions(false)
+    }
+  }
+
+  // const handleSave = () => {
+
+  //   const therapyQuestion = partIds.map((part) => {
+
+  //     const questions = questionsByPart[part] || [];
+
+  //     const ans = questions.map((q) => {
+
+  //       const key = part + "_" + q.questionId;
+
+  //       return {
+  //         questionId: q.questionId,
+  //         answer: answers[key] || "",
+  //       };
+
+  //     });
+
+  //     return {
+  //       bodyPart: part,
+  //       answers: ans,
+  //     };
+
+  //   });
+
+  //   onSave({
+  //     therapyQuestion,
+  //   });
+
+  // };
+  const handleSave = () => {
+
+    const therapyQuestion = partIds.map((part) => {
+      const questions = questionsByPart?.[part] || [];
+
+      const ans = questions.map((q) => {
+        const key = part + "_" + q.questionId;
+
+        return {
+          questionId: q.questionId,
+          answer: Array.isArray(answers[key])
+            ? answers[key].join(", ")
+            : answers[key] || "",
+        };
+      });
 
       return {
-        questionId: q.questionId,
-        answer: answers[key] || "",
+        bodyPart: part,
+        answers: ans,
       };
-
     });
 
-    return {
-      bodyPart: part,
-      answers: ans,
-    };
+    // ✅ convert to backend format
+    const formattedAnswers = {};
 
-  });
+    therapyQuestion.forEach((item) => {
+      formattedAnswers[item.bodyPart] = item.answers;
+    });
 
-  onSave({
-    therapyQuestion,
-  });
+    // ✅ FINAL CORRECT STRUCTURE
+    onSave({
+      parts: partIds,               // ✅ FIX (was missing / empty)
+      answerData: formattedAnswers, // ✅ NOT array
+    });
+  };
+  useEffect(() => {
+    if (partId) {
+      setQuestionsByPart({})   // ✅ clear old data FIRST
+      fetchQuestions()         // ✅ then fetch
+    }
+  }, [partId])
 
-};
+  const handleMultiSelect = (key, value) => {
+    setAnswers((prev) => {
+      const existing = prev[key] || [];
 
+      if (existing.includes(value)) {
+        // remove
+        return {
+          ...prev,
+          [key]: existing.filter((v) => v !== value),
+        };
+      } else {
+        // add
+        return {
+          ...prev,
+          [key]: [...existing, value],
+        };
+      }
+    });
+  };
   return (
-    <CModal visible={visible} onClose={onClose} size="lg">
+    <>
+      <style>
+        {
 
-      <CModalHeader>
-        <CModalTitle>
-          Assessment - {partIds.join(", ")}
-        </CModalTitle>
-      </CModalHeader>
+          `
+        .form-check-input:checked {
+          background-color: ${COLORS.primary};
+          border-color: ${COLORS.primary};
+        }
+        `
+        }
 
-      <CModalBody>
+      </style >
 
-        {partIds.map((part) => {
+      <CModal visible={visible} onClose={onClose} size="lg" backdrop="static" className="custom-modal">
 
-          const questions = questionsByPart[part] || [];
+        <CModalHeader>
+          <CModalTitle style={{ color: COLORS.primary }}>
+            Assessment - {partIds.join(", ")}
+          </CModalTitle>
+        </CModalHeader>
 
-          return (
-            <div key={part} style={{ marginBottom: 20 }}>
+        <CModalBody>
 
-              <h5>{part.toUpperCase()}</h5>
+          {partIds.map((part) => {
 
-              {questions.length === 0 && (
-                <p>No questions</p>
-              )}
+            const questions = questionsByPart[part] || [];
 
-              {questions.map((q) => {
+            return (
+              <div key={part} style={{ marginBottom: 20, color: COLORS.primary }}>
 
-                const key = part + "_" + q.questionId;
+                <h5>{part.toUpperCase()}</h5>
 
-                return (
-                  <div key={q.questionId} className="mb-3">
+                {loadingQuestions ? (
+                  <div style={{ color: COLORS.primary }}><CSpinner size="sm" /> Loading questions...</div>   // 🔄 loading state
+                ) : questions.length === 0 ? (
+                  <div style={{ color: COLORS.primary }}>No questions</div>          // ❌ only if truly empty
+                ) : null}
 
-                    <label>{q.question}</label>
+                {questions.map((q) => {
 
-                    {/* YES / NO */}
-                    {q.type === "YES/NO" && (
-  <>
-    <CFormCheck
-      type="radio"
-      name={key}
-      label="Yes"
-      value="YES"
-      checked={answers[key] === "YES"}
-      onChange={(e) =>
-        handleChange(key, e.target.value)
-      }
-    />
+                  const key = part + "_" + q.questionId;
 
-    <CFormCheck
-      type="radio"
-      name={key}
-      label="No"
-      value="NO"
-      checked={answers[key] === "NO"}
-      onChange={(e) =>
-        handleChange(key, e.target.value)
-      }
-    />
-  </>
-)}
+                  return (
+                    <div key={q.questionId} className="mb-3">
 
-                    {/* TEXT */}
-                    {q.type === "TEXT" && (
-                      <CFormInput
-                        type="text"
-                        onChange={(e) =>
-                          handleChange(key, e.target.value)
-                        }
-                      />
-                    )}
+                      <label style={{ color: COLORS.primary }}>
+                        {q.question}
+                      </label>
 
-                    {/* NUMBER */}
-                    {q.type === "NUMBER" && (
-                      <CFormInput
-                        type="number"
-                        onChange={(e) =>
-                          handleChange(key, e.target.value)
-                        }
-                      />
-                    )}
+                      {/* YES / NO */}
+                      {q.type === "YES/NO" && (
+                        <div>
+                          <CFormCheck
+                            type="radio"
+                            name={key}
+                            label="Yes"
+                            value="YES"
+                            checked={answers[key] === "YES"}
+                            onChange={(e) => handleChange(key, e.target.value)}
+                            style={{ color: COLORS.primary }}
+                          />
 
-                  </div>
-                );
-              })}
+                          <CFormCheck
+                            type="radio"
+                            name={key}
+                            label="No"
+                            value="NO"
+                            checked={answers[key] === "NO"}
+                            onChange={(e) => handleChange(key, e.target.value)}
+                            style={{ color: COLORS.primary }}
+                          />
+                        </div>
+                      )}
 
-            </div>
-          );
-        })}
+                      {/* TEXT */}
+                      {q.type === "TEXT" && (
+                        <CFormInput
+                          type="text"
+                          value={answers[key] || ""}
+                          onChange={(e) => handleChange(key, e.target.value)}
+                          style={{
+                            color: COLORS.primary,
+                            borderColor: COLORS.primary
+                          }}
+                        />
+                      )}
 
-      </CModalBody>
+                      {/* NUMBER */}
+                      {q.type === "NUMBER" && (
+                        <CFormInput
+                          type="number"
+                          value={answers[key] || ""}
+                          onChange={(e) => handleChange(key, e.target.value)}
+                          style={{
+                            color: COLORS.primary,
+                            borderColor: COLORS.primary
+                          }}
+                        />
+                      )}
 
-      <CModalFooter>
+                      {/* SELECT (Checkbox) */}
+                      {q.type === "SELECT" && (
+                        <div>
+                          {q.options?.map((opt, index) => (
+                            <CFormCheck
+                              key={index}
+                              type="checkbox"
+                              label={opt}
+                              value={opt}
+                              checked={answers[key]?.includes(opt)}
+                              onChange={() => handleMultiSelect(key, opt)}
+                              style={{ color: COLORS.primary }}
+                            />
+                          ))}
+                        </div>
+                      )}
 
-        <CButton color="secondary" onClick={onClose}>
-          Close
-        </CButton>
+                    </div>
+                  );
 
-        <CButton color="primary" onClick={handleSave}>
-          Save
-        </CButton>
+                })}
 
-      </CModalFooter>
 
-    </CModal>
+
+              </div>
+            );
+          })}
+
+        </CModalBody>
+
+        <CModalFooter>
+
+          <CButton color="secondary" onClick={onClose}>
+            Close
+          </CButton>
+
+          <CButton color="primary" onClick={handleSave}>
+            Save
+          </CButton>
+
+        </CModalFooter>
+
+      </CModal>
+    </>
   );
 }

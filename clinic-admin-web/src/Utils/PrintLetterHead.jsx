@@ -4,72 +4,71 @@ import React from 'react'
 import { useHospital } from '../views/Usecontext/HospitalContext'
 import { Building2, Mail, MapPin, Phone } from 'lucide-react'
 
-const PrintLetterHead = ({ children,printDate  }) => {
+const PrintLetterHead = ({ children, printDate }) => {
   const now = printDate ? new Date(printDate) : new Date()
-
   const date = now.toLocaleDateString()
   const time = now.toLocaleTimeString()
-const{selectedHospital} = useHospital()
+  const { selectedHospital } = useHospital()
+
   return (
     <div className="print-letter">
       {/* HEADER */}
       <div className="letter-header">
         <div className="logo">
-        <img
-  src={
-    selectedHospital?.data?.hospitalLogo
-      ? `data:image/jpeg;base64,${selectedHospital.data.hospitalLogo}`
-      : "/logo.png"
-  }
-  alt="logo"
-  style={{ height: 60 }}
-/>
+          <img
+            src={
+              selectedHospital?.data?.hospitalLogo
+                ? `data:image/jpeg;base64,${selectedHospital.data.hospitalLogo}`
+                : '/logo.png'
+            }
+            alt="logo"
+            style={{ height: 60 }}
+          />
         </div>
 
-        <div className="hospital-info" >
-          <h4 className='fw-bold' style={{color:"#000"}}>{selectedHospital?.data?.name}</h4>
-         <div
-  style={{
-    display: "flex",
-    justifyContent: "center", 
-    alignItems: "center",
-    fontSize: "13px",
-    flexDirection:"column",
-    flexWrap: "wrap",
-    color:"gray"
-  }}
->
-  <span style={{ display: "flex", alignItems: "center", gap: 5,color:"gray" }}>
-    <MapPin size={14} />
-    {selectedHospital?.data?.address}
-  </span>
-
-  
-</div>
-        <div
-  style={{
-    display: "flex",
-    justifyContent: "center",
-    gap: "20px",
-    alignItems: "center",
-    fontSize: "13px",
-    marginTop:"5px"
-  }}
->
-  <span style={{ display: "flex", alignItems: "center", gap: 5,color:"gray" }}>
-    <Building2 size={14} />
-    {selectedHospital?.data?.branch}
-  </span>
-  <span style={{ display: "flex", alignItems: "center", gap: 5,color:"gray" }}>
-    <Phone size={14} />
-    {selectedHospital?.data?.contactNumber}
-  </span>
-
-  <span style={{ display: "flex", alignItems: "center", gap: 5 ,color:"gray"}}>
-    <Mail size={14} />
-    {selectedHospital?.data?.emailAddress}
-  </span>
-</div>
+        <div className="hospital-info">
+          <h4 className="fw-bold" style={{ color: '#000' }}>
+            {selectedHospital?.data?.name}
+          </h4>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              fontSize: '13px',
+              flexDirection: 'column',
+              flexWrap: 'wrap',
+              color: 'gray',
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'gray' }}>
+              <MapPin size={14} />
+              {selectedHospital?.data?.address}
+            </span>
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '20px',
+              alignItems: 'center',
+              fontSize: '13px',
+              marginTop: '5px',
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'gray' }}>
+              <Building2 size={14} />
+              {selectedHospital?.data?.branch}
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'gray' }}>
+              <Phone size={14} />
+              {selectedHospital?.data?.contactNumber}
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'gray' }}>
+              <Mail size={14} />
+              {selectedHospital?.data?.emailAddress}
+            </span>
+          </div>
         </div>
 
         <div className="print-info">
@@ -82,109 +81,98 @@ const{selectedHospital} = useHospital()
 
       {/* CONTENT */}
       <div className="letter-body">{children}</div>
+
       {/* FOOTER */}
-<div className="letter-footer">
-  <div className="footer-line"></div>
+      <div className="letter-footer">
+        <div className="footer-line"></div>
+        <div className="footer-content">
+          <div className="footer-left">Authorized Signature</div>
+          <div className="footer-right">Thank You. Visit Again!</div>
+        </div>
+      </div>
 
-  <div className="footer-content">
-    <div className="footer-left">
-      Authorized Signature
-    </div>
+      <style>{`
+        /* ===== CRITICAL: Remove browser print headers/footers (date, URL, title) ===== */
+        @media print {
+          @page {
+            margin: 0mm;
+            size: A4 portrait;
+          }
 
-    <div className="footer-right">
-      Thank You. Visit Again!
-    </div>
-  </div>
-</div>
-<style>
-{`
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+        }
 
-.print-letter {
-  width: 100%;
-  display: block;
-  padding-bottom: 80px; /* space for footer */
-}
+        /* ===== LETTER STYLES ===== */
+        .print-letter {
+          width: 100%;
+          display: block;
+          padding-bottom: 30px;
+        }
 
-.letter-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+        .letter-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
 
-.hospital-info {
-  text-align: center;
-}
+        .hospital-info {
+          text-align: center;
+          flex: 1;
+          padding: 0 12px;
+        }
 
-.print-info {
-  text-align: right;
-}
+        .print-info {
+          text-align: right;
+          white-space: nowrap;
+          font-size: 13px;
+        }
 
-.letter-body {
-  width: 100%;
-}
+        .letter-body {
+          width: 100%;
+        }
 
-/* FOOTER */
+        /* FOOTER */
+        .letter-footer {
+          width: 100%;
+         
+        }
 
-.letter-footer {
-  width: 100%;
-}
+        .footer-line {
+          border-top: 1px solid black;
+          margin-bottom: 5px;
+        }
 
-.footer-line {
-  border-top: 1px solid black;
-  margin-top: 30px;
-  margin-bottom: 5px;
-}
+        .footer-content {
+          display: flex;
+          justify-content: space-between;
+          font-size: 13px;
+        }
 
-.footer-content {
-  display: flex;
-  justify-content: space-between;
-  font-size: 14px;
-}
+        .footer-left { text-align: left; }
+        .footer-right { text-align: right; }
 
-.footer-left {
-  text-align: left;
-}
+        /* PRINT VISIBILITY */
+        @media print {
+          .print-letter,
+          .print-letter * {
+            visibility: visible;
+          }
 
-.footer-right {
-  text-align: right;
-}
+          .letter-footer {
+            /* Footer at natural position — no fixed needed since @page margin is 0 */
+            margin-top: 20px;
+          }
 
-
-/* ================= PRINT ================= */
-
-@media print {
-
-  body * {
-    visibility: hidden;
-  }
-
-  .print-letter,
-  .print-letter * {
-    visibility: visible;
-  }
-
-  .print-letter {
-    position: relative;
-    width: 100%;
-    padding-bottom: 100px; /* important for footer space */
-  }
-
-  .letter-footer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background: white;
-  }
-
-  .no-print {
-    display: none !important;
-  }
-
-}
-
-`}
-</style>
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }

@@ -13,12 +13,13 @@ import React from 'react'
 import { toast } from 'react-toastify'
 import '../views/Style/CustomToast.css' // optional for extra styles
 import { useHospital } from '../views/Usecontext/HospitalContext'
+import { COLORS } from '../Constant/Themes'
 
 const CustomToast = ({ message, type = 'success' }) => {
   const { fetchHospital, selectedHospital } = useHospital()
   return (
-    <div className={`custom-toast ${type}`}>
-      {selectedHospital?.data.hospitalLogo ? (
+    <div style={{ color: COLORS.primary }}>
+      {/* {selectedHospital?.data.hospitalLogo ? (
         <img
           className="profile-image"
           src={
@@ -31,8 +32,8 @@ const CustomToast = ({ message, type = 'success' }) => {
         />
       ) : (
         <div className="spinner"></div>
-      )}
-      <div className="toast-message">{message}</div>
+      )} */}
+      <span className="toast-message" style={{ color: 'white', marginLeft: '8px' }}>{message}</span>
     </div>
   )
 }
@@ -42,13 +43,24 @@ export const showCustomToast = (message, type = 'success') => {
     position: 'top-right',
     autoClose: 3000,
     hideProgressBar: false,
-     toastId: `custom-${message}`,
+    toastId: `custom-${message}`,
     closeOnClick: true,
     pauseOnHover: true,
     draggable: true,
     progress: undefined,
-    closeButton: (
-      <span style={{ color: 'white', fontWeight: 'bold', fontSize: '18px', marginRight: '10px' }}>
+    style: {
+      backgroundColor: "red",
+      color: 'white',
+      fontSize: '16px',
+      fontWeight: 'bold',
+      padding: '10px 15px',
+      borderRadius: '8px',
+    },
+    closeButton: ({ closeToast }) => (
+      <span
+        onClick={closeToast}
+        style={{ color: 'white', fontWeight: 'bold', fontSize: '18px', marginRight: '10px', cursor: 'pointer' }}
+      >
         ×
       </span>
     ),

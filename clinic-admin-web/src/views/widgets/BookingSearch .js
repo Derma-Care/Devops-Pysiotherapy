@@ -12,9 +12,10 @@ import {
   CRow,
 } from '@coreui/react'
 import { toast } from 'react-toastify'
-import { getInProgressfollowupBookings } from '../../APIs/GetFollowUpApi'
+import { getBookingsForFollowUps } from '../../APIs/GetFollowUpApi'
 import { getBookingsByPatientId } from '../../APIs/GetpatinetData'
 import { showCustomToast } from '../../Utils/Toaster'
+import { COLORS } from '../../Constant/Themes'
 
 const BookingSearch = ({
   visitType,
@@ -27,30 +28,86 @@ const BookingSearch = ({
   const [selectedBooking, setSelectedBooking] = useState(null)
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
+  const [searchMessage, setSearchMessage] = useState('')
 
   // 🧠 Common API handler
+  const formatAddress = (address) => {
+    if (!address) return "";
+
+    const {
+      houseNo,
+      street,
+      landmark,
+      city,
+      state,
+      country,
+      postalCode,
+    } = address;
+
+    return [
+      houseNo,
+      street,
+      landmark,
+      city,
+      state,
+      country,
+      postalCode,
+    ]
+      .filter(Boolean) // remove null/undefined
+      .join(", ");
+  };
+
   const fetchBookings = async (apiFunc, searchValue) => {
-    const query = searchValue?.trim()
-    if (!query) return
+    const query = searchValue?.trim();
+    if (!query) return;
 
-    setLoading(true)
+    setLoading(true);
+    setSearchMessage(''); // Reset message on new search
+    setBookingData([]); // Clear previous results immediately
     try {
-      const res = await apiFunc(query)
+      const res = await apiFunc(query);
+      const resData = res?.data;
+      const apiData = resData?.data;
 
-      setBookingData(res?.data?.data || [])
-      console.log('Fetched bookings:', res?.data?.data || [])
+      // Normalize to array and filter out items that have no patientId or name
+      const rawItems = Array.isArray(apiData) ? apiData : [apiData];
+      const validItems = rawItems.filter(
+        (item) => item && item.patientId && item.name
+      );
+
+      if (validItems.length === 0) {
+        setBookingData([]);
+        if (visitType === 'followup') {
+          setSearchMessage('No follow-up booking found for this Booking ID.');
+        } else {
+          setSearchMessage('No patient found.');
+          showCustomToast('No patient records found.', 'info');
+        }
+      } else {
+        const formattedData = validItems.map((item) => ({
+          ...item,
+          patientAddress: formatAddress(item.patientAddress), // ✅ convert to string
+        }));
+        setBookingData(formattedData);
+      }
+
+      console.log("Final bookingData count:", validItems.length);
     } catch (err) {
-      console.error('Error fetching bookings:', err)
-      setBookingData([])
+      console.error("Error fetching bookings:", err);
+      setBookingData([]);
+      const errMsg = err.response?.data?.message || 'Something went wrong while fetching data.';
+      setSearchMessage(errMsg);
+      showCustomToast(errMsg, 'error');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // 🔍 Manual search on button click
   const handleSearch = async () => {
-    if (!patientSearch.trim()) {
-      showCustomToast('Please enter a valid Patient ID / Name / Mobile','error')
+    const trimmedSearch = patientSearch.trim()
+    if (!trimmedSearch) {
+      showCustomToast('Please enter a valid Patient ID / Name / Mobile', 'error')
       return
     }
 
@@ -59,33 +116,50 @@ const BookingSearch = ({
     setModalVisible(false)
 
     if (visitType === 'followup') {
-      await fetchBookings(getInProgressfollowupBookings, patientSearch)
+      await fetchBookings(getBookingsForFollowUps, trimmedSearch)
     } else {
-      await fetchBookings(getBookingsByPatientId, patientSearch)
+      await fetchBookings(getBookingsByPatientId, trimmedSearch)
     }
   }
 
-  // ⚡ Auto-fetch on typing (debounced)
+  // 🧹 Clear search and results
+  const handleClear = () => {
+    setPatientSearch('')
+    setBookingData([])
+    setSearchMessage('')
+    setSelectedBooking(null)
+    setModalVisible(false)
+  }
+
+  // 🧹 Clear when visitType changes
   useEffect(() => {
-    if (!patientSearch.trim()) {
-      setBookingData([])
-      setSelectedBooking(null)
-      setModalVisible(false)
-      return
-    }
+    setBookingData([])
+    setSearchMessage('')
+    setSelectedBooking(null)
+    setModalVisible(false)
+  }, [visitType])
 
-    const delayDebounce = setTimeout(async () => {
-      setSelectedBooking(null) // Reset before new fetch
-      setModalVisible(false)
-      if (visitType === 'followup') {
-        await fetchBookings(getInProgressfollowupBookings, patientSearch)
-      } else {
-        await fetchBookings(getBookingsByPatientId, patientSearch)
-      }
-    }, 600)
+  // ⚡ Auto-fetch on typing (debounced)
+  // useEffect(() => {
+  //   if (!patientSearch.trim()) {
+  //     setBookingData([])
+  //     setSelectedBooking(null)
+  //     setModalVisible(false)
+  //     return
+  //   }
 
-    return () => clearTimeout(delayDebounce)
-  }, [patientSearch, visitType])
+  //   const delayDebounce = setTimeout(async () => {
+  //     setSelectedBooking(null)
+  //     setModalVisible(false)
+  //     if (visitType === 'followup') {
+  //       await fetchBookings(getBookingsForFollowUps, patientSearch)
+  //     } else {
+  //       await fetchBookings(getBookingsByPatientId, patientSearch)
+  //     }
+  //   }, 600)
+
+  //   return () => clearTimeout(delayDebounce)
+  // }, [patientSearch, visitType])
 
   // // ⚡ Auto-fetch on typing (debounced)
   // useEffect(() => {
@@ -119,7 +193,7 @@ const BookingSearch = ({
     if (visitType === 'followup') {
       if (!booking?.doctorId) {
         console.warn('Doctor ID missing for follow-up booking:', booking)
-        showCustomToast('Doctor details missing for this booking.','error')
+        showCustomToast('Doctor details missing for this booking.', 'error')
         return
       }
 
@@ -140,69 +214,56 @@ const BookingSearch = ({
     <div>
       {/* 🔍 Search Bar */}
       <CRow className="mb-3">
-        <CCol md={10}>
+        <CCol md={9}>
           <CFormInput
             type="text"
-            placeholder={visitType === 'followup' ? "Search by Patient ID":"Search by Name / Patient ID / Mobile"}
-            value={patientSearch}
+            placeholder={visitType === 'followup' ? "Search by Booking Id" : "Search by Name / Patient ID / Mobile"}
+            value={patientSearch.toUpperCase()}
             onChange={(e) => setPatientSearch(e.target.value)}
           />
         </CCol>
-        <CCol md={2}>
-          <CButton  style={{color:"white",backgroundColor:"var(--color-black)"}} onClick={handleSearch} disabled={loading}>
+        <CCol md={3} className="d-flex gap-2">
+          <CButton style={{ color: "white", backgroundColor: COLORS.primary }} onClick={handleSearch} disabled={loading} className="flex-grow-1">
             {loading ? 'Searching...' : 'Search'}
+          </CButton>
+          <CButton color="secondary" variant="outline" onClick={handleClear} disabled={loading} className="flex-grow-1">
+            Clear
           </CButton>
         </CCol>
       </CRow>
 
       {/* 📋 Booking List */}
-      {Array.isArray(bookingData) && bookingData.length > 0
-        ? !selectedBooking &&
-          Array.isArray(bookingData) &&
-          bookingData.length > 0 && (
-            <CListGroup className="shadow-sm mb-4">
-              {bookingData.map((item) => (
-                <CListGroupItem
-                  key={item.bookingId}
-                  action
-                  onClick={() => handleSelectBooking(item)}
-                  style={{
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <strong>{item.name}</strong>
-                  <span className="text-muted">{item.patientId}</span>
-                  <span className="text-muted">{item.doctorName}</span>
-                  <span className="text-muted">{item.branchname}</span>
-                </CListGroupItem>
-              ))}
-            </CListGroup>
-          )
-        : !loading &&
-          patientSearch && (
-            <p className="text-muted">
-              {visitType === 'followup'
-                ? `No bookings found for ${patientSearch}`
-                : `No Patient details found for ${patientSearch}`}
-            </p>
-          )}
-      {/* {visitType === 'followup' && (
-        <div className="mt-4 text-end d-flex justify-content-end gap-2">
-          <CButton color="secondary" onClick={onClose}>
-            Cancel
-          </CButton>
+      {bookingData.length > 0 && !selectedBooking && (
+        <CListGroup className="shadow-sm mb-4">
+          {bookingData.map((item) => (
+            <CListGroupItem
+              key={item.patientId}
+              action
+              onClick={() => handleSelectBooking(item)}
+              style={{
+                cursor: 'pointer',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <strong>{item.name}</strong>
+              <span className="text-muted">{item.patientId}</span>
+              <span className="text-muted">{item.doctorName || '-'}</span>
+              <span className="text-muted">{item.branchname || '-'}</span>
+            </CListGroupItem>
+          ))}
+        </CListGroup>
+      )}
 
-          <CButton
-            onClick={() => handleFollowUpSubmit(selectedBooking)}
-            style={{ backgroundColor: 'var(--color-bgcolor)', color: 'var(--color-black)' }}
-          >
-            Submit
-          </CButton>
+      {/* 📢 No Data Message */}
+      {!loading && bookingData.length === 0 && searchMessage && !selectedBooking && (
+        <div className="text-center py-5 mb-4 border rounded shadow-sm bg-light">
+          <h6 className="mb-0 text-muted">
+            {searchMessage}
+          </h6>
         </div>
-      )} */}
+      )}
 
       {/* 🧾 Modal */}
       <CModal
@@ -211,6 +272,7 @@ const BookingSearch = ({
         size="lg"
         backdrop="static"
         className="custom-modal"
+
       >
         <CModalHeader>
           <CModalTitle>

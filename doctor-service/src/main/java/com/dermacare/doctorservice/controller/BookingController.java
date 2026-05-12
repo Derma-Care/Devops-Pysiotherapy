@@ -1,7 +1,5 @@
 package com.dermacare.doctorservice.controller;
 
-
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -78,6 +76,13 @@ public class BookingController {
     public ResponseEntity<?> getDoctorFutureAppointments(@PathVariable String doctorId) {
         return bookingService.getDoctorFutureAppointments(doctorId);
     }
+    
+    @GetMapping("/in-progress/PatientId/bookingId/{patientId}/{bookingId}")
+	   public ResponseEntity<?> getInprogressBookingsByPatientId(
+				 @PathVariable String patientId, @PathVariable String bookingId){
+		   return bookingService.getInProgressBookingsByIds(patientId, bookingId);
+		   
+	 }
 
 }
 
