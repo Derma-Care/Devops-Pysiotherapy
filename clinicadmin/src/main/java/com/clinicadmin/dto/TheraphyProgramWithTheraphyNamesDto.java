@@ -17,5 +17,6 @@ public class TheraphyProgramWithTheraphyNamesDto {
 	private String clinicId;
 	private String branchId;
 	private long theraphyCount;
+	
 
 }
