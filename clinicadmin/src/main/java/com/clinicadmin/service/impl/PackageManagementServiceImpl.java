@@ -247,7 +247,8 @@ public class PackageManagementServiceImpl implements PackageManagementService {
         entity.setProgramIds(dto.getProgramIds());
         entity.setPackageAmount(dto.getPackageAmount());
         entity.setDiscountAmount(dto.getDiscountAmount());
-        entity.setFinalAmount(dto.getFinalAmount());
+        String finalAmount = String.valueOf(Integer.valueOf(dto.getPackageAmount()) - Integer.valueOf(dto.getDiscountAmount()));
+        entity.setFinalAmount(finalAmount);
         // ✅ Apply discount logic
         double finalDiscount = applyDiscountLogic(
                 dto.getStartOfferDate(),
