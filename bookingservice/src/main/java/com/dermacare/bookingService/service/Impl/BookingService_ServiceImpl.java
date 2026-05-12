@@ -384,7 +384,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 			    }
 
 
-			    if (request.getPatientMobileNumber() == null || request.getPatientMobileNumber().trim().isEmpty()) {
+			   if (request.getPatientMobileNumber() == null || request.getPatientMobileNumber().trim().isEmpty()) {
 			    	if(request.getMobileNumber() == null  || request.getMobileNumber().trim().isEmpty()) {
 			        throw new RuntimeException("patientmobilenumber or Mobile Number is mandatory");
 			    }}
@@ -489,7 +489,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	}
 	
 	
-///  getTodayDoctorAppointmentsByDoctorId  /////
+
 public ResponseEntity<?> getTodayDoctorAppointmentsByDoctorId(String clinicId,
             String doctorId) {
 
