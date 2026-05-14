@@ -32,7 +32,7 @@ public interface BookingService_Service {
 	public ResponseEntity<?> getInProgressAppointments(String number);
 	public ResponseEntity<?> retrieveOneWeekAppointments(String cinicId,String branchId);								
 	public ResponseEntity<?> getDoctorFutureAppointments(String doctorId);
-	public List<BookingResponse> getBookedServicesByClinicIdWithBranchId(String clinicId, String branchId);
+	public List<Map<String,Object>> getBookedServicesByClinicIdWithBranchId(String clinicId, String branchId);
 	public ResponseEntity<?> retrieveAppointments(String cinicId,String branchId,String date);
 	public ResponseEntity<?> updateAppointmentBasedOnBookingId(BookingResponse dto);
 	public ResponseEntity<?> getRelationsByCustomerId(String customerId);
