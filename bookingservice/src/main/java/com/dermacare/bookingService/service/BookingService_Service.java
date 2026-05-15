@@ -63,5 +63,10 @@ public ResponseEntity<Response> getBookingById(String bookingId);
 public List<BookingResponse> bookingByPatientIdAndBookingId(String patientId,String bookingId);
 public List<ReportsDTO> getReportsByPatientId(String patientId);
 public void deleteBookedServiceReports(String bookingId,String index);
+public ResponseEntity<?> getBookedServicesByClinicIdWithBranchIdAnddoctorIdAndStatus(
+        String clinicId,
+        String branchId,
+        String doctorId,
+        String status);
 	   	
 }
