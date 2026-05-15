@@ -443,28 +443,13 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	
 	     
 	public ResponseEntity<?> getAppointsByPatientId(String patientId) {
-		ResponseStructure<List<Map<String,Object>>> res = new ResponseStructure<List<Map<String,Object>>>();
-		List<Map<String,Object>> list = new ArrayList<>(); 
-		try {
+		ResponseStructure<List<BookingResponse>> res = new ResponseStructure<List<BookingResponse>>();
+		    try {
 			List<Booking> existingBooking = repository.findByPatientId(patientId);
 			if(existingBooking != null && !existingBooking.isEmpty() ) {
-				 ObjectMapper mapper = new ObjectMapper();
-		         mapper.registerModule(new JavaTimeModule());
-		         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);		        
-			List<BookingResponse> respnse = mapper.convertValue(existingBooking, new TypeReference<List<BookingResponse>>() {});		
-			respnse.stream().map(n->{Map<String,Object> map = new LinkedHashMap<>();
- 			map.put("bookingId", n.getBookingId()); map.put("serviceDate", n.getServiceDate()); map.put("servicetime", n.getServicetime());
- 			map.put("name", n.getName()); map.put("mobileNumber", !n.getPatientMobileNumber().isEmpty() ? n.getPatientMobileNumber() : n.getMobileNumber()); map.put("doctorId", n.getDoctorId());
- 			map.put("doctorName", n.getDoctorName()); map.put("paymentType", n.getPaymentType()); map.put("visitType", n.getVisitType());
- 			map.put("status", n.getStatus()); map.put("followupStatus", n.getFollowupStatus()); map.put("patientId", n.getPatientId());
- 			map.put("clinicId", n.getClinicId()); map.put("customerId", n.getCustomerId());  map.put("branchId", n.getBranchId());		
- 			map.put("age", n.getAge());map.put("gender", n.getGender()); map.put("branchName", n.getBranchname());	
- 			map.put("session", n.getSession());map.put("problem", n.getProblem());				
- 			list.add(map);
- 			return n;
- 			}).toList();	 
+			List<BookingResponse> respnse = new ObjectMapper().convertValue(existingBooking, new TypeReference<List<BookingResponse>>() {});
 			res.setStatusCode(200);
-			res.setData(list);
+			res.setData(respnse);
 			res.setMessage("Appointments Are Found");
 			return ResponseEntity.status(200).body(res); 
 			}else{
@@ -505,10 +490,12 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 
 public ResponseEntity<?> getTodayDoctorAppointmentsByDoctorId(String clinicId,
             String doctorId) {
-List<Map<String,Object>> list = new ArrayList<>();	   
-ResponseStructure<List<Map<String,Object>>> res = new ResponseStructure<>();
+
+ResponseStructure<List<BookingResponse>> res = new ResponseStructure<>();
 List<BookingResponse> responseList = new ArrayList<>();
+
 try {
+
 // Fetch bookings based on clinicId and doctorId
 List<Booking> existingBookings =
 repository.findByClinicIdAndDoctorId(clinicId, doctorId);
@@ -538,28 +525,27 @@ responseList.add(temp);
 }
 }
 }
-responseList.stream().map(n->{Map<String,Object> map = new LinkedHashMap<>();
-map.put("bookingId", n.getBookingId()); map.put("serviceDate", n.getServiceDate()); map.put("servicetime", n.getServicetime());
-map.put("name", n.getName()); map.put("mobileNumber",  !n.getPatientMobileNumber().isEmpty() ? n.getPatientMobileNumber() : n.getMobileNumber()); map.put("doctorId", n.getDoctorId());
-map.put("doctorName", n.getDoctorName()); map.put("paymentType", n.getPaymentType()); map.put("visitType", n.getVisitType());
-map.put("status", n.getStatus()); map.put("followupStatus", n.getFollowupStatus()); map.put("patientId", n.getPatientId());
-map.put("clinicId", n.getClinicId()); map.put("customerId", n.getCustomerId());  map.put("branchId", n.getBranchId());		
-map.put("age", n.getAge());map.put("gender", n.getGender()); map.put("branchName", n.getBranchname());	map.put("problem", n.getProblem());		
-list.add(map);
-return n;
-}).toList();
+
 res.setStatusCode(200);
 res.setHttpStatus(HttpStatus.OK);
-res.setData(list);
-if (!list.isEmpty()) {
+res.setData(responseList);
+
+if (!responseList.isEmpty()) {
 res.setMessage("Today's Appointments Found");
 } else {
 res.setMessage("No Appointments for Today");
-}} else {
+}
+
+} else {
+
 res.setStatusCode(200);
 res.setHttpStatus(HttpStatus.OK);
+res.setData(responseList);
 res.setMessage("Appointments Not Found");
-}} catch (Exception e) {
+}
+
+} catch (Exception e) {
+
 res.setStatusCode(500);
 res.setHttpStatus(HttpStatus.INTERNAL_SERVER_ERROR);
 res.setMessage("Error occurred : " + e.getMessage());
@@ -1678,9 +1664,8 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 		
 	
 		public ResponseEntity<?> getDoctorFutureAppointments(String doctorId){
-			ResponseStructure<List<Map<String,Object>>> res = new ResponseStructure<List<Map<String,Object>>>();
-			List<Map<String,Object>> list = new ArrayList<>();			    
-			try{
+			ResponseStructure<List<BookingResponse>> res = new ResponseStructure<List<BookingResponse>>();
+			   try{
 				List<Booking> booked=repository.findByDoctorId(doctorId);
 				List<BookingResponse> response=new ArrayList<>();
 				if(booked!=null && !booked.isEmpty()){
@@ -1691,24 +1676,15 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 					LocalDate plus = currentDate.plusDays(15);
 						if(!serviceDate.isBefore(currentDate) && !serviceDate.isAfter(plus)){
 							response.add(toResponse(b));}}
-					response.stream().map(n->{Map<String,Object> map = new LinkedHashMap<>();
-				    map.put("bookingId", n.getBookingId()); map.put("serviceDate", n.getServiceDate()); map.put("servicetime", n.getServicetime());
-				    map.put("name", n.getName());  map.put("mobileNumber",  !n.getPatientMobileNumber().isEmpty() ? n.getPatientMobileNumber() : n.getMobileNumber()); map.put("doctorId", n.getDoctorId());
-				    map.put("doctorName", n.getDoctorName()); map.put("paymentType", n.getPaymentType()); map.put("visitType", n.getVisitType());
-				    map.put("status", n.getStatus()); map.put("followupStatus", n.getFollowupStatus()); map.put("patientId", n.getPatientId());
-				    map.put("clinicId", n.getClinicId()); map.put("customerId", n.getCustomerId());  map.put("branchId", n.getBranchId());		
-				    map.put("age", n.getAge());map.put("gender", n.getGender()); map.put("branchName", n.getBranchname()); map.put("problem", n.getProblem());		
-				    list.add(map);
-				    return n;
-				    }).toList();
 					if(response!=null && !response.isEmpty()){
 						res.setStatusCode(200);
 						res.setHttpStatus(HttpStatus.OK);
-						res.setData(list);
+						res.setData(response);
 						res.setMessage("appointments found");
 					}else{
 						res.setStatusCode(200);
 						res.setHttpStatus(HttpStatus.OK);
+						res.setData(response);
 						res.setMessage("appointments not found");}}}
 			catch(Exception e){
 				res.setStatusCode(500);
@@ -1734,9 +1710,8 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 		
 		
 		@Override
-		public List<Map<String,Object>> getBookedServicesByClinicIdWithBranchId(String clinicId, String branchId) {
-			List<Map<String,Object>> list = new ArrayList<>();
-			List<Booking> bookings = repository.findByClinicIdAndBranchId(clinicId, branchId);
+		public List<BookingResponse> getBookedServicesByClinicIdWithBranchId(String clinicId, String branchId) {
+		    List<Booking> bookings = repository.findByClinicIdAndBranchId(clinicId, branchId);
 		    List<Booking> reversedBookings = new ArrayList<>();
 		    for (int i = bookings.size() - 1; i >= 0; i--) {
 		        reversedBookings.add(bookings.get(i));
@@ -1744,158 +1719,7 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 		    if (bookings == null || bookings.isEmpty()) {
 		        return null;
 		    }
-		    List<BookingResponse> rev =  toResponses(reversedBookings);
-		    rev.stream().map(n->{Map<String,Object> map = new LinkedHashMap<>();
-			map.put("bookingId", n.getBookingId()); map.put("serviceDate", n.getServiceDate()); map.put("servicetime", n.getServicetime());
-			map.put("name", n.getName());  map.put("mobileNumber",  !n.getPatientMobileNumber().isEmpty() ? n.getPatientMobileNumber() : n.getMobileNumber()); map.put("doctorId", n.getDoctorId());
-			map.put("doctorName", n.getDoctorName()); map.put("paymentType", n.getPaymentType()); map.put("visitType", n.getVisitType());
-			map.put("status", n.getStatus()); map.put("followupStatus", n.getFollowupStatus()); map.put("patientId", n.getPatientId());
-			map.put("clinicId", n.getClinicId()); map.put("customerId", n.getCustomerId());  map.put("branchId", n.getBranchId());		
-			map.put("age", n.getAge());map.put("gender", n.getGender()); map.put("branchName", n.getBranchname());map.put("problem", n.getProblem());	
-			map.put("session", n.getSession());
-			list.add(map);
-			return n;
-			}).toList();
-		   return list;
-		}
-
-		
-		@Override
-		public ResponseEntity<?> getBookedServicesByClinicIdWithBranchIdAnddoctorIdAndStatus(
-		        String clinicId,
-		        String branchId,
-		        String doctorId,
-		        String status) {
-		        try {
-		        List<Map<String, Object>> list = new ArrayList<>();
-		        List<BookingResponse> reversedBookings = new ArrayList<>();
-
-		        LocalDate currentDate = LocalDate.now(ZoneId.of("Asia/Kolkata"));
-
-		        if (status.equalsIgnoreCase("pending")) {
-                     String requiredStatus = "confirmed";
-		            List<Booking> bookings =
-		                    repository.findByClinicIdAndBranchIdAndDoctorIdAndStatusIgnoreCase(
-		                            clinicId,
-		                            branchId,
-		                            doctorId,
-		                            requiredStatus);
-		            reversedBookings = toResponses(bookings);
-		            // BEFORE current date
-		            reversedBookings = reversedBookings.stream()
-		                    .filter(b -> {
-		                        LocalDate bookingDate = LocalDate.parse(b.getServiceDate());
-		                        return bookingDate.isBefore(currentDate);
-		                    })
-		                    .toList();
-		        } else if (status.equalsIgnoreCase("confirmed")) {		        	
-		            List<Booking> bookings =
-		                    repository.findByClinicIdAndBranchIdAndDoctorIdAndStatusIgnoreCase(
-		                            clinicId,
-		                            branchId,
-		                            doctorId,
-		                            status);
-
-		            reversedBookings = toResponses(bookings);
-
-		            // AFTER current date
-		            reversedBookings = reversedBookings.stream()
-		                    .filter(b -> {
-		                        LocalDate bookingDate = LocalDate.parse(b.getServiceDate());
-		                        return bookingDate.isAfter(currentDate);
-		                    })
-		                    .toList();
-		        }else{
-		            List<Booking> bookings =		            		
-		                    repository.findByClinicIdAndBranchIdAndDoctorIdAndStatusIgnoreCase(
-		                            clinicId,
-		                            branchId,
-		                            doctorId,
-		                            status);
-		            if(!bookings.isEmpty()) {
-		            reversedBookings = toResponses(bookings);
-		            }else {
-		             List<Booking> bkings =		            		
-				                 repository.findByClinicIdAndBranchIdAndDoctorIdAndFollowupStatusIgnoreCase(
-				                            clinicId,
-				                            branchId,
-				                            doctorId,
-				                            status);	
-		            	 reversedBookings = toResponses(bkings);}}
-		        if (reversedBookings != null && !reversedBookings.isEmpty()) {
-
-		            reversedBookings.stream().map(n -> {
-
-		                Map<String, Object> map = new LinkedHashMap<>();
-
-		                map.put("bookingId", n.getBookingId());
-		                map.put("serviceDate", n.getServiceDate());
-		                map.put("servicetime", n.getServicetime());
-		                map.put("name", n.getName());
-
-		                map.put("mobileNumber",
-		                        !n.getPatientMobileNumber().isEmpty()
-		                                ? n.getPatientMobileNumber()
-		                                : n.getMobileNumber());
-
-		                map.put("doctorId", n.getDoctorId());
-		                map.put("doctorName", n.getDoctorName());
-		                map.put("paymentType", n.getPaymentType());
-		                map.put("visitType", n.getVisitType());
-		                map.put("status", n.getStatus());
-		                map.put("followupStatus", n.getFollowupStatus());
-		                map.put("patientId", n.getPatientId());
-		                map.put("clinicId", n.getClinicId());
-		                map.put("customerId", n.getCustomerId());
-		                map.put("branchId", n.getBranchId());
-		                map.put("age", n.getAge());
-		                map.put("gender", n.getGender());
-		                map.put("branchName", n.getBranchname());
-		                map.put("problem", n.getProblem());
-		                map.put("session", n.getSession());
-
-		                list.add(map);
-
-		                return n;
-
-		            }).toList();
-
-		            return ResponseEntity.status(HttpStatus.OK)
-		                    .body(new Response(
-		                            true,
-		                            list,
-		                            null,
-		                            "appointments are found",
-		                            200,
-		                            null,
-		                            null
-		                    ));
-		        }
-
-		        return ResponseEntity.status(HttpStatus.OK)
-		                .body(new Response(
-		                        false,
-		                        null,
-		                        null,
-		                        "No appointments found",
-		                        200,
-		                        null,
-		                        null
-		                ));
-
-		    } catch (Exception e) {
-
-		        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-		                .body(new Response(
-		                        false,
-		                        null,
-		                        null,
-		                        e.getMessage(),
-		                        500,
-		                        null,
-		                        null
-		                ));
-		    }
+		    return toResponses(reversedBookings);
 		}
 
 		
@@ -2868,6 +2692,7 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 		
 		public ResponseEntity<?> getRelationsByCustomerId(String customerId) {
 		    ResponseStructure<Map<String, List<RelationInfoDTO>>> res = new ResponseStructure<>();
+
 		    try {
 		        List<Booking> bookings = repository.findByCustomerId(customerId);
 
@@ -3066,10 +2891,10 @@ public List<Map<String,Object>> getTodayBookings(String cId,String bId) {
     	List<BookingResponse> dto = toResponses(b);
     	dto.stream().map(n->{Map<String,Object> map = new LinkedHashMap<>();
 		    map.put("bookingId", n.getBookingId()); map.put("serviceDate", n.getServiceDate()); map.put("servicetime", n.getServicetime());
-		    map.put("name", n.getName());  map.put("mobileNumber",  !n.getPatientMobileNumber().isEmpty()? n.getPatientMobileNumber() : n.getMobileNumber()); map.put("doctorId", n.getDoctorId());
+		    map.put("name", n.getName()); map.put("mobileNumber", n.getMobileNumber()); map.put("doctorId", n.getDoctorId());
 		    map.put("doctorName", n.getDoctorName()); map.put("paymentType", n.getPaymentType()); map.put("visitType", n.getVisitType());
 		    map.put("status", n.getStatus()); map.put("followupStatus", n.getFollowupStatus()); map.put("patientId", n.getPatientId());
-		    map.put("clinicId", n.getClinicId()); map.put("customerId", n.getCustomerId());  map.put("branchId", n.getBranchId());map.put("problem", n.getProblem());				  
+		    map.put("clinicId", n.getClinicId()); map.put("customerId", n.getCustomerId());  map.put("branchId", n.getBranchId());		  
 		    list.add(map);
 		    return n;
 		    }).toList();  
@@ -3206,6 +3031,7 @@ private static final DateTimeFormatter FORMATTER =
 
 @Override
 public ResponseEntity<Response> getTodayAllBookings(String clinicId, String branchId) {
+
 	try {
 		String today = LocalDate.now().format(FORMATTER);
 		List<Map<String,Object>> list = new ArrayList<>();
@@ -3275,11 +3101,11 @@ public ResponseEntity<Response> getTodayAllBookings(String clinicId, String bran
 			}).toList();}
 		    bookingres.stream().map(n->{Map<String,Object> map = new LinkedHashMap<>();
 		    map.put("bookingId", n.getBookingId()); map.put("serviceDate", n.getServiceDate()); map.put("servicetime", n.getServicetime());
-		    map.put("name", n.getName());  map.put("mobileNumber", !n.getPatientMobileNumber().isEmpty() ? n.getPatientMobileNumber() : n.getMobileNumber()); map.put("doctorId", n.getDoctorId());
+		    map.put("name", n.getName()); map.put("mobileNumber", n.getMobileNumber()); map.put("doctorId", n.getDoctorId());
 		    map.put("doctorName", n.getDoctorName()); map.put("paymentType", n.getPaymentType()); map.put("visitType", n.getVisitType());
 		    map.put("status", n.getStatus()); map.put("followupStatus", n.getFollowupStatus()); map.put("patientId", n.getPatientId());
 		    map.put("clinicId", n.getClinicId()); map.put("customerId", n.getCustomerId());  map.put("branchId", n.getBranchId());
-		    map.put("session", n.getSession());map.put("problem", n.getProblem());				
+		    map.put("session", n.getSession());
 		    list.add(map);
 		    return n;
 		    }).toList();  
@@ -3339,7 +3165,6 @@ public ResponseEntity<Response> getTodayAllBookings(String clinicId, String bran
 public ResponseEntity<Response> getUpcomingBookings(String clinicId,
 													String branchId,
 													int option) {
-	List<Map<String,Object>> list = new ArrayList<>();	 
 	try {
 		int days;
 
@@ -3383,22 +3208,11 @@ public ResponseEntity<Response> getUpcomingBookings(String clinicId,
 				n.setSession(null);}				
 				return n;
 			}).toList();
-			res.stream().map(n->{Map<String,Object> map = new LinkedHashMap<>();
-			map.put("bookingId", n.getBookingId()); map.put("serviceDate", n.getServiceDate()); map.put("servicetime", n.getServicetime());
-			map.put("name", n.getName());  map.put("mobileNumber", !n.getPatientMobileNumber().isEmpty() ? n.getPatientMobileNumber() : n.getMobileNumber()); map.put("doctorId", n.getDoctorId());
-			map.put("doctorName", n.getDoctorName()); map.put("paymentType", n.getPaymentType()); map.put("visitType", n.getVisitType());
-			map.put("status", n.getStatus()); map.put("followupStatus", n.getFollowupStatus()); map.put("patientId", n.getPatientId());
-			map.put("clinicId", n.getClinicId()); map.put("customerId", n.getCustomerId());  map.put("branchId", n.getBranchId());		
-			map.put("age", n.getAge());map.put("gender", n.getGender()); map.put("branchName", n.getBranchname());	
-			map.put("session", n.getSession());map.put("problem", n.getProblem());	
-			
-			list.add(map);
-			return n;
-			}).toList();
 //System.out.println(bookings);
 		} catch (Exception e) {
 			System.out.println("Error while fetching session details: " + e.getMessage());
 		}
+
 		// ✅ Total count
 		long totalCount = bookings.size();
 
@@ -3431,7 +3245,7 @@ public ResponseEntity<Response> getUpcomingBookings(String clinicId,
 		summary.put("endDate", endDate.toString());
 
 		return ResponseEntity.ok(
-				new Response(true, list, summary,
+				new Response(true, res, summary,
 						"Upcoming bookings fetched", 200, null, null)
 		);
 
@@ -3528,7 +3342,7 @@ public ResponseEntity<Response> getBookingByCustomRange(String clinicId,
                                                         String branchId,                                                       
                                                         String start,
                                                         String end) {
-	List<Map<String,Object>> list = new ArrayList<>();	 	
+
     try {
         LocalDate strt = LocalDate.parse(start);
 		String minusday = strt.minusDays(1).format(FORMATTER);
@@ -3552,18 +3366,6 @@ public ResponseEntity<Response> getBookingByCustomRange(String clinicId,
  				}else {
  				n.setSession(null);
  				}return n;}).toList();
-        	res.stream().map(n->{Map<String,Object> map = new LinkedHashMap<>();
- 			map.put("bookingId", n.getBookingId()); map.put("serviceDate", n.getServiceDate()); map.put("servicetime", n.getServicetime());
- 			map.put("name", n.getName()); map.put("mobileNumber", !n.getPatientMobileNumber().isEmpty() ? n.getPatientMobileNumber() : n.getMobileNumber()); map.put("doctorId", n.getDoctorId());
- 			map.put("doctorName", n.getDoctorName()); map.put("paymentType", n.getPaymentType()); map.put("visitType", n.getVisitType());
- 			map.put("status", n.getStatus()); map.put("followupStatus", n.getFollowupStatus()); map.put("patientId", n.getPatientId());
- 			map.put("clinicId", n.getClinicId()); map.put("customerId", n.getCustomerId());  map.put("branchId", n.getBranchId());		
- 			map.put("age", n.getAge());map.put("gender", n.getGender()); map.put("branchName", n.getBranchname());	
- 			map.put("session", n.getSession());map.put("problem", n.getProblem());	
- 			
- 			list.add(map);
- 			return n;
- 			}).toList();	 
         }catch(Exception e) {}
         // ✅ Total count
         long totalCount = bookings.size();
@@ -3590,7 +3392,7 @@ public ResponseEntity<Response> getBookingByCustomRange(String clinicId,
         
 
         return ResponseEntity.ok(
-                new Response(true, list, summary,"Custom range bookings fetched", 200, null, null)
+                new Response(true, res, summary,"Custom range bookings fetched", 200, null, null)
         );
 
     } catch (Exception e) {
