@@ -3,8 +3,10 @@ import { formatDistanceToNow } from 'date-fns'
 import { format, addDays, parse } from 'date-fns'
 import {
   CCard, CCardBody, CRow, CCol, CButton,
+  CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter,
+  CForm, CFormInput, CFormLabel, CInputGroup, CInputGroupText
 } from '@coreui/react'
-import { averageRatings, getAvailableSlots } from '../../Auth/Auth'
+import { averageRatings, getAvailableSlots, updateAvailability, updateLogin } from '../../Auth/Auth'
 import { COLORS } from '../../Themes'
 import { capitalizeEachWord } from '../../utils/CaptalZeWord'
 
@@ -443,13 +445,20 @@ const ListItems = ({ items, fallback }) => {
 /* ══════════════════════════════════════════════════════════════════════════ */
 const DoctorProfile = () => {
   const [doctorDetails, setDoctorDetails] = useState(null)
-  const [activeKey, setActiveKey]         = useState(1)
-  const [ratingsData, setRatingsData]     = useState(null)
-  const [slotsData, setSlotsData]         = useState([])
-  const [doctorImage, setDoctorImage]     = useState(null)
-  const [loading, setLoading]             = useState(false)
-  const [days, setDays]                   = useState([])
-  const [selectedDate, setSelectedDate]   = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [activeKey, setActiveKey] = useState(1)
+  const [ratingsData, setRatingsData] = useState(null)
+  const [slotsData, setSlotsData] = useState([])
+  const [doctorImage, setDoctorImage] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [days, setDays] = useState([])
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+
+  // Password Modal State
+  const [showPassModal, setShowPassModal] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passLoading, setPassLoading] = useState(false)
+  const [passMsg, setPassMsg] = useState({ type: '', text: '' })
 
   useEffect(() => {
     const today = new Date()
@@ -464,10 +473,14 @@ const DoctorProfile = () => {
     if (stored) {
       try {
         const parsed = JSON.parse(stored)
-        if (parsed.doctorPicture) {
-          setDoctorImage(parsed.doctorPicture.startsWith('data:image')
-            ? parsed.doctorPicture
-            : `data:image/jpeg;base64,${parsed.doctorPicture}`)
+        const clinicStored = localStorage.getItem('clinicDetails')
+        const clinicParsed = clinicStored ? JSON.parse(clinicStored) : null
+
+        const rawPic = parsed.doctorPicture || parsed.profilePicture || clinicParsed?.hospitalLogo || clinicParsed?.clinicLogo
+        if (rawPic) {
+          setDoctorImage(rawPic.startsWith('data:image')
+            ? rawPic
+            : `data:image/jpeg;base64,${rawPic}`)
         }
         setDoctorDetails(parsed)
       } catch (e) { console.error(e) }
@@ -501,6 +514,39 @@ const DoctorProfile = () => {
   const slotsForSelectedDate = slotsData.find(
     (day) => normalizeDate(day.date) === selectedDate
   )?.availableSlots || []
+
+  const handlePasswordUpdate = async (e) => {
+    e.preventDefault()
+    if (!newPassword || !confirmPassword) {
+      setPassMsg({ type: 'danger', text: 'Please fill all fields' })
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPassMsg({ type: 'danger', text: 'Passwords do not match' })
+      return
+    }
+
+    setPassLoading(true)
+    setPassMsg({ type: '', text: '' })
+    try {
+      const doctorMobile = localStorage.getItem('doctorMobileNumber')
+      if (!doctorMobile) throw new Error("Doctor mobile not found")
+
+      await updateLogin({ password: newPassword }, doctorMobile)
+      setPassMsg({ type: 'success', text: 'Password updated successfully!' })
+      setTimeout(() => {
+        setShowPassModal(false)
+        setNewPassword('')
+        setConfirmPassword('')
+        setPassMsg({ type: '', text: '' })
+      }, 1500)
+    } catch (err) {
+      console.error(err)
+      setPassMsg({ type: 'danger', text: err.response?.data?.message || 'Failed to update password' })
+    } finally {
+      setPassLoading(false)
+    }
+  }
 
   const TABS = [
     { key: 1, label: '👤 Doctor Info' },
@@ -541,9 +587,46 @@ const DoctorProfile = () => {
                   : <div className="dp-avatar-placeholder">No Image</div>
                 }
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="dp-hero-badge">
-                    <div className="dp-hero-badge-dot" />
-                    <span className="dp-hero-badge-txt">Active Doctor</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+                    <div className="dp-hero-badge">
+                      <div className="dp-hero-badge-dot" style={{ background: doctorDetails?.isAvailable ? COLORS.green : COLORS.rose }} />
+                      <span className="dp-hero-badge-txt">{doctorDetails?.isAvailable ? 'Active Doctor' : 'Inactive'}</span>
+                    </div>
+
+                    {/* Availability Toggle */}
+                    <button
+                      onClick={async () => {
+                        const newStatus = !doctorDetails?.isAvailable;
+                        try {
+                          const doctorId = localStorage.getItem('doctorId');
+                          await updateAvailability(doctorId, { isAvailable: newStatus });
+                          const updated = { ...doctorDetails, isAvailable: newStatus };
+                          setDoctorDetails(updated);
+                          localStorage.setItem('doctorDetails', JSON.stringify(updated));
+                        } catch (err) {
+                          console.error("Failed to update availability:", err);
+                        }
+                      }}
+                      style={{
+                        background: doctorDetails?.isAvailable ? COLORS.rose : COLORS.green,
+                        color: '#fff', border: 'none', borderRadius: 8, padding: '4px 12px',
+                        fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s'
+                      }}
+                    >
+                      {doctorDetails?.isAvailable ? '⭕ Set Inactive' : '🟢 Set Active'}
+                    </button>
+
+                    {/* <button 
+                      onClick={() => setShowPassModal(true)}
+                      style={{
+                        background: 'rgba(255,255,255,0.1)',
+                        color: '#fff', border: '1px solid rgba(255,255,255,0.3)', 
+                        borderRadius: 8, padding: '4px 12px',
+                        fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s'
+                      }}
+                    >
+                      🔐 Change Password
+                    </button> */}
                   </div>
                   <div className="dp-hero-name">
                     {capitalizeEachWord(doctorDetails?.doctorName) || 'Doctor Name'}
@@ -586,12 +669,12 @@ const DoctorProfile = () => {
               </div>
               <div className="dp-card-body">
                 <div className="dp-info-grid">
-                  <InfoItem label="Email"            value={doctorDetails?.doctorEmail} />
-                  <InfoItem label="Phone"            value={doctorDetails?.doctorMobileNumber} />
-                  <InfoItem label="Gender"           value={doctorDetails?.gender} />
-                  <InfoItem label="Languages"        value={doctorDetails?.languages?.join(', ')} />
-                  <InfoItem label="Available Days"   value={doctorDetails?.availableDays} />
-                  <InfoItem label="Available Times"  value={doctorDetails?.availableTimes} />
+                  <InfoItem label="Email" value={doctorDetails?.doctorEmail} />
+                  <InfoItem label="Phone" value={doctorDetails?.doctorMobileNumber} />
+                  <InfoItem label="Gender" value={doctorDetails?.gender} />
+                  <InfoItem label="Languages" value={doctorDetails?.languages?.join(', ')} />
+                  <InfoItem label="Available Days" value={doctorDetails?.availableDays} />
+                  <InfoItem label="Available Times" value={doctorDetails?.availableTimes} />
                 </div>
 
                 {/* Signature */}
@@ -599,9 +682,9 @@ const DoctorProfile = () => {
                   <div className="dp-section-label">Doctor Signature</div>
                   {doctorDetails?.doctorSignature
                     ? <div className="dp-sig-box">
-                        <img src={doctorDetails.doctorSignature} alt="Signature"
-                          style={{ height: 56, display: 'block' }} />
-                      </div>
+                      <img src={doctorDetails.doctorSignature} alt="Signature"
+                        style={{ height: 56, display: 'block' }} />
+                    </div>
                     : <span style={{ fontSize: 13, color: '#9ca3af' }}>No signature uploaded</span>
                   }
                 </div>
@@ -769,9 +852,9 @@ const DoctorProfile = () => {
                               <div className="dp-feedback-time">
                                 {fb.dateAndTimeAtRating
                                   ? formatDistanceToNow(
-                                      parse(fb.dateAndTimeAtRating, 'dd-MM-yyyy hh:mm:ss a', new Date()),
-                                      { addSuffix: true }
-                                    )
+                                    parse(fb.dateAndTimeAtRating, 'dd-MM-yyyy hh:mm:ss a', new Date()),
+                                    { addSuffix: true }
+                                  )
                                   : 'Unknown time'}
                               </div>
                             </div>
@@ -812,8 +895,8 @@ const DoctorProfile = () => {
                   <div style={{ display: 'flex', flexWrap: 'wrap' }}>
                     {doctorDetails?.category?.length
                       ? doctorDetails.category.map(c => (
-                          <span key={c.categoryId} className="dp-service-tag">{c.categoryName}</span>
-                        ))
+                        <span key={c.categoryId} className="dp-service-tag">{c.categoryName}</span>
+                      ))
                       : <p style={{ fontSize: 13, color: '#9ca3af', margin: 0 }}>No categories listed</p>
                     }
                   </div>
@@ -823,8 +906,8 @@ const DoctorProfile = () => {
                   <div style={{ display: 'flex', flexWrap: 'wrap' }}>
                     {doctorDetails?.service?.length
                       ? doctorDetails.service.map(s => (
-                          <span key={s.serviceId} className="dp-service-tag">{s.serviceName}</span>
-                        ))
+                        <span key={s.serviceId} className="dp-service-tag">{s.serviceName}</span>
+                      ))
                       : <p style={{ fontSize: 13, color: '#9ca3af', margin: 0 }}>No services listed</p>
                     }
                   </div>
@@ -834,10 +917,10 @@ const DoctorProfile = () => {
                   <div style={{ display: 'flex', flexWrap: 'wrap' }}>
                     {doctorDetails?.subServices?.length
                       ? doctorDetails.subServices.map((sub, i) => (
-                          <span key={i} className="dp-service-tag">
-                            {typeof sub === 'string' ? sub : sub.subServiceName || 'Unnamed'}
-                          </span>
-                        ))
+                        <span key={i} className="dp-service-tag">
+                          {typeof sub === 'string' ? sub : sub.subServiceName || 'Unnamed'}
+                        </span>
+                      ))
                       : <p style={{ fontSize: 13, color: '#9ca3af', margin: 0 }}>No sub-services listed</p>
                     }
                   </div>
@@ -846,6 +929,88 @@ const DoctorProfile = () => {
             </div>
           </div>
         )}
+
+        {/* ── PASSWORD MODAL ─────────────────────────────────────── */}
+        <CModal
+          visible={showPassModal}
+          onClose={() => {
+            if (!passLoading) {
+              setShowPassModal(false)
+              setPassMsg({ type: '', text: '' })
+              setNewPassword('')
+              setConfirmPassword('')
+            }
+          }}
+          alignment="center"
+          size="sm"
+        >
+          <CModalHeader closeButton={!passLoading}>
+            <CModalTitle style={{ fontSize: '1rem', fontWeight: 700, color: '#1B4F8A' }}>
+              Update Password
+            </CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            <CForm onSubmit={handlePasswordUpdate}>
+              <div className="mb-3">
+                <CFormLabel style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4b5563' }}>New Password</CFormLabel>
+                <CInputGroup>
+                  <CInputGroupText>🔒</CInputGroupText>
+                  <CFormInput
+                    type="password"
+                    placeholder="Enter new password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    style={{ fontSize: '0.9rem' }}
+                  />
+                </CInputGroup>
+              </div>
+              <div className="mb-3">
+                <CFormLabel style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4b5563' }}>Confirm Password</CFormLabel>
+                <CInputGroup>
+                  <CInputGroupText>✅</CInputGroupText>
+                  <CFormInput
+                    type="password"
+                    placeholder="Confirm new password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    style={{ fontSize: '0.9rem' }}
+                  />
+                </CInputGroup>
+              </div>
+              {passMsg.text && (
+                <div className={`alert alert-${passMsg.type}`} style={{ fontSize: '0.8rem', padding: '8px 12px', marginBottom: 0 }}>
+                  {passMsg.text}
+                </div>
+              )}
+            </CForm>
+          </CModalBody>
+          <CModalFooter>
+            <CButton
+              color="secondary"
+              variant="ghost"
+              onClick={() => setShowPassModal(false)}
+              disabled={passLoading}
+              style={{ fontSize: '0.85rem' }}
+            >
+              Cancel
+            </CButton>
+            <CButton
+              color="primary"
+              onClick={handlePasswordUpdate}
+              disabled={passLoading}
+              style={{
+                fontSize: '0.85rem',
+                background: '#1B4F8A',
+                borderColor: '#1B4F8A',
+                boxShadow: '0 4px 12px rgba(27,79,138,0.25)'
+              }}
+            >
+              {passLoading ? 'Updating...' : 'Update Password'}
+            </CButton>
+          </CModalFooter>
+        </CModal>
 
       </div>
     </>

@@ -5,7 +5,9 @@ import {
   appointmentsCountbaseUrl,
   clinicbaseUrl,
   doctorbaseUrl,
-  updateLoginEndpoint,
+  updatePasswordEndpoint,
+  updateAvailabilityEndpoint,
+  getDoctorByIdEndpoint,
   testsbaseUrl,
   diseasesbaseUrl,
   treatmentsbaseUrl,
@@ -33,12 +35,13 @@ import {
   therapyUrl,
   exerciseUrl,
   packageUrl,
+  packageUrlId,
   programUrlId,
   therapyUrlId,
   exerciseUrlId,
-  packageUrlId,
   getInProgressDetailsEndpoint,
   visitHistoryByPatientIdAndBookingIdEndpoint,
+  ipUrl,
 } from './BaseUrl'
 
 export const postLogin = async (payload, endpoint) => {
@@ -59,14 +62,19 @@ export const postLogin = async (payload, endpoint) => {
 
 export const getDoctorDetails = async () => {
   const doctorId = localStorage.getItem('doctorId')
+  if (!doctorId || doctorId === 'undefined') return null
   try {
-    const response = await api.get(`${doctorbaseUrl}/${doctorId}`)
-    const doctorData = response.data.data
-    console.log('✅ Doctor Details:', doctorData)
-    return doctorData
+    const response = await api.get(`${doctorbaseUrl}/getDoctorById/${doctorId}`)
+    return response.data?.data || response.data
   } catch (error) {
-    console.error('❌ Error fetching doctor details:', error)
-    throw error
+    console.error('❌ Error fetching from physiotherapy-doctor, trying /api/doctors...', error)
+    try {
+      const altResponse = await api.get(`${ipUrl}/api/doctors/getDoctorById/${doctorId}`)
+      return altResponse.data?.data || altResponse.data
+    } catch (err2) {
+      console.error('❌ Both doctor detail APIs failed.', err2)
+      return null
+    }
   }
 }
 
@@ -126,15 +134,33 @@ export const getTodayFutureAppointments = async () => {
   }
 }
 
-export const getAppointments = async (number) => {
+export const getAppointments = async (status) => {
   const doctorId = localStorage.getItem('doctorId')
   const hospitalId = localStorage.getItem('hospitalId')
+  const branchId = localStorage.getItem('branchId')
   try {
-    const response = await api.get(`${appointmentsbaseUrl}/${hospitalId}/${doctorId}/${number}`)
-    const appointments = response?.data?.data
-    return Array.isArray(appointments) ? appointments : []
+    const response = await api.get(`${appointmentsbaseUrl}/${hospitalId}/000101/${doctorId}/${status}`)
+    console.log(`📡 getAppointments(${status}) raw:`, response.data)
+
+    // Check various common locations for the array
+    let data = response?.data?.data
+    if (!Array.isArray(data)) {
+      if (Array.isArray(response?.data)) {
+        data = response.data
+      } else if (Array.isArray(response?.data?.data?.appointments)) {
+        data = response.data.data.appointments
+      } else if (Array.isArray(response?.data?.data?.list)) {
+        data = response.data.data.list
+      } else if (data && typeof data === 'object') {
+        // If data is an object, try to find any array property
+        const arrayProp = Object.values(data).find(v => Array.isArray(v))
+        if (arrayProp) data = arrayProp
+      }
+    }
+
+    return Array.isArray(data) ? data : []
   } catch (error) {
-    console.error('❌ Error fetching appointment details:', error)
+    console.error('❌ Error fetching appointments:', error)
     return []
   }
 }
@@ -400,10 +426,32 @@ export const averageRatings = async (doctorId) => {
 
 export const updateLogin = async (payload, userName) => {
   try {
-    const response = await api.put(`/api/doctors/update-password/${userName}`, payload)
+    const response = await api.put(`${doctorbaseUrl}/${updatePasswordEndpoint}/${userName}`, payload)
     return response.data
   } catch (err) {
     console.error('Update login error:', err)
+    throw err
+  }
+}
+
+
+
+export const getDoctorById = async (doctorId) => {
+  try {
+    const response = await api.get(`${doctorbaseUrl}/${getDoctorByIdEndpoint}/${doctorId}`)
+    return response.data
+  } catch (err) {
+    console.error('Error fetching doctor by ID:', err)
+    throw err
+  }
+}
+
+export const updateAvailability = async (doctorId, payload) => {
+  try {
+    const response = await api.put(`${doctorbaseUrl}/${updateAvailabilityEndpoint}/${doctorId}`, payload)
+    return response.data
+  } catch (err) {
+    console.error('Update availability error:', err)
     throw err
   }
 }
@@ -627,6 +675,19 @@ export const getInProgressDetails = async (patientId, bookingId) => {
   }
 };
 
+export const getExerciseSessionsWithRecords = async (clinicId, branchId, bookingId, patientId, therapistRecordId) => {
+  try {
+    const response = await api.get(
+      `${baseUrl}/payment/getExerciseSessionsWithRecords/${clinicId}/${branchId}/${bookingId}/${patientId}/${therapistRecordId}`
+    );
+    console.log("✅ Exercise Sessions with Records:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("❌ Error fetching exercise sessions with records:", error);
+    throw error;
+  }
+};
+
 export const getMedicineTypes = async () => {
   const clinicId = localStorage.getItem("hospitalId")
   try {
@@ -766,15 +827,30 @@ export const addOrSearchMedicine = async (medicineName) => {
     console.error("❌ Error adding medicine:", error.response?.data || error.message)
     return false
   }
+
+
 }
 
-export const getBookingDetails = async (clinicId, branchId) => {
+export const getBookingDetails = async (booking) => {
+  const bookingId = typeof booking === 'object' ? booking.bookingId : booking
+  if (!bookingId) {
+    console.warn('⚠️ getBookingDetails called without a valid bookingId')
+    return null
+  }
   try {
-    const response = await api.get(`${bookingDetailsUrl}/${clinicId}/${branchId}`)
+    const url = `${ipUrl}/api/customer/getBookedService/${bookingId}`
+    console.log('📡 getBookingDetails requesting:', url)
+    const response = await api.get(url)
+
+    // The API might return { data: { ... } } or { success: true, data: { ... } }
+    // We want the inner data object.
+    if (response.data?.data) {
+      return response.data.data
+    }
     return response.data
   } catch (error) {
     console.error('❌ Booking API Error:', error)
-    throw error
+    return null
   }
 }
 
@@ -799,6 +875,18 @@ export const getTherapyExercises = async (clinicId, branchId) => {
     return []
   }
 }
+
+export const getFollowUpRecord = async (clinicId, branchId, patientId, bookingId) => {
+  try {
+    const response = await api.get(`${ipUrl}/api/physiotherapy-doctor/get-record/${clinicId}/${branchId}/${patientId}/${bookingId}`)
+    console.log('✅ FollowUp Record API:', response.data)
+    return response.data?.data || response.data
+  } catch (error) {
+    console.error('❌ FollowUp Record API Error:', error)
+    return null
+  }
+}
+
 
 export const createDoctorSaveDetails = async (prescriptionData) => {
   try {

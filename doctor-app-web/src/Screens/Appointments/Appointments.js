@@ -23,25 +23,49 @@ import { getAppointments } from '../../Auth/Auth'
 import { useDoctorContext } from '../../Context/DoctorContext'
 
 const tabLabels = {
-  upcoming: 'Upcoming',
-  inprogress: 'In-Progress',
+  all: 'All',
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  dueForInvestigation: 'Due for Investigation',
+  investigationDone: 'Investigation Done',
+  followUpNeeded: 'Follow-up Needed',
+  cancelled: 'Cancelled',
+  rescheduled: 'Rescheduled',
+  drop: 'Drop',
+  noReply: 'No Reply',
   completed: 'Completed',
+  "on-going": 'On-Going',
+  inprogress: "In-Progress",
+
+  followUpPending: 'Follow-up Pending',
 }
 
-const tabToNumberMap = {
-  upcoming: 1,
-  inprogress: 4,
-  completed: 3,
+const tabToStatusMap = {
+  all: 'All',
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  cancelled: 'Cancelled',
+  completed: 'Completed',
+  inprogress: 'In-Progress',
+  noshow: 'No Reply',
+  dueForInvestigation: 'Due for Investigation',
+  investigationDone: 'Investigation Done',
+  followUpNeeded: 'Follow-up Needed',
+  rescheduled: 'Rescheduled',
+  drop: 'Drop',
+  noReply: 'No Reply',
+  followUpPending: 'Follow-up Pending',
 }
 
 const Appointments = ({ searchTerm = '' }) => {
   const { doctorDetails } = useDoctorContext()
   const branches = doctorDetails?.branches || []
 
-  const [activeTab, setActiveTab] = useState('upcoming')
+  const [activeTab, setActiveTab] = useState('all')
   const [appointments, setAppointments] = useState([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('All')
+  const [searchQuery, setSearchQuery] = useState('')
   const [selectedBranch, setSelectedBranch] = useState(null)
   const [selectedDate, setSelectedDate] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -68,19 +92,23 @@ const Appointments = ({ searchTerm = '' }) => {
     setLoading(true)
     try {
       if (activeTab === 'all') {
-        const [upcoming, active, completed] = await Promise.all([
-          getAppointments(`1?_=${Date.now()}`),
-          getAppointments(`4?_=${Date.now()}`),
-          getAppointments(`3?_=${Date.now()}`),
+        const [upcoming, active, completed, cancelled, drop] = await Promise.all([
+          getAppointments('Confirmed'),
+          getAppointments('In-Progress'),
+          getAppointments('Completed'),
+          getAppointments('Cancelled'),
+          getAppointments('Drop'),
         ])
         setAppointments([
           ...(upcoming || []),
           ...(active || []),
           ...(completed || []),
+          ...(cancelled || []),
+          ...(drop || []),
         ])
       } else {
-        const tabNumber = tabToNumberMap[activeTab]
-        const data = await getAppointments(`${tabNumber}?_=${Date.now()}`)
+        const status = tabToStatusMap[activeTab]
+        const data = await getAppointments(status)
         setAppointments(data || [])
       }
     } catch (err) {
@@ -97,14 +125,16 @@ const Appointments = ({ searchTerm = '' }) => {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [activeTab, filter, selectedBranch, selectedDate, searchTerm])
+  }, [activeTab, filter, selectedBranch, selectedDate, searchTerm, searchQuery])
 
-  const safeSearch = searchTerm.toLowerCase()
+  const safeSearch = (searchQuery || searchTerm).toLowerCase()
 
   const filteredPatients = Array.isArray(appointments)
     ? appointments
       .filter((p) => {
-        const matchesSearch = p.name?.toLowerCase().includes(safeSearch)
+        const matchesSearch =
+          p.name?.toLowerCase().includes(safeSearch) ||
+          p.patientMobileNumber?.toLowerCase().includes(safeSearch) || p.mobileNumber?.toLowerCase().includes(safeSearch)
         const matchesFilter =
           filter === 'All' ||
           filter === 'First-Time & Follow-up' ||
@@ -206,7 +236,7 @@ const Appointments = ({ searchTerm = '' }) => {
                           ({filteredPatients.length})
                         </span>
                       </CDropdownToggle>
-                      <CDropdownMenu placement="end">
+                      <CDropdownMenu placement="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
                         <CDropdownItem
                           active={activeTab === 'all'}
                           onClick={() => {
@@ -217,7 +247,7 @@ const Appointments = ({ searchTerm = '' }) => {
                         >
                           All
                         </CDropdownItem>
-                        {Object.keys(tabLabels).map((key) => (
+                        {Object.keys(tabLabels).filter(k => k !== 'all').map((key) => (
                           <CDropdownItem
                             key={key}
                             active={activeTab === key}
@@ -232,6 +262,64 @@ const Appointments = ({ searchTerm = '' }) => {
                         ))}
                       </CDropdownMenu>
                     </CDropdown>
+
+                    {/* Search Bar */}
+                    <div style={{ position: 'relative' }}>
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: '10px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          color: COLORS.black,
+                          pointerEvents: 'none',
+                          fontSize: '13px',
+                        }}
+                      >
+                        🔍
+                      </span>
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search patient name or mobile..."
+                        style={{
+                          width: '260px',
+                          paddingLeft: '32px',
+                          paddingRight: searchQuery ? '28px' : '10px',
+                          paddingTop: '6px',
+                          paddingBottom: '6px',
+                          borderRadius: '8px',
+                          border: `1.5px solid ${COLORS.bgcolor}40`,
+                          fontSize: '13px',
+                          outline: 'none',
+                          backgroundColor: COLORS.white,
+                          color: COLORS.black,
+                          transition: 'border-color 0.2s',
+                        }}
+                        onFocus={(e) => (e.target.style.borderColor = COLORS.bgcolor)}
+                        onBlur={(e) => (e.target.style.borderColor = `${COLORS.bgcolor}40`)}
+                      />
+                      {searchQuery && (
+                        <button
+                          onClick={() => setSearchQuery('')}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: COLORS.black,
+                            fontSize: '13px',
+                            padding: 0,
+                          }}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
 
                     {/* First-Time & Follow-up */}
                     {/* <button
@@ -352,7 +440,7 @@ const Appointments = ({ searchTerm = '' }) => {
                     className="text-nowrap"
                     style={{ fontSize: '0.875rem' }}
                   >
-                    {['S.No', 'Name', 'Mobile', 'Date', 'Time', 'Consultation', 'Branch', 'Status', 'Action'].map(
+                    {['S.No', 'Name', 'Mobile', 'Date', 'Time', 'Branch', 'Visit Type', 'Follow-up Status', 'Status', 'Action'].map(
                       (header) => (
                         <CTableHeaderCell
                           key={header}
@@ -376,7 +464,7 @@ const Appointments = ({ searchTerm = '' }) => {
                   {loading ? (
                     <CTableRow>
                       <CTableDataCell
-                        colSpan={9}
+                        colSpan={10}
                         className="text-center py-4"
                         style={{ color: COLORS.black, fontSize: '14px' }}
                       >
@@ -386,7 +474,7 @@ const Appointments = ({ searchTerm = '' }) => {
                   ) : currentPatients.length === 0 ? (
                     <CTableRow>
                       <CTableDataCell
-                        colSpan={9}
+                        colSpan={10}
                         className="text-center py-4"
                         style={{ color: COLORS.gray, fontSize: '14px' }}
                       >
@@ -410,7 +498,7 @@ const Appointments = ({ searchTerm = '' }) => {
                           {p.name ? p.name.charAt(0).toUpperCase() + p.name.slice(1) : 'NA'}
                         </CTableDataCell>
                         <CTableDataCell style={{ padding: '10px 12px', color: COLORS.black }}>
-                          {p.mobileNumber}
+                          {p.patientMobileNumber || p.mobileNumber}
                         </CTableDataCell>
                         <CTableDataCell style={{ padding: '10px 12px', color: COLORS.black }}>
                           {p.serviceDate}
@@ -418,7 +506,7 @@ const Appointments = ({ searchTerm = '' }) => {
                         <CTableDataCell style={{ padding: '10px 12px', color: COLORS.black }}>
                           {p.servicetime}
                         </CTableDataCell>
-                        <CTableDataCell style={{ padding: '10px 12px' }}>
+                        {/* <CTableDataCell style={{ padding: '10px 12px' }}>
                           <span
                             style={{
                               backgroundColor: '#EAF1FB',
@@ -431,7 +519,7 @@ const Appointments = ({ searchTerm = '' }) => {
                           >
                             {p.consultationType}
                           </span>
-                        </CTableDataCell>
+                        </CTableDataCell> */}
                         <CTableDataCell
                           style={{
                             padding: '10px 12px',
@@ -443,17 +531,27 @@ const Appointments = ({ searchTerm = '' }) => {
                         >
                           {branches.find((b) => b.branchId === p.branchId)?.branchName || 'N/A'}
                         </CTableDataCell>
+                        <CTableDataCell style={{ padding: '10px 12px', color: COLORS.black, textTransform: 'capitalize' }}>
+                          {p.visitType ? p.visitType.replace(/_/g, ' ').toLowerCase() : 'N/A'}
+                        </CTableDataCell>
+                        <CTableDataCell style={{ padding: '10px 12px', color: COLORS.black, textTransform: 'capitalize' }}>
+                          {p.followupStatus || 'N/A'}
+                        </CTableDataCell>
                         <CTableDataCell style={{ padding: '10px 12px' }}>
                           <span
                             style={{
                               backgroundColor:
                                 p.status === 'Confirmed' ? '#EAF7F0'
                                   : p.status === 'In-Progress' ? '#FFF4E0'
-                                    : '#F0F6FF',
+                                    : p.status === 'Cancelled' ? '#FFF0F0'
+                                      : p.status === 'No-Show' ? '#F4F4F4'
+                                        : '#F0F6FF',
                               color:
                                 p.status === 'Confirmed' ? '#1B8A56'
                                   : p.status === 'In-Progress' ? COLORS.orange
-                                    : COLORS.black,
+                                    : p.status === 'Cancelled' ? '#D32F2F'
+                                      : p.status === 'No-Show' ? '#616161'
+                                        : COLORS.black,
                               borderRadius: '20px',
                               padding: '3px 10px',
                               fontSize: '12px',
