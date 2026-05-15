@@ -83,13 +83,6 @@ public class BookingController {
 		   return bookingService.getInProgressBookingsByIds(patientId, bookingId);
 		   
 	 }
-    
-    @GetMapping("/getDoctorAppointmentsonStatus/{clinicId}/{branchId}/{doctorId}/{status}")
-	public ResponseEntity<?> getDoctorAppointmentsonStatus(@PathVariable String clinicId,@PathVariable String branchId,
-		@PathVariable String doctorId,@PathVariable String status){
-		return bookingService.getDoctorAppointmentsonStatus(clinicId, branchId, doctorId, status);
-		   
-	 }
 
 }
 

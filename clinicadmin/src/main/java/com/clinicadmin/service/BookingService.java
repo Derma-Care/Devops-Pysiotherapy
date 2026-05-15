@@ -1,7 +1,6 @@
 package com.clinicadmin.service;
 
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 
@@ -16,7 +15,7 @@ public interface BookingService {
 
 	Response getAllBookedServicesDetailsByBranchId(String branchId);
 	
-	public ResponseEntity<ResponseStructure<List<Map<String,Object>>>> getBookingsByClinicIdWithBranchId(String clinicId, String branchId);
+	public ResponseEntity<ResponseStructure<List<BookingResponse>>> getBookingsByClinicIdWithBranchId(String clinicId, String branchId);
 	public ResponseEntity<?> retrieveOneWeekAppointments(String clinicId, String branchId);
 
 	public ResponseEntity<?> retrieveAppointnmentsByServiceDate(String clinicId, String branchId,String date);
