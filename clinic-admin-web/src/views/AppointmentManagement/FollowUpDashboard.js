@@ -33,7 +33,7 @@ import {
 import { bookingUpdate, deleteBookingData } from './appointmentAPI'
 import LoadingIndicator from '../../Utils/loader'
 import capitalizeWords from '../../Utils/capitalizeWords'
-import BookAppointmentModal from './BookAppointmentModal '
+import BookAppointmentModal from './BookAppointmentModal'
 import axios from 'axios'
 import { useGlobalSearch } from '../Usecontext/GlobalSearchContext'
 import { BASE_URL } from '../../baseUrl'
@@ -526,8 +526,22 @@ export default function FollowupDashboard() {
             </div>
           </div>
 
-          {/* Right controls — only date pickers, status dropdown, and book button */}
           <div className="wd-header-right">
+            <div className="cm-search-wrapper" style={{ minWidth: '250px', marginLeft: '0' }}>
+              <Search size={14} className="cm-search-icon-left" />
+              <input
+                type="text"
+                placeholder="Search bookings, patients..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="cm-search-input"
+              />
+              {searchQuery && (
+                <button className="cm-search-clear" onClick={() => setSearchQuery('')}>
+                  <X size={14} />
+                </button>
+              )}
+            </div>
 
             <div className="wd-date-group">
               <label className="wd-date-label">From</label>
@@ -659,35 +673,6 @@ export default function FollowupDashboard() {
           }}
           editData={editData}
         />
-        <div style={{ position: 'relative', maxWidth: '300px' }} className="mb-3">
-          <CFormInput
-            placeholder="Search bookings, patients..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ paddingLeft: '35px', paddingRight: searchQuery ? '35px' : '10px' }}
-          />
-          <Search
-            size={18}
-            style={{
-              position: 'absolute', left: '10px', top: '50%',
-              transform: 'translateY(-50%)', color: '#94a3b8'
-            }}
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              style={{
-                position: 'absolute', right: '10px', top: '50%',
-                transform: 'translateY(-50%)',
-                background: 'none', border: 'none',
-                color: '#94a3b8', cursor: 'pointer',
-                padding: '4px', display: 'flex', alignItems: 'center'
-              }}
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
 
         {/* ── TABLE ─────────────────────────────────────────────────── */}
         <div className="wd-table-wrapper" style={{ overflowX: 'auto' }}>
@@ -818,7 +803,7 @@ export default function FollowupDashboard() {
                             </button>
 
                             {/* Update Button */}
-                            {can('Appointments', 'update') && (
+                            {/* {can('Appointments', 'update') && (
                               <button
                                 className="wd-action-btn edit"
                                 onClick={() => handleEdit(row)}
@@ -826,7 +811,7 @@ export default function FollowupDashboard() {
                               >
                                 <Pencil size={16} />
                               </button>
-                            )}
+                            )} */}
 
                             {/* Delete Button */}
                             {can('Appointments', 'delete') && (
@@ -1116,7 +1101,7 @@ export default function FollowupDashboard() {
         .wd-stat-value { font-size: 22px; font-weight: 700; color: #0c447c; line-height: 1.1; }
 
         .wd-page-header {
-          display: flex; align-items: flex-start; justify-content: space-between;
+          display: flex; align-items: center; justify-content: space-between;
           flex-wrap: wrap; gap: 10px; margin-bottom: 18px;
           padding-bottom: 14px; border-bottom: 0.5px solid #d0dce9;
         }
@@ -1128,6 +1113,7 @@ export default function FollowupDashboard() {
         }
         .wd-page-title { font-size: 17px; font-weight: 600; color: #0c447c; margin: 0; }
         .wd-page-sub   { font-size: 12px; color: #6b7280; margin: 0; }
+
 
         .wd-header-right { display: flex; align-items: flex-end; gap: 6px; flex-wrap: wrap; }
 
