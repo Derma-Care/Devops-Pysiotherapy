@@ -6,7 +6,7 @@ import { COLORS } from '../Themes'
 import { CCard, CCardBody, CNav, CNavItem, CNavLink, CContainer } from '@coreui/react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useDoctorContext } from '../Context/DoctorContext'
-import { SavePatientPrescription, getInProgressDetails } from '../Auth/Auth'
+import { SavePatientPrescription, getInProgressDetails, getFollowUpRecord } from '../Auth/Auth'
 import { useToast } from '../utils/Toaster'
 import { normalizeSavedData } from '../utils/normalizeData'
 import Investigation from '../Prescription/Investigation'
@@ -14,7 +14,15 @@ import Investigation from '../Prescription/Investigation'
 const CompletedAppointmentsView = ({ defaultTab, tabs, fromDoctorTemplate = false }) => {
   const { id } = useParams()
   const { state } = useLocation()
-  const { patientData } = useDoctorContext()
+  const { patientData, setPatientData } = useDoctorContext()
+
+  // Clear patient context on unmount so sidebar reverts to doctor profile
+  useEffect(() => {
+    return () => {
+      setPatientData(null)
+    }
+  }, [setPatientData])
+
   const [patient, setPatient] = useState(patientData || state?.patient || null)
   const navigate = useNavigate()
   const { success, info } = useToast()
@@ -52,7 +60,7 @@ const CompletedAppointmentsView = ({ defaultTab, tabs, fromDoctorTemplate = fals
     }
   }, [id, patient])
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(state?.formData || {
     symptoms: {},
     assessment: {},
     diagnosis: {},
@@ -67,26 +75,7 @@ const CompletedAppointmentsView = ({ defaultTab, tabs, fromDoctorTemplate = fals
     patientPain: '',
   })
 
-  // ── Fetch & pre-populate all tabs from visit history ──────────────────────
-  useEffect(() => {
-    if (!patient) return
-    const patientId = patient.patientId || patient.id
-    const bookingId = patient.bookingId
-    if (!patientId || !bookingId) return
-
-    ; (async () => {
-      try {
-        const data = await getInProgressDetails(patientId, bookingId)
-        const saved = data?.savedDetails?.[0]
-        if (saved) {
-          const normalized = normalizeSavedData(saved)
-          setFormData(normalized)
-        }
-      } catch (err) {
-        console.error('❌ Failed to fetch appointment details for pre-population:', err)
-      }
-    })()
-  }, [patient])
+  // ── Pre-populated from TooltipButton, no need to fetch here again ──
 
   const goToNext = useCallback(
     (current) => {

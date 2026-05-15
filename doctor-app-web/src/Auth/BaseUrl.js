@@ -1,16 +1,21 @@
 export const ipUrl = 'http://3.111.28.174:9090'
-export const baseUrl = `${ipUrl}/api/doctors`
+// export const ipUrl = 'http://3.7.165.97:9090'
+
+
+export const baseUrl = `${ipUrl}/api/physiotherapy-doctor`
 
 // Login
-export const loginEndpoint = 'login'
-export const updateLoginEndpoint = 'update-password'
+export const loginUrl = `${ipUrl}/api/doctors/login`
+export const updatePasswordEndpoint = 'update-PhysioDoctorpassword'
+export const updateAvailabilityEndpoint = 'update-PhysioDoctorAvailability'
+export const getDoctorByIdEndpoint = 'getDoctorById'
 
 // Admin
 export const adminBaseUrl = `${ipUrl}/admin`
 export const clinicbaseUrl = `${ipUrl}/admin/getClinicById`
 
 // Doctor
-export const doctorbaseUrl = `${ipUrl}/clinic-admin/doctor`
+export const doctorbaseUrl = `${ipUrl}/api/physiotherapy-doctor`
 export const getdoctorSaveDetailsEndpoint = `${ipUrl}/api/doctors/getDoctorSaveDetailsById`
 // export const getVisitHistoryByPatientIdAndDoctorIdEndpoint = `${ipUrl}/api/doctors/getVisitHistoryByPatientIdAndDoctorId`
 export const visitHistoryBypatientIdAndBookingId = `${ipUrl}/api/doctors/visitHistoryBypatientIdAndBookingId`
@@ -19,7 +24,7 @@ export const getDoctorSlotsEndpoint = `${ipUrl}/clinic-admin/getDoctorslots`
 // Appointments
 export const todayappointmentsbaseUrl = `${ipUrl}/api/physiotherapy-doctor/getTodaysAppointmentsByUsingClinicIdAndDoctorId`
 export const todayfutureappointmentsbaseUrl = `${ipUrl}/api/doctors/getFutureDoctorappointmentsByDoctorId`
-export const appointmentsbaseUrl = `${ipUrl}/api/doctors/appointments/filter`
+export const appointmentsbaseUrl = `${ipUrl}/api/doctors/getDoctorAppointmentsonStatus`
 export const appointmentsCountbaseUrl = `${ipUrl}/api/doctors/appointments/completed`
 export const bookingDetailsUrl = `${ipUrl}/clinic-admin/getAllbookingsDetailsByClinicAndBranchId`
 
@@ -73,3 +78,4 @@ export const programAllUrl = `${ipUrl}/clinic-admin/program/getAll`
 export const getInProgressDetailsEndpoint = `${ipUrl}/api/physiotherapy-doctor/getIn-progressByUsingPatientIdAndBookingId`
 
 export const visitHistoryByPatientIdAndBookingIdEndpoint = `${ipUrl}/api/physiotherapy-doctor/visitHistoryByUsingPatientIdAndBooking`
+export const getExerciseSessionsWithRecordsEndpoint = `${ipUrl}/api/physiotherapy-doctor/payment/getExerciseSessionsWithRecords`

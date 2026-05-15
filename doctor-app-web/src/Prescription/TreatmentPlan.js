@@ -13,6 +13,7 @@ import {
   getExercisesByBranchAndIdAndId,
   getPackagesByBranchAndId,
 } from '../Auth/Auth'
+import { useDoctorContext } from '../Context/DoctorContext'
 
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 const FREQ_UNITS = ['Day', 'Week', 'Month']
@@ -157,7 +158,7 @@ const RadioBtn = ({ label, emoji, value, active, onClick }) => (
 )
 
 /* ─── Multi-Therapist Search ─────────────────────────────────────────────── */
-const TherapistMultiSearch = ({ therapists, loading, selectedTherapists, onChange, hasError }) => {
+const TherapistMultiSearch = ({ therapists, loading, selectedTherapists, onChange, hasError, onRefresh }) => {
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(false)
 
@@ -183,34 +184,55 @@ const TherapistMultiSearch = ({ therapists, loading, selectedTherapists, onChang
   return (
     <div style={{ position: 'relative' }}>
       {/* Input */}
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <input
-          value={search}
-          onChange={e => { setSearch(e.target.value); setOpen(true) }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 200)}
-          placeholder={
-            loading
-              ? 'Loading therapists...'
-              : !therapists.length
-                ? 'No therapists available'
-                : 'Search by ID or name to add therapist...'
-          }
-          disabled={loading}
-          style={{
-            ...inputStyle,
-            opacity: loading ? 0.6 : 1,
-            borderColor: hasError ? '#e53e3e' : selectedTherapists.length > 0 ? '#38a169' : '#b6cfe8',
-            backgroundColor: hasError ? '#fff5f5' : '#FFFFFF',
-            boxShadow: hasError ? '0 0 0 3px rgba(229,62,62,0.12)' : 'none',
-          }}
-        />
-        {search && (
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <input
+            value={search}
+            onChange={e => { setSearch(e.target.value); setOpen(true) }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 200)}
+            placeholder={
+              loading
+                ? 'Loading therapists...'
+                : !therapists.length
+                  ? 'No therapists available'
+                  : 'Search by ID or name to add therapist...'
+            }
+            disabled={loading}
+            style={{
+              ...inputStyle,
+              opacity: loading ? 0.6 : 1,
+              borderColor: hasError ? '#e53e3e' : selectedTherapists.length > 0 ? '#38a169' : '#b6cfe8',
+              backgroundColor: hasError ? '#fff5f5' : '#FFFFFF',
+              boxShadow: hasError ? '0 0 0 3px rgba(229,62,62,0.12)' : 'none',
+            }}
+          />
+          {search && (
+            <button
+              type="button"
+              onMouseDown={e => { e.preventDefault(); setSearch('') }}
+              style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontWeight: 700, fontSize: 14, padding: '2px 4px' }}
+            >✕</button>
+          )}
+        </div>
+
+        {onRefresh && (
           <button
             type="button"
-            onMouseDown={e => { e.preventDefault(); setSearch('') }}
-            style={{ position: 'absolute', right: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontWeight: 700, fontSize: 14, padding: '2px 4px' }}
-          >✕</button>
+            onClick={onRefresh}
+            disabled={loading}
+            title="Refresh therapist list"
+            style={{
+              width: 38, height: 38, borderRadius: 8, border: '1.5px solid #1B4F8A',
+              background: '#f0f6ff', color: '#1B4F8A', cursor: loading ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+              transition: 'all 0.2s', flexShrink: 0
+            }}
+            onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = '#1B4F8A'; e.currentTarget.style.color = '#fff' } }}
+            onMouseLeave={e => { if (!loading) { e.currentTarget.style.background = '#f0f6ff'; e.currentTarget.style.color = '#1B4F8A' } }}
+          >
+            {loading ? '⌛' : '🔄'}
+          </button>
         )}
       </div>
 
@@ -800,7 +822,7 @@ const ExerciseTable = ({ exercises, onUpdate }) => {
 }
 
 /* ─── TherapyBlock ───────────────────────────────────────────────────────── */
-const TherapyBlock = ({ therapyKey, therapy, checked, onToggle, exercises, onUpdateExercises, loading }) => (
+const TherapyBlock = ({ therapyKey, therapy, checked, onToggle, exercises, onUpdateExercises, loading, programName }) => (
   <div style={{ border: `2px solid ${checked ? '#1B4F8A' : '#dde8f2'}`, borderRadius: 10, overflow: 'hidden', transition: 'border-color 0.18s', marginBottom: 12 }}>
     <div
       onClick={(e) => { e.stopPropagation(); onToggle(therapyKey) }}
@@ -810,7 +832,14 @@ const TherapyBlock = ({ therapyKey, therapy, checked, onToggle, exercises, onUpd
         style={{ width: 20, height: 20, borderRadius: 5, flexShrink: 0, border: `2px solid ${checked ? '#1B4F8A' : '#a0bcda'}`, background: checked ? 'linear-gradient(135deg,#1B4F8A,#2A6DB5)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {checked && <span style={{ color: '#fff', fontSize: '0.72rem', lineHeight: 1, fontWeight: 700 }}>✓</span>}
       </div>
-      <span style={{ fontWeight: 700, fontSize: '0.93rem', color: '#1B4F8A', flex: 1 }}>{therapy}</span>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {programName && (
+          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#4a7abf', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: -2 }}>
+            {programName}
+          </span>
+        )}
+        <span style={{ fontWeight: 700, fontSize: '0.93rem', color: '#1B4F8A' }}>{therapy}</span>
+      </div>
       {loading
         ? <span style={{ fontSize: '0.78rem', color: '#4a7abf', fontWeight: 500 }}>Loading exercises...</span>
         : <span style={{ fontSize: '0.78rem', color: checked ? '#1B4F8A' : '#8fa8c0', fontWeight: 600 }}>
@@ -840,78 +869,111 @@ const restoreTherophyDataState = (sessions) => {
   const mapped = {}
 
   sessions.forEach((sess) => {
-    if (sess.serviceType === 'package' && Array.isArray(sess.programs)) {
+    // Handle Package
+    if (sess.serviceType === 'package' && (Array.isArray(sess.programs) || Array.isArray(sess.programList))) {
       const pkgId = sess.packageId || ''
-      sess.programs.forEach((prog) => {
-        const progName = prog.programName || ''
-          ; (prog.therapyData || []).forEach((therapy, tIdx) => {
-            const key = `${pkgId}__${progName}__${therapy.therapyName}__${tIdx}`
-            mapped[key] = {
-              checked: true,
-              packageId: pkgId, packageName: sess.packageName || '',
-              programId: prog.programId || '', programName: progName,
-              therapyId: therapy.therapyId || '', therapyName: therapy.therapyName || '',
-              exercises: (therapy.exercises || []).map(ex => ({
-                ...ex, exerciseName: ex.exerciseName || ex.name || '',
-                sessions: ex.noOfSessions ?? ex.sessions ?? '',
-                sets: ex.sets ?? '', reps: ex.repetitions ?? ex.reps ?? '',
-                frequencyCount: parseFrequency(ex.frequency).count,
-                frequencyUnit: parseFrequency(ex.frequency).unit,
-                notes: ex.notes ?? '', _checked: true,
-              }))
-            }
-          })
+      const programs = Array.isArray(sess.programs) ? sess.programs : sess.programList
+      programs.forEach((prog) => {
+        const progName = prog.programName || prog.name || ''
+
+        // Handle both 'therapyData' and 'therophyData' or 'activities' or 'programActivities'
+        const therapies = Array.isArray(prog.therapyData)
+          ? prog.therapyData
+          : (Array.isArray(prog.therophyData)
+            ? prog.therophyData
+            : (Array.isArray(prog.activities)
+              ? prog.activities
+              : (Array.isArray(prog.programActivities)
+                ? prog.programActivities
+                : (Array.isArray(prog.program_activities) ? prog.program_activities : []))))
+
+        therapies.forEach((therapy, tIdx) => {
+          const key = `${pkgId}__${progName}__${therapy.therapyName || therapy.name || ''}__${tIdx}`
+          mapped[key] = {
+            checked: true,
+            packageId: pkgId, packageName: sess.packageName || sess.name || '',
+            programId: prog.id || prog.programId || '', programName: progName,
+            therapyId: therapy.id || therapy.therapyId || '', therapyName: therapy.therapyName || therapy.name || '',
+            exercises: (therapy.exercises || therapy.activities || []).map(ex => ({
+              ...ex, exerciseName: ex.name || ex.exerciseName || '',
+              sessions: ex.noOfSessions ?? ex.session ?? ex.sessions ?? '',
+              sets: ex.sets ?? '', reps: ex.repetitions ?? ex.reps ?? '',
+              frequencyCount: parseFrequency(ex.frequency || ex.frequencyCount).count,
+              frequencyUnit: parseFrequency(ex.frequency || ex.frequencyCount).unit,
+              notes: ex.notes ?? '',
+              duration: ex.duration || ex.activityDuration || '',
+              video: ex.video || ex.videoUrl || '',
+              _checked: true,
+            }))
+          }
+        })
       })
-    } else if (sess.serviceType === 'program' && Array.isArray(sess.therapyData)) {
-      const progId = sess.programId || ''
-      sess.therapyData.forEach((therapy, tIdx) => {
-        const key = `${progId}__${therapy.therapyName}__${tIdx}`
+    }
+    // Handle Program
+    else if (sess.serviceType === 'program' && (Array.isArray(sess.therapyData) || Array.isArray(sess.therophyData) || Array.isArray(sess.activities) || Array.isArray(sess.programActivities))) {
+      const progId = sess.programId || sess.id || ''
+      const therapies = Array.isArray(sess.therapyData)
+        ? sess.therapyData
+        : (Array.isArray(sess.therophyData)
+          ? sess.therophyData
+          : (Array.isArray(sess.activities)
+            ? sess.activities
+            : (Array.isArray(sess.programActivities)
+              ? sess.programActivities
+              : (Array.isArray(sess.program_activities) ? sess.program_activities : []))))
+
+      therapies.forEach((therapy, tIdx) => {
+        const key = `${progId}__${therapy.therapyName || therapy.name || ''}__${tIdx}`
         mapped[key] = {
           checked: true,
-          programId: progId, programName: sess.programName || '',
-          therapyId: therapy.therapyId || '', therapyName: therapy.therapyName || '',
-          exercises: (therapy.exercises || []).map(ex => ({
-            ...ex, exerciseName: ex.exerciseName || ex.name || '',
-            sessions: ex.noOfSessions ?? ex.sessions ?? '',
+          programId: progId, programName: sess.programName || sess.name || '',
+          therapyId: therapy.id || therapy.therapyId || '', therapyName: therapy.therapyName || therapy.name || '',
+          exercises: (therapy.exercises || therapy.activities || []).map(ex => ({
+            ...ex, exerciseName: ex.name || ex.exerciseName || '',
+            sessions: ex.noOfSessions ?? ex.session ?? ex.sessions ?? '',
             sets: ex.sets ?? '', reps: ex.repetitions ?? ex.reps ?? '',
-            frequencyCount: parseFrequency(ex.frequency).count,
-            frequencyUnit: parseFrequency(ex.frequency).unit,
-            notes: ex.notes ?? '', _checked: true,
+            frequencyCount: parseFrequency(ex.frequency || ex.frequencyCount).count,
+            frequencyUnit: parseFrequency(ex.frequency || ex.frequencyCount).unit,
+            notes: ex.notes ?? '',
+            duration: ex.duration || ex.activityDuration || '',
+            video: ex.video || ex.videoUrl || '',
+            _checked: true,
           }))
         }
       })
-    } else if (sess.serviceType === 'exercise' && Array.isArray(sess.exercises)) {
-      const exId = sess.exerciseId || 'exercise'
+    }
+    // Handle Therapy
+    else if (sess.serviceType === 'therapy' && (Array.isArray(sess.exercises) || Array.isArray(sess.activities))) {
+      const therapyName = sess.therapyName || sess.name || ''
+      const therapyId = sess.therapyId || sess.id || ''
+      const key = `${therapyId}__${therapyName}__0`
+      mapped[key] = {
+        checked: true, therapyId, therapyName,
+        exercises: (sess.exercises || sess.activities || []).map(ex => ({
+          ...ex, exerciseName: ex.name || ex.exerciseName || '',
+          sessions: ex.noOfSessions ?? ex.session ?? ex.sessions ?? '',
+          sets: ex.sets ?? '', reps: ex.repetitions ?? ex.reps ?? '',
+          frequencyCount: parseFrequency(ex.frequency || ex.frequencyCount).count,
+          frequencyUnit: parseFrequency(ex.frequency || ex.frequencyCount).unit,
+          notes: ex.notes ?? '', _checked: true,
+        }))
+      }
+    }
+    // Handle Exercise
+    else if (sess.serviceType === 'exercise' && Array.isArray(sess.exercises)) {
+      const exId = sess.exerciseId || sess.id || 'exercise'
       const key = `${exId}__exercise__0`
       mapped[key] = {
         checked: true, therapyName: sess.exerciseName || sess.name || 'Exercise',
         exercises: sess.exercises.map(ex => ({
           ...ex, exerciseName: ex.exerciseName || ex.name || '',
-          sessions: ex.noOfSessions ?? ex.sessions ?? '',
+          sessions: ex.noOfSessions ?? ex.session ?? ex.sessions ?? '',
           sets: ex.sets ?? '', reps: ex.repetitions ?? ex.reps ?? '',
-          frequencyCount: parseFrequency(ex.frequency).count,
-          frequencyUnit: parseFrequency(ex.frequency).unit,
+          frequencyCount: parseFrequency(ex.frequency || ex.frequencyCount).count,
+          frequencyUnit: parseFrequency(ex.frequency || ex.frequencyCount).unit,
           notes: ex.notes ?? '', _checked: true,
         }))
       }
-    } else {
-      const therapyData = Array.isArray(sess.therapyData) ? sess.therapyData : []
-      const sessId = sess.therapyId || sess.programId || sess.packageId || 'unknown'
-      therapyData.forEach((therapy, tIndex) => {
-        const key = `${sessId}__${therapy.therapyName}__${tIndex}`
-        mapped[key] = {
-          checked: true,
-          therapyName: therapy.therapyName || '',
-          exercises: (therapy.exercises || []).map(ex => ({
-            ...ex, exerciseName: ex.name || ex.exerciseName || '',
-            sessions: ex.noOfSessions ?? ex.session ?? ex.sessions ?? '',
-            sets: ex.sets ?? '', reps: ex.repetitions ?? ex.reps ?? '',
-            frequencyCount: parseFrequency(ex.frequency).count,
-            frequencyUnit: parseFrequency(ex.frequency).unit,
-            notes: ex.notes ?? '', _checked: true,
-          }))
-        }
-      })
     }
   })
 
@@ -1076,14 +1138,16 @@ const TherapySession = ({ seed = {}, onNext, patientData }) => {
   const savedSessions = Array.isArray(seed?.sessions) ? seed.sessions : []
   const savedSession = savedSessions[0] ?? {}
 
-  const { toasts, toastError, toastSuccess } = useToast()
+  const { toasts, toastError, toastSuccess, toastWarning } = useToast()
   const [errors, setErrors] = useState({})
 
   const inferredMode = savedSession.serviceType || seed.serviceType || 'package'
   const [mode, setMode] = useState(inferredMode)
 
+  const { doctorDetails } = useDoctorContext()
   const clinicId = localStorage.getItem('hospitalId')
-  const branchId = patientData?.branchId
+  // Try to find branchId from patient record, then context, then localStorage
+  const branchId = patientData?.branchId || doctorDetails?.branches?.[0]?.branchId || localStorage.getItem('branchId')
   const idsReady = !!(clinicId && branchId)
 
   const [therapists, setTherapists] = useState([])
@@ -1164,7 +1228,11 @@ const TherapySession = ({ seed = {}, onNext, patientData }) => {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!idsReady) return
+    if (!idsReady) {
+      console.warn('🕒 Skipping fetchDataByMode: clinicId or branchId missing', { clinicId, branchId })
+      return
+    }
+    console.log(`🎬 Triggering fetchDataByMode for mode: ${mode}`)
     fetchDataByMode()
   }, [idsReady, clinicId, branchId, mode]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1179,6 +1247,7 @@ const TherapySession = ({ seed = {}, onNext, patientData }) => {
   }
 
   const fetchDataByMode = async () => {
+    console.log(`🌐 fetchDataByMode called. Mode: ${mode}, Clinic: ${clinicId}, Branch: ${branchId}`)
     setLoadingTherapists(true)
     setLoadingPrograms(true)
     try {
@@ -1186,15 +1255,40 @@ const TherapySession = ({ seed = {}, onNext, patientData }) => {
         getTherapists(clinicId, branchId),
         getServiceByMode(mode, clinicId, branchId),
       ])
-      setTherapists(therapistRes.status === 'fulfilled' && Array.isArray(therapistRes.value) ? therapistRes.value : [])
-      setPrograms(serviceRes.status === 'fulfilled' && Array.isArray(serviceRes.value) ? serviceRes.value : [])
+
+      if (therapistRes.status === 'fulfilled') {
+        console.log(`✅ Fetched ${therapistRes.value?.length || 0} therapists`)
+        setTherapists(Array.isArray(therapistRes.value) ? therapistRes.value : [])
+      }
+
+      if (serviceRes.status === 'fulfilled') {
+        console.log(`✅ Fetched ${serviceRes.value?.length || 0} ${mode}(s)`)
+        setPrograms(Array.isArray(serviceRes.value) ? serviceRes.value : [])
+      } else {
+        console.error(`❌ Failed to fetch ${mode}s:`, serviceRes.reason)
+      }
     } catch (err) {
-      console.error('❌ fetchDataByMode error:', err)
+      console.error('❌ fetchDataByMode unexpected error:', err)
     } finally {
       setLoadingTherapists(false)
       setLoadingPrograms(false)
     }
   }
+
+  const refreshTherapists = useCallback(() => {
+    if (!idsReady) return
+    setLoadingTherapists(true)
+    getTherapists(clinicId, branchId)
+      .then(data => {
+        setTherapists(Array.isArray(data) ? data : [])
+        toastSuccess('Therapist list refreshed')
+      })
+      .catch(err => {
+        console.error('❌ Error refreshing therapists:', err)
+        toastError('Failed to refresh therapists.')
+      })
+      .finally(() => setLoadingTherapists(false))
+  }, [idsReady, clinicId, branchId, toastSuccess, toastError])
 
   useEffect(() => {
     if (!idsReady || exercisesFetchedRef.current) return
@@ -1235,57 +1329,166 @@ const TherapySession = ({ seed = {}, onNext, patientData }) => {
     setLoadingByItemId(prev => ({ ...prev, [id]: true }))
     try {
       let data = null
-      switch (mode) {
-        case 'package': data = await getPackagesByBranchAndId(clinicId, branchId, id); break
-        case 'program': data = await getProgramsByBranchAndId(clinicId, branchId, id); break
-        case 'therapy': data = await getTherapiesByBranchAndId(clinicId, branchId, id); break
-        case 'exercise': data = await getExercisesByBranchAndIdAndId(clinicId, branchId, id); break
-        default: data = obj
+      
+      // Check if we already have programs/activities in the object to avoid failing API calls
+      const hasAlreadyNested = (o) => {
+        if (!o) return false
+        if (mode === 'package') return (Array.isArray(o.programs) && o.programs.length > 0) || (Array.isArray(o.programList) && o.programList.length > 0) || (Array.isArray(o.programIds) && o.programIds.length > 0)
+        if (mode === 'program') return (Array.isArray(o.therophyData) && o.therophyData.length > 0) || (Array.isArray(o.therapyData) && o.therapyData.length > 0) || (Array.isArray(o.activities) && o.activities.length > 0)
+        return false
+      }
+
+      if (hasAlreadyNested(obj)) {
+        console.log(`⚡ Using existing nested data for ${mode} ${id}`)
+        data = obj
+      } else {
+        switch (mode) {
+          case 'package': data = await getPackagesByBranchAndId(clinicId, branchId, id); break
+          case 'program': data = await getProgramsByBranchAndId(clinicId, branchId, id); break
+          case 'therapy': data = await getTherapiesByBranchAndId(clinicId, branchId, id); break
+          case 'exercise': data = await getExercisesByBranchAndIdAndId(clinicId, branchId, id); break
+          default: data = obj
+        }
       }
       console.log(`✅ ${mode} detail for ${id}:`, data)
+      if (!data) {
+        console.error(`❌ No data returned for ${mode} ${id}`)
+        toastError(`Failed to load ${mode} details.`)
+        return
+      }
 
       if (mode === 'package') {
-        const programsList = Array.isArray(data?.programs) ? data.programs : []
+        // Robust check for programs array (handle both 'programs' and 'programList')
+        const programsList = (
+          (Array.isArray(data?.programs) && data.programs.length > 0) ? data.programs :
+            ((Array.isArray(data?.programList) && data.programList.length > 0) ? data.programList :
+              (Array.isArray(data?.programIds) ? data.programIds : []))
+        )
+
+        console.log(`📦 Found ${programsList.length} programs/IDs in package ${id}`)
+
         const mapped = {}
-        programsList.forEach((program) => {
-          const programName = program.programName || program.name || ''
-          const therophyData = Array.isArray(program.therophyData) ? program.therophyData : []
-          therophyData.forEach((therapy, tIndex) => {
-            const key = `${id}__${programName}__${therapy.therapyName}__${tIndex}`
+
+        // ── HYDRATION ──────────────────────────────────────────────────────
+        const hydratedPrograms = await Promise.all(programsList.map(async (item) => {
+          // item could be an object {id, programName...} or a string ID
+          const pId = typeof item === 'string' ? item : (item.id || item.programId)
+          if (!pId) return item
+
+          // Check if it's already hydrated (has therapies)
+          const therapies = (Array.isArray(item.therophyData) || Array.isArray(item.therapyData) || Array.isArray(item.activities) || Array.isArray(item.programActivities) || Array.isArray(item.therapyDetails))
+            ? (item.therophyData ?? item.therapyData ?? item.activities ?? item.programActivities ?? item.therapyDetails)
+            : null
+
+          if (therapies && therapies.length > 0) return item
+
+          try {
+            console.log(`📡 Fetching details for ${item.programName || 'program'}...`)
+            let fullProg = await getProgramsByBranchAndId(clinicId, branchId, pId)
+            // Flatten if array
+            if (Array.isArray(fullProg)) fullProg = fullProg[0]
+            return fullProg || item
+          } catch (err) {
+            console.error(`❌ Hydration failed for program ${pId}:`, err)
+            return item
+          }
+        }))
+
+        hydratedPrograms.forEach((program, pIdx) => {
+          if (!program) return
+          const programName = program.programName || program.name || `Program ${pIdx + 1}`
+          console.log(`🔎 [Package Hydration] Mapping program: ${programName}`, program)
+
+          const therapiesArr = (
+            (Array.isArray(program.therophyData) && program.therophyData.length > 0) ? program.therophyData :
+              (Array.isArray(program.therapyData) && program.therapyData.length > 0) ? program.therapyData :
+                (Array.isArray(program.activities) && program.activities.length > 0) ? program.activities :
+                  (Array.isArray(program.programActivities) && program.programActivities.length > 0) ? program.programActivities :
+                    (Array.isArray(program.therapyDetails) && program.therapyDetails.length > 0) ? program.therapyDetails :
+                      (Array.isArray(program.therapyList) && program.therapyList.length > 0) ? program.therapyList :
+                        (Array.isArray(program.exercises) && program.exercises.length > 0) ? program.exercises : []
+          )
+
+          console.log(`   └─ Found ${therapiesArr.length} therapies for ${programName}`)
+
+          therapiesArr.forEach((therapy, tIndex) => {
+            if (!therapy) return
+            const therapyName = therapy.therapyName || therapy.name || therapy.activityName || 'General Therapy'
+            const key = `${id}__${programName}__${therapyName}__${tIndex}`
+
+            const exercisesArr = (
+              Array.isArray(therapy.exercises) ? therapy.exercises :
+                Array.isArray(therapy.activities) ? therapy.activities :
+                  Array.isArray(therapy.activityList) ? therapy.activityList :
+                    Array.isArray(therapy.therapyActivities) ? therapy.therapyActivities :
+                      (Array.isArray(therapy) ? therapy : [])
+            )
+
             mapped[key] = {
               checked: true,
-              packageId: data.packageId || id, packageName: data.packageName || '',
-              programId: program.id || program.programId || '', programName,
-              therapyId: therapy.id || '', therapyName: therapy.therapyName || '',
-              exercises: (therapy.exercises || []).map(ex => ({
-                ...ex, exerciseName: ex.name || ex.exerciseName || '',
-                sessions: ex.session ?? ex.sessions ?? '', sets: ex.sets ?? '',
+              packageId: data.packageId || id,
+              packageName: data.packageName || data.name || 'Package',
+              programId: program.id || program.programId || '',
+              programName,
+              therapyId: therapy.id || therapy.therapyId || '',
+              therapyName,
+              exercises: exercisesArr.map(ex => ({
+                ...ex,
+                exerciseName: ex.name || ex.exerciseName || ex.activityName || 'Exercise',
+                sessions: ex.noOfSessions ?? ex.session ?? ex.sessions ?? ex.sessionsCount ?? '',
+                sets: ex.sets ?? '',
                 reps: ex.repetitions ?? ex.reps ?? '',
-                frequencyCount: parseFrequency(ex.frequency).count,
-                frequencyUnit: parseFrequency(ex.frequency).unit,
-                notes: ex.notes ?? '', _checked: true,
+                frequencyCount: parseFrequency(ex.frequency || ex.frequencyCount).count,
+                frequencyUnit: parseFrequency(ex.frequency || ex.frequencyCount).unit,
+                notes: ex.notes ?? '',
+                duration: ex.duration || ex.activityDuration || '',
+                video: ex.video || ex.videoUrl || '',
+                _checked: true,
               }))
             }
           })
         })
+
+        const count = Object.keys(mapped).length
+        console.log(`✅ Package ${id} mapped with ${count} therapy/exercise blocks`)
+        if (count > 0) toastSuccess(`Loaded package contents successfully.`)
+        else toastWarning(`Package "${data.packageName || 'Selected'}" contains no exercise data.`)
+
         setTherophyDataState(prev => ({ ...prev, ...mapped }))
 
       } else if (mode === 'program') {
-        const therophyData = Array.isArray(data?.therophyData) ? data.therophyData : []
+        // Handle 'therophyData', 'therapyData', 'activities', 'programActivities'
+        const therapies = Array.isArray(data?.therophyData)
+          ? data.therophyData
+          : (Array.isArray(data?.therapyData)
+            ? data.therapyData
+            : (Array.isArray(data?.activities)
+              ? data.activities
+              : (Array.isArray(data?.programActivities)
+                ? data.programActivities
+                : (Array.isArray(data?.program_activities) ? data.program_activities : []))))
+
         const mapped = {}
-        therophyData.forEach((therapy, tIndex) => {
-          const key = `${id}__${therapy.therapyName}__${tIndex}`
+        therapies.forEach((therapy, tIndex) => {
+          const key = `${id}__${therapy.therapyName || therapy.name || ''}__${tIndex}`
           mapped[key] = {
             checked: true,
-            programId: data.programId || data.id || id, programName: data.programName || '',
-            therapyId: therapy.id || '', therapyName: therapy.therapyName || '',
-            exercises: (therapy.exercises || []).map(ex => ({
-              ...ex, exerciseName: ex.name || ex.exerciseName || '',
-              sessions: ex.session ?? ex.sessions ?? '', sets: ex.sets ?? '',
+            programId: id,
+            programName: data.programName || data.name || '',
+            therapyId: therapy.id || therapy.therapyId || '',
+            therapyName: therapy.therapyName || therapy.name || '',
+            exercises: (therapy.exercises || therapy.activities || []).map(ex => ({
+              ...ex,
+              exerciseName: ex.name || ex.exerciseName || '',
+              sessions: ex.noOfSessions ?? ex.session ?? ex.sessions ?? '',
+              sets: ex.sets ?? '',
               reps: ex.repetitions ?? ex.reps ?? '',
-              frequencyCount: parseFrequency(ex.frequency).count,
-              frequencyUnit: parseFrequency(ex.frequency).unit,
-              notes: ex.notes ?? '', _checked: true,
+              frequencyCount: parseFrequency(ex.frequency || ex.frequencyCount).count,
+              frequencyUnit: parseFrequency(ex.frequency || ex.frequencyCount).unit,
+              notes: ex.notes ?? '',
+              duration: ex.duration || ex.activityDuration || '',
+              video: ex.video || ex.videoUrl || '',
+              _checked: true,
             }))
           }
         })
@@ -1428,6 +1631,7 @@ const TherapySession = ({ seed = {}, onNext, patientData }) => {
   }
 
   const handleModeChange = (val) => {
+    console.log(`🔄 Mode manually changed to: ${val}. Triggering fetch...`)
     setMode(val)
     setSelectedItems(new Map())
     setBulkPending(new Set())
@@ -1438,6 +1642,8 @@ const TherapySession = ({ seed = {}, onNext, patientData }) => {
     setTherophyDataState({})
     restoredFromSeedRef.current = false
     setErrors({})
+    // Explicitly call fetch to ensure it happens immediately
+    fetchDataByMode()
   }
 
   /* ── Validate ── only flag therapies error when user has ZERO checked ── */
@@ -1530,7 +1736,7 @@ const TherapySession = ({ seed = {}, onNext, patientData }) => {
         repetitions: Number(ex.reps || ex.repetitions || 0),
         pricePerSession: Number(ex.pricePerSession || 0),
         // totalPrice: Number(ex.totalPrice || 0),
-        ...(ex.videoUrl ? { youtubeUrl: ex.videoUrl } : {}),
+        ...(ex.video ? { youtubeUrl: ex.video } : {}),
       }
     }
 
@@ -1663,23 +1869,31 @@ const TherapySession = ({ seed = {}, onNext, patientData }) => {
                     (multiple selection allowed)
                   </span>
                 </label>
-                {programs.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => { setShowBrowsePanel(v => !v); setBrowseSearch(''); setBulkPending(new Set()) }}
-                    style={{
-                      padding: '7px 18px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
-                      border: '1.5px solid #1B4F8A',
-                      background: showBrowsePanel ? 'linear-gradient(135deg,#1B4F8A,#2A6DB5)' : '#FFFFFF',
-                      color: showBrowsePanel ? '#fff' : '#1B4F8A',
-                      fontWeight: 700, fontSize: '0.85rem',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      boxShadow: showBrowsePanel ? '0 2px 8px rgba(27,79,138,0.25)' : 'none',
-                    }}
-                  >
-                    📚 {showBrowsePanel ? '✕ Close' : `Browse ${mode === 'exercise' ? 'Activity' : mode.charAt(0).toUpperCase() + mode.slice(1)}s`}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    console.log('📚 Browse button clicked')
+                    setShowBrowsePanel(v => !v)
+                    setBrowseSearch('')
+                    setBulkPending(new Set())
+                    // If list is empty, try to fetch again
+                    if (programs.length === 0) {
+                      console.log('Empty list detected on Browse click. Refreshing...')
+                      fetchDataByMode()
+                    }
+                  }}
+                  style={{
+                    padding: '7px 18px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
+                    border: '1.5px solid #1B4F8A',
+                    background: showBrowsePanel ? 'linear-gradient(135deg,#1B4F8A,#2A6DB5)' : '#FFFFFF',
+                    color: showBrowsePanel ? '#fff' : '#1B4F8A',
+                    fontWeight: 700, fontSize: '0.85rem',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    boxShadow: showBrowsePanel ? '0 2px 8px rgba(27,79,138,0.25)' : 'none',
+                  }}
+                >
+                  📚 {showBrowsePanel ? '✕ Close' : (loadingPrograms ? 'Loading...' : `Browse ${mode === 'exercise' ? 'Activity' : mode.charAt(0).toUpperCase() + mode.slice(1)}s`)}
+                </button>
               </div>
 
               {errors.service && (
@@ -1807,6 +2021,7 @@ const TherapySession = ({ seed = {}, onNext, patientData }) => {
                           return (
                             <TherapyBlock
                               key={key} therapyKey={key} therapy={ts.therapyName || key}
+                              programName={ts.programName}
                               checked={ts.checked} onToggle={toggleTherophyData}
                               exercises={ts.exercises || []}
                               onUpdateExercises={updated => updateTherophyDataExercises(key, updated)}
@@ -1852,6 +2067,7 @@ const TherapySession = ({ seed = {}, onNext, patientData }) => {
               loading={loadingTherapists}
               selectedTherapists={selectedTherapists}
               hasError={!!errors.therapist}
+              onRefresh={refreshTherapists}
               onChange={(updated) => {
                 setSelectedTherapists(updated)
                 if (updated.length > 0) setErrors(prev => ({ ...prev, therapist: undefined }))

@@ -8,19 +8,19 @@ import { useNavigate } from 'react-router-dom'
 import { useDoctorContext } from '../../Context/DoctorContext'
 import { flushSync } from 'react-dom'
 import { CSpinner } from '@coreui/react'
-import { getInProgressDetails } from '../../Auth/Auth'
+import { getInProgressDetails, getFollowUpRecord } from '../../Auth/Auth'
 import { capitalizeFirst } from '../../utils/CaptalZeWord'
 import { normalizeSavedData } from '../../utils/normalizeData'
 
 const generateContent = (patient) => (
   <div className="tooltip-body">
     {[
-      { label: 'Name',       value: capitalizeFirst(patient.name) },
-      { label: 'Age',        value: patient.age },
-      { label: 'Gender',     value: patient.gender },
-      { label: 'Problem',    value: patient.problem },
+      { label: 'Name', value: capitalizeFirst(patient.name) },
+      { label: 'Age', value: patient.age },
+      { label: 'Gender', value: patient.gender },
+      { label: 'Problem', value: patient.problem },
       ...(patient.subService ? [{ label: 'Subservice', value: patient.subService }] : []),
-      ...(patient.duration   ? [{ label: 'Duration',   value: patient.duration   }] : []),
+      ...(patient.duration ? [{ label: 'Duration', value: patient.duration }] : []),
     ].map(({ label, value }) => (
       <div
         key={label}
@@ -110,26 +110,50 @@ const TooltipButton = ({ patient, onSelect, tab, disabled }) => {
       let formData = {}
       let details = null
 
-      if (tab === 'In-Progress') {
-        details = await getInProgressDetails(patient.patientId, patient.bookingId)
-        const raw = details?.savedDetails?.[0] || {}
-        formData = normalizeSavedData(raw)
+      const vType = patient?.visitType?.toLowerCase()?.replace(/[\s_-]+/g, '') || ''
+      const isFollowUp = vType === 'followup' || vType === 'follow_up'
+      const tabLower = tab?.toLowerCase()?.replace(/[\s_-]+/g, '') || ''
+      const isTargetStatus = ['inprogress', 'inprograss', 'completed'].includes(tabLower)
+
+      console.log('🧐 [TooltipButton] Clicked View. Raw Status:', tab, '| Raw VisitType:', patient?.visitType)
+      console.log('🧐 [TooltipButton] Evaluated isTargetStatus:', isTargetStatus, '| isFollowUp:', isFollowUp)
+
+      if (isFollowUp || isTargetStatus || tabLower === 'ongoing') {
+        const clinicId = localStorage.getItem('hospitalId')
+        const branchId = patient.branchId
+
+        const resp = await getFollowUpRecord(clinicId, branchId, patient.patientId, patient.bookingId)
+        console.log('✅ [TooltipButton] API Response:', resp)
+
+        // The API returns response.data.data or response.data.
+        // We need to find the record object, which might be the response itself or the first element of an array.
+        const record = Array.isArray(resp) ? resp[0] : (resp?.data && !Array.isArray(resp.data) ? resp.data : resp)
+        details = record || {}
+
+        // Handle nested savedDetails if present (common in some In-Progress responses)
+        const saved = details?.savedDetails?.[0] || details
+        formData = normalizeSavedData(saved)
       }
 
       setPatientData({ ...patient, details })
       onSelect?.()
 
-      if (tab.toLowerCase() === 'confirmed') {
+      if (tabLower === 'confirmed') {
         navigate(`/tab-content/${patient.patientId}`, {
-          state: { patient, formData, fromTab: 'Confirmed' },
+          state: { patient, formData, details, fromTab: 'Confirmed' },
         })
-      } else if (tab.toLowerCase() === 'in-progress') {
+      } else if (tabLower === 'inprogress' || tabLower === 'inprograss' || tabLower === 'ongoing') {
         navigate(`/tab-inProgress/${patient.patientId}`, {
           state: { patient, formData, details, fromTab: 'In-Progress' },
         })
-      } else if (tab === 'Completed') {
+      } else if (tabLower === 'completed') {
         navigate(`/tab-completed-content/${patient.patientId}`, {
-          state: { patient, formData, fromTab: 'Completed' },
+          state: { patient, formData, details, fromTab: 'Completed' },
+        })
+      } else {
+        // Fallback for any other status (Pending, etc.)
+        navigate(`/tab-content/${patient.patientId}`, {
+          state: { patient, formData, details, fromTab: tab || 'Confirmed' },
         })
       }
     } catch (error) {

@@ -36,6 +36,7 @@ const Dashboard = () => {
   const [itemsPerPage] = useState(10);
   const [futureAppointments, setFutureAppointments] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loadingCalendar, setLoadingCalendar] = useState(false);
 
   const fetchAppointments = useCallback(async () => {
     try {
@@ -50,6 +51,7 @@ const Dashboard = () => {
   }, [doctorDetails?.id, setTodayAppointments]);
 
   const fetchFutureAppointments = useCallback(async () => {
+    setLoadingCalendar(true);
     try {
       const response = await getTodayFutureAppointments();
       if (response.statusCode === 200) {
@@ -60,6 +62,8 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Error fetching future appointments:', error);
       setFutureAppointments([]);
+    } finally {
+      setLoadingCalendar(false);
     }
   }, []);
 
@@ -129,7 +133,7 @@ const Dashboard = () => {
               </button>
 
               {/* Consultation type buttons */}
-              {Object.entries(consultationCounts).map(([type, count]) => (
+              {/* {Object.entries(consultationCounts).map(([type, count]) => (
                 <button
                   key={type}
                   onClick={() => setSelectedType(type)}
@@ -147,7 +151,7 @@ const Dashboard = () => {
                 >
                   {type} ({count})
                 </button>
-              ))}
+              ))} */}
             </div>
 
             {/* RIGHT: Search + Branch Dropdown + Calendar */}
@@ -263,7 +267,7 @@ const Dashboard = () => {
             <CTable className="mb-0" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
               <CTableHead>
                 <CTableRow>
-                  {['S.No', 'Name', 'Mobile', 'Date', 'Time', 'Consultation', 'Branch', 'Action'].map(
+                  {['S.No', 'Name', 'Mobile', 'Date', 'Time', 'Branch', 'Visit Type', 'Follow-up Status', 'Status', 'Action'].map(
                     (header, i) => (
                       <CTableHeaderCell
                         key={i}
@@ -291,7 +295,7 @@ const Dashboard = () => {
                 {currentPatients.length === 0 ? (
                   <CTableRow>
                     <CTableDataCell
-                      colSpan="8"
+                      colSpan="11"
                       className="text-center py-4"
                       style={{ color: COLORS.gray, fontSize: '14px' }}
                     >
@@ -316,7 +320,7 @@ const Dashboard = () => {
                         {capitalizeFirst(item.name)}
                       </CTableDataCell>
                       <CTableDataCell style={{ fontSize: '13px', padding: '10px 12px', color: COLORS.black }}>
-                        {item.patientMobileNumber}
+                        {item.patientMobileNumber || item.mobileNumber}
                       </CTableDataCell>
                       <CTableDataCell style={{ fontSize: '13px', padding: '10px 12px', color: COLORS.black }}>
                         {item.serviceDate}
@@ -324,7 +328,7 @@ const Dashboard = () => {
                       <CTableDataCell style={{ fontSize: '13px', padding: '10px 12px', color: COLORS.black }}>
                         {item.servicetime}
                       </CTableDataCell>
-                      <CTableDataCell style={{ fontSize: '13px', padding: '10px 12px' }}>
+                      {/* <CTableDataCell style={{ fontSize: '13px', padding: '10px 12px' }}>
                         <span
                           style={{
                             backgroundColor: '#EAF1FB',
@@ -335,9 +339,9 @@ const Dashboard = () => {
                             fontWeight: '500',
                           }}
                         >
-                          {item.consultationType}
+                          {item.visitType}
                         </span>
-                      </CTableDataCell>
+                      </CTableDataCell> */}
                       <CTableDataCell
                         style={{
                           fontSize: '13px',
@@ -348,7 +352,58 @@ const Dashboard = () => {
                           color: COLORS.black,
                         }}
                       >
-                        {branches.find((b) => b.branchId === item.branchId)?.branchName || 'N/A'}
+                        {item?.branchName || 'N/A'}
+                      </CTableDataCell>
+                      <CTableDataCell style={{ fontSize: '13px', padding: '10px 12px', color: COLORS.black, textTransform: 'capitalize' }}>
+                        {item.visitType ? item.visitType.replace(/_/g, ' ').toLowerCase() : 'N/A'}
+                      </CTableDataCell>
+                      <CTableDataCell style={{ fontSize: '13px', padding: '10px 12px', color: COLORS.black, textTransform: 'capitalize' }}>
+                        <span
+                          style={{
+                            backgroundColor:
+                              item.followupStatus && item.followupStatus.toLowerCase() !== 'pending'
+                                ? '#EAF1FB'
+                                : 'transparent',
+                            color:
+                              item.followupStatus && item.followupStatus.toLowerCase() !== 'pending'
+                                ? COLORS.bgcolor
+                                : COLORS.gray,
+                            borderRadius: '12px',
+                            padding: '2px 8px',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                          }}
+                        >
+                          {item.followupStatus || 'N/A'}
+                        </span>
+                      </CTableDataCell>
+                      <CTableDataCell style={{ fontSize: '13px', padding: '10px 12px' }}>
+                        <span
+                          style={{
+                            backgroundColor:
+                              item.status === 'Confirmed' ? '#EAF7F0'
+                                : item.status === 'In-Progress' || item.status === 'On-Going' ? '#FFF4E0'
+                                  : item.status === 'Cancelled' || item.status === 'Drop' ? '#FFF0F0'
+                                    : item.status === 'No-Show' || item.status === 'No Reply' ? '#F4F4F4'
+                                      : item.status === 'Completed' ? '#EAF7F0'
+                                        : item.status === 'Due for Investigation' || item.status === 'Investigation Done' ? '#EBF5FF'
+                                          : '#F0F6FF',
+                            color:
+                              item.status === 'Confirmed' ? '#1B8A56'
+                                : item.status === 'In-Progress' || item.status === 'On-Going' ? COLORS.orange
+                                  : item.status === 'Cancelled' || item.status === 'Drop' ? '#D32F2F'
+                                    : item.status === 'No-Show' || item.status === 'No Reply' ? '#616161'
+                                      : item.status === 'Completed' ? '#1B8A56'
+                                        : item.status === 'Due for Investigation' || item.status === 'Investigation Done' ? COLORS.bgcolor
+                                          : COLORS.black,
+                            borderRadius: '20px',
+                            padding: '3px 10px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                          }}
+                        >
+                          {item.status}
+                        </span>
                       </CTableDataCell>
                       <CTableDataCell className="text-center" style={{ padding: '10px 12px' }}>
                         <TooltipButton patient={item} tab={item.status} />
@@ -414,6 +469,7 @@ const Dashboard = () => {
           defaultBookedSlots={[]}
           handleClick={handleCalendarClick}
           fetchAppointments={fetchFutureAppointments}
+          loading={loadingCalendar}
         />
       )}
     </div>
