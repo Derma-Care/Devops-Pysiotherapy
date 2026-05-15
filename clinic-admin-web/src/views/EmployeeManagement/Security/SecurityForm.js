@@ -43,6 +43,7 @@ const makeEmptyForm = () => ({
   policeVerification: '',
   previousEmployeeHistory: '',
   traningOrGuardLicense: '',
+  emergencyContact: '',
   permissions: {},
   userName: '',
   password: '',
@@ -147,7 +148,7 @@ const SecurityForm = ({
     'bankAccountDetails.accountNumber', 'bankAccountDetails.accountHolderName',
     'bankAccountDetails.bankName', 'bankAccountDetails.branchName',
     'bankAccountDetails.ifscCode', 'bankAccountDetails.panCardNumber',
-    'medicalFitnessCertificate', 'profilePicture',
+    'medicalFitnessCertificate', 'profilePicture', 'emergencyContact',
   ]
 
   const handleChange = (field, value) => {
@@ -245,7 +246,18 @@ const SecurityForm = ({
       }
     })
 
+    if (formData.govermentId) {
+      if (formData.govermentId.length !== 12) {
+        newErrors.govermentId = 'Aadhar ID must be exactly 12 digits.'
+        isValid = false
+      } else if (/^(.)\1+$/.test(formData.govermentId)) {
+        newErrors.govermentId = 'Aadhar ID cannot have all identical digits.'
+        isValid = false
+      }
+    }
+
     const todayStr = new Date().toISOString().split('T')[0]
+
 
     if (formData.dateOfBirth) {
       if (formData.dateOfBirth > todayStr) {
@@ -258,12 +270,40 @@ const SecurityForm = ({
         const before = today.getMonth() < dob.getMonth() || (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())
         if (before) age--
         if (age < 18) { newErrors.dateOfBirth = 'Security must be at least 18 years old.'; isValid = false }
+        if (age >= 100) { newErrors.dateOfBirth = 'Security must be less than 100 years old.'; isValid = false }
       }
     }
 
-    if (formData.dateOfJoining && formData.dateOfJoining > todayStr) {
-      newErrors.dateOfJoining = 'Joining Date cannot be in the future.'
-      isValid = false
+    if (formData.dateOfJoining) {
+      if (formData.dateOfJoining > todayStr) {
+        newErrors.dateOfJoining = 'Joining Date cannot be in the future.'
+        isValid = false
+      } else {
+        const joinDate = new Date(formData.dateOfJoining)
+        const fifteenYearsAgo = new Date()
+        fifteenYearsAgo.setFullYear(fifteenYearsAgo.getFullYear() - 15)
+        if (joinDate < fifteenYearsAgo) {
+          newErrors.dateOfJoining = 'Joining Date cannot be more than 15 years ago.'
+          isValid = false
+        }
+      }
+    }
+
+    if (formData.bankAccountDetails.accountNumber) {
+      const accLen = formData.bankAccountDetails.accountNumber.length
+      if (accLen < 9 || accLen > 18) {
+        if (!newErrors.bankAccountDetails) newErrors.bankAccountDetails = {}
+        newErrors.bankAccountDetails.accountNumber = 'Account number must be between 9 and 18 digits.'
+        isValid = false
+      }
+    }
+
+    if (formData.bankAccountDetails.panCardNumber) {
+      if (formData.bankAccountDetails.panCardNumber.length !== 10) {
+        if (!newErrors.bankAccountDetails) newErrors.bankAccountDetails = {}
+        newErrors.bankAccountDetails.panCardNumber = 'PAN Card must be exactly 10 characters.'
+        isValid = false
+      }
     }
 
     if (formData.contactNumber && !/^[6-9]\d{9}$/.test(formData.contactNumber)) {
@@ -463,6 +503,7 @@ const SecurityForm = ({
                         className="sf-input" type="date"
                         value={formData.dateOfJoining}
                         max={new Date().toISOString().split('T')[0]}
+                        min={new Date(new Date().setFullYear(new Date().getFullYear() - 15)).toISOString().split('T')[0]}
                         onChange={(e) => handleChange('dateOfJoining', e.target.value)}
                       />
                     </Field>
@@ -472,7 +513,7 @@ const SecurityForm = ({
                       <input
                         className="sf-input"
                         value={formData.department}
-                        onChange={(e) => handleChange('department', e.target.value)}
+                        onChange={(e) => handleChange('department', e.target.value.replace(/[^A-Za-z\s]/g, ''))}
                       />
                     </Field>
                   </div>
@@ -488,6 +529,17 @@ const SecurityForm = ({
                 </div>
 
                 <div className="sf-row">
+                  <div className="sf-col-third">
+                    <Field label="Emergency Contact" required error={errors.emergencyContact}>
+                      <input
+                        className="sf-input" type="text" maxLength={10}
+                        value={formData.emergencyContact}
+                        onChange={(e) => {
+                          if (/^\d*$/.test(e.target.value)) handleChange('emergencyContact', e.target.value)
+                        }}
+                      />
+                    </Field>
+                  </div>
                   <div className="sf-col-full">
                     <Field label="Shift Timings / Availability" required error={errors.shiftTimingsOrAvailability}>
                       <select
@@ -552,7 +604,7 @@ const SecurityForm = ({
                           value={formData.bankAccountDetails[field]}
                           disabled={ifscLoading && (field === 'bankName' || field === 'branchName')}
                           placeholder={ifscLoading && (field === 'bankName' || field === 'branchName') ? 'Fetching...' : ''}
-                          maxLength={field === 'accountNumber' ? 20 : field === 'panCardNumber' ? 10 : field === 'ifscCode' ? 11 : field === 'accountHolderName' ? 50 : undefined}
+                          maxLength={field === 'accountNumber' ? 18 : field === 'panCardNumber' ? 10 : field === 'ifscCode' ? 11 : field === 'accountHolderName' ? 50 : undefined}
                           onChange={async (e) => {
                             let value = e.target.value
                             if (field === 'accountHolderName') {
