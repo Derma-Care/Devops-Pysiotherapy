@@ -85,7 +85,7 @@ public class BookingController {
 	 }
     
     @GetMapping("/getDoctorAppointmentsonStatus/{clinicId}/{doctorId}/{status}")
-	public ResponseEntity<?> getDoctorAppointmentsonStatus(@PathVariable String clinicId,@PathVariable String branchId,
+	public ResponseEntity<?> getDoctorAppointmentsonStatus(@PathVariable String clinicId,
 		@PathVariable String doctorId,@PathVariable String status){
 		return bookingService.getDoctorAppointmentsonStatus(clinicId,doctorId, status);
 		   
