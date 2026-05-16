@@ -204,7 +204,7 @@ services:
     build: ./notification-service
     container_name: notification_service
     ports:
-      - "8089:8089"
+      - "9909:9909"
     environment:
       - JAVA_TOOL_OPTIONS=-Xms128m -Xmx384m
       - SPRING_APPLICATION_NAME=notification-service
