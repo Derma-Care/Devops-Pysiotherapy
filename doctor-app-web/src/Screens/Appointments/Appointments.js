@@ -21,6 +21,7 @@ import TooltipButton from '../../components/CustomButton/TooltipButton'
 import Button from '../../components/CustomButton/CustomButton'
 import { getAppointments } from '../../Auth/Auth'
 import { useDoctorContext } from '../../Context/DoctorContext'
+import { useToast } from '../../utils/Toaster'
 
 const tabLabels = {
   pending: 'Pending',
@@ -64,11 +65,12 @@ const Appointments = ({ searchTerm = '' }) => {
   const [appointments, setAppointments] = useState([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('All')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedBranch, setSelectedBranch] = useState(null)
   const [selectedDate, setSelectedDate] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(10)
+  const toast = useToast()
 
   const isFetchingRef = useRef(false)
 
@@ -91,15 +93,18 @@ const Appointments = ({ searchTerm = '' }) => {
     setLoading(true)
     try {
       const status = tabToStatusMap[activeTab]
-      const data = await getAppointments(status)
-      setAppointments(data || [])
+      const response = await getAppointments(status, selectedBranch?.branchId || 'all')
+      setAppointments(response.data || [])
+      if (response.success && response.message) {
+        toast.info(response.message)
+      }
     } catch (err) {
       console.error('Error fetching appointments:', err)
     } finally {
       setLoading(false)
       isFetchingRef.current = false
     }
-  }, [activeTab])
+  }, [activeTab, selectedBranch])
 
   useEffect(() => {
     fetchData()
@@ -201,6 +206,7 @@ const Appointments = ({ searchTerm = '' }) => {
                     <CDropdown className="themed-dropdown-menu" style={{ cursor: 'pointer' }}>
                       <CDropdownToggle
                         size="sm"
+                        disabled={loading}
                         className="d-flex align-items-center gap-2"
                         style={{
                           backgroundColor: COLORS.bgcolor,
@@ -210,6 +216,7 @@ const Appointments = ({ searchTerm = '' }) => {
                           fontWeight: '600',
                           fontSize: '13px',
                           padding: '6px 14px',
+                          cursor: loading ? 'not-allowed' : 'pointer',
                         }}
                       >
                         <span>{getDropdownLabel()}</span>
@@ -357,6 +364,7 @@ const Appointments = ({ searchTerm = '' }) => {
                   <CDropdown className="themed-dropdown-menu" style={{ cursor: 'pointer' }}>
                     <CDropdownToggle
                       size="sm"
+                      disabled={loading}
                       className="d-flex align-items-center gap-2"
                       style={{
                         backgroundColor: COLORS.white,
@@ -366,6 +374,7 @@ const Appointments = ({ searchTerm = '' }) => {
                         fontWeight: '600',
                         fontSize: '13px',
                         padding: '6px 14px',
+                        cursor: loading ? 'not-allowed' : 'pointer',
                       }}
                     >
                       {selectedBranch ? selectedBranch.branchName : 'All Branches'}

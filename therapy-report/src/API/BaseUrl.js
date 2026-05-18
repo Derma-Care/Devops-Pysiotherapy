@@ -1,6 +1,9 @@
  
-export let wifiUrl = 'http://3.111.28.174:9090'
+// export let wifiUrl = 'http://3.111.28.174:9090'
  
+
+
+export let wifiUrl = 'http://3.7.165.97:9090'
 export let splrUrl = 'http:/localhost:8801'
  
 export const SBASE_URL = `${wifiUrl}/clinicadminpublicapis`
