@@ -17,7 +17,7 @@ import com.dermaCare.customerService.service.TherapyRecordService;
 
 @RestController
 @RequestMapping("/customer/therapy-records")
-@CrossOrigin(origins = "*")
+///@CrossOrigin(origins = "*")
 public class TherapyRecordController {
 
 	 @Autowired
@@ -88,6 +88,19 @@ public class TherapyRecordController {
 	                        branchId,
 	                        patientId,
 	                        therapyRecordId);
+	    }
+	    
+	    
+	    @GetMapping("/getByClinicBranchExercise/{clinicId}/{branchId}/{exerciseId}")
+	    public ResponseEntity<?> getTherapyRecords(
+	            @PathVariable String clinicId,
+	            @PathVariable String branchId,
+	            @PathVariable String exerciseId) {
+
+	        return service.getTherapyRecordsByClinicAndBranchAndExercise(
+	                clinicId,
+	                branchId,
+	                exerciseId);
 	    }
 	    
 	    

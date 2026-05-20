@@ -455,13 +455,40 @@ export const getDoctorById = async (doctorId) => {
   }
 }
 
+// export const getDoctorDetails = async () => {
+//   try {
+//     const doctorId = localStorage.getItem('doctorId')
+//     if (!doctorId) throw new Error("No doctorId found in localStorage")
+//     const response = await api.get(`${doctorbaseUrl}/${getDoctorByIdEndpoint}/${doctorId}`)
+//     return response.data?.data
+//   } catch (err) {
+//     console.error('Error fetching doctor details:', err)
+//     throw err
+//   }
+// }
+
 export const updateAvailability = async (doctorId, payload) => {
   try {
-    const response = await api.put(`${doctorbaseUrl}/${updateAvailabilityEndpoint}/${doctorId}`, payload)
-    return response.data
+
+    console.log("URL =>",
+      `${doctorbaseUrl}/${updateAvailabilityEndpoint}/${doctorId}`
+    );
+
+    console.log("PAYLOAD =>", payload);
+
+    const response = await api.put(
+      `${doctorbaseUrl}/${updateAvailabilityEndpoint}/${doctorId}`,
+      payload
+    );
+
+    console.log("FULL RESPONSE =>", response);
+
+    return response.data;
+
   } catch (err) {
-    console.error('Update availability error:', err)
-    throw err
+    console.error('Update availability error:', err);
+    console.log("ERROR DATA =>", err?.response?.data);
+    throw err;
   }
 }
 
@@ -684,6 +711,19 @@ export const getInProgressDetails = async (patientId, bookingId) => {
   }
 };
 
+export const getExerciseSessionsByExerciseId = async (clinicId, branchId, exerciseId) => {
+  try {
+    const url = `${ipUrl}/api/customer/therapy-records/getByClinicBranchExercise/${clinicId}/${branchId}/${exerciseId}`
+    console.log('📡 getExerciseSessionsByExerciseId requesting remote URL:', url)
+    const response = await api.get(url)
+    console.log('✅ getExerciseSessionsByExerciseId response:', response.data)
+    return response.data
+  } catch (error) {
+    console.error('❌ getExerciseSessionsByExerciseId Error:', error)
+    return null
+  }
+}
+
 export const getExerciseSessionsWithRecords = async (clinicId, branchId, bookingId, patientId, therapistRecordId) => {
   try {
     const response = await api.get(
@@ -693,6 +733,19 @@ export const getExerciseSessionsWithRecords = async (clinicId, branchId, booking
     return response.data;
   } catch (error) {
     console.error("❌ Error fetching exercise sessions with records:", error);
+    throw error;
+  }
+};
+
+export const getCompletedTherapyRecord = async (clinicId, branchId, therapistRecordId, sessionId) => {
+  try {
+    const response = await api.get(
+      `${baseUrl}/getCompletedTherapyRecord/${clinicId}/${branchId}/${therapistRecordId}/${sessionId}`
+    );
+    console.log("✅ Completed Therapy Record:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("❌ Error fetching completed therapy record:", error);
     throw error;
   }
 };
@@ -738,7 +791,7 @@ export const getPatientVitals = async (bookingId, patientId) => {
 
   try {
     const response = await api.get(
-      `${baseUrl}/getVitals/${bookingId}/${patientId}`
+      `${addDiseaseUrl}/getVitals/${bookingId}/${patientId}`
     );
 
     if (response?.data?.success) {
