@@ -1,5 +1,7 @@
 package com.dermaCare.customerService.dto;
 
+import java.util.List;
+
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
@@ -21,18 +23,11 @@ public class TherapyRecordDTO {
 
     @NotNull(message = "Patient ID is required")
     private String patientid;
-
+    private String duration;
     private String name;
-
-    private String setsdone;
-
-    private boolean repitationdone;
-
-    private Boolean sessioncompleted;
-
-    private String notes;
-
-    private String image;
-
-    private String video;
+    private String excerciseId;
+    private String status;
+    private Integer sessioncountremaining;
+    private String frequancy;
+   private List<TherophyRecordListDTO> therapyrecord;
 }

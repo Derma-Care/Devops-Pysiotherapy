@@ -1,298 +1,614 @@
-version: '3.8'
+version: '3.9'
 
 services:
+
+  # =========================================================
+  # ZOOKEEPER
+  # =========================================================
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.0
     container_name: zookeeper
+    restart: unless-stopped
+
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+
     ports:
       - "2181:2181"
-    
-    restart: always
+
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     networks:
       - app-network
+
+  # =========================================================
+  # KAFKA
+  # =========================================================
 
   kafka:
     image: confluentinc/cp-kafka:7.6.0
     container_name: kafka
+    restart: unless-stopped
+
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_started
+
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_HEAP_OPTS: "-Xms256M -Xmx512M"
+
     ports:
       - "9092:9092"
-    
-    restart: always
+
+    healthcheck:
+      test: ["CMD", "bash", "-c", "nc -z localhost 9092"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     networks:
       - app-network
+
+  # =========================================================
+  # MONGODB
+  # =========================================================
 
   mongodb:
     image: mongo:6.0
     container_name: mongodb_service
+    restart: unless-stopped
+
     command: mongod --wiredTigerCacheSizeGB 0.25
+
     ports:
       - "27017:27017"
-    
-    restart: always
-    networks:
-      - app-network
+
     volumes:
       - mongodb_data:/data/db
 
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - app-network
+
+  # =========================================================
+  # EUREKA SERVER
+  # =========================================================
+
   eureka-server:
-    build: ./eureka-server
+    build:
+      context: ./eureka-server
+      dockerfile: Dockerfile
+
     container_name: eureka_service
+    restart: unless-stopped
+
     ports:
       - "8761:8761"
+
     environment:
-      - JAVA_TOOL_OPTIONS=-Xms64m -Xmx256m
-    
-    restart: always
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m"
+
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     networks:
       - app-network
+
+  # =========================================================
+  # API GATEWAY
+  # =========================================================
 
   apigateway:
-    build: ./apigateway
+    build:
+      context: ./apigateway
+      dockerfile: Dockerfile
+
     container_name: apigateway_service
+    restart: unless-stopped
+
     ports:
       - "9090:9090"
-    environment:
-      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx384m
-      - SPRING_APPLICATION_NAME=apigateway
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
     depends_on:
-      - eureka-server
-    
-    restart: always
+      eureka-server:
+        condition: service_started
+
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx768m"
+      SPRING_APPLICATION_NAME: apigateway
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_CLOUD_GATEWAY_HTTPCLIENT_CONNECT_TIMEOUT: 30000
+      SPRING_CLOUD_GATEWAY_HTTPCLIENT_RESPONSE_TIMEOUT: 60s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     networks:
       - app-network
+
+  # =========================================================
+  # ADMIN SERVICE
+  # =========================================================
 
   adminservice:
-    build: ./adminservice
+    build:
+      context: ./adminservice
+      dockerfile: Dockerfile
+
     container_name: admin_service
+    restart: unless-stopped
+
     ports:
       - "8081:8081"
-    environment:
-      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx384m
-      - SPRING_APPLICATION_NAME=adminservice
-      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/AdminService
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
     depends_on:
-      - mongodb
-      - eureka-server
-    
-    restart: always
+      mongodb:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx512m"
+      SPRING_APPLICATION_NAME: adminservice
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/AdminService?connectTimeoutMS=30000&socketTimeoutMS=60000
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_CONNECTTIMEOUT: 30000
+      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_READTIMEOUT: 60000
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     networks:
       - app-network
+
+  # =========================================================
+  # CLINIC ADMIN SERVICE
+  # =========================================================
 
   clinicadmin:
-    build: ./clinicadmin
+    build:
+      context: ./clinicadmin
+      dockerfile: Dockerfile
+
     container_name: clinicadmin_service
+    restart: unless-stopped
+
     ports:
       - "8080:8080"
-    environment:
-      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx512m
-      - SPRING_APPLICATION_NAME=clinicadmin
-      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/clinicadminservice
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
     depends_on:
-      - mongodb
-      - eureka-server
-    
-    restart: always
+      mongodb:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx768m"
+      SPRING_APPLICATION_NAME: clinicadmin
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/clinicadminservice?connectTimeoutMS=30000&socketTimeoutMS=60000
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_CONNECTTIMEOUT: 30000
+      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_READTIMEOUT: 60000
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     networks:
       - app-network
 
-  category-services:
-    build: ./category-services
-    container_name: category_service
-    ports:
-      - "8800:8800"
-    environment:
-      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx256m
-      - SPRING_APPLICATION_NAME=category-services
-      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/category-services
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
-    depends_on:
-      - mongodb
-      - eureka-server
-    
-    restart: always
-    networks:
-      - app-network
+  # =========================================================
+  # DOCTOR SERVICE
+  # =========================================================
 
   doctor-service:
-    build: ./doctor-service
+    build:
+      context: ./doctor-service
+      dockerfile: Dockerfile
+
     container_name: doctor_service
+    restart: unless-stopped
+
     ports:
       - "8082:8082"
-    environment:
-      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx640m
-      - SPRING_APPLICATION_NAME=doctor-service
-      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/dermacaredoctor-db
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
     depends_on:
-      - mongodb
-      - eureka-server
-    
-    restart: always
+      mongodb:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx768m"
+      SPRING_APPLICATION_NAME: doctor-service
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/dermacaredoctor-db?connectTimeoutMS=30000&socketTimeoutMS=60000
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     networks:
       - app-network
+
+  # =========================================================
+  # PHYSIOTHERAPY DOCTOR SERVICE
+  # =========================================================
 
   physiotherapydoctor-service:
-    build: ./physiotherapydoctor-service
+    build:
+      context: ./physiotherapydoctor-service
+      dockerfile: Dockerfile
+
     container_name: physiotherapydoctor_service
+    restart: unless-stopped
+
     ports:
       - "8888:8888"
-    environment:
-      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx512m
-      - SPRING_APPLICATION_NAME=physiotherapydoctor-service
-      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/physiotherapydoctorservice
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
     depends_on:
-      - mongodb
-      - eureka-server
-    
-    restart: always
+      mongodb:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx512m"
+      SPRING_APPLICATION_NAME: physiotherapydoctor-service
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/physiotherapydoctorservice?connectTimeoutMS=30000&socketTimeoutMS=60000
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     networks:
       - app-network
+
+  # =========================================================
+  # CUSTOMER SERVICE
+  # =========================================================
 
   customerservice:
-    build: ./customerservice
+    build:
+      context: ./customerservice
+      dockerfile: Dockerfile
+
     container_name: customer_service
+    restart: unless-stopped
+
     ports:
       - "8083:8083"
-    environment:
-      - JAVA_TOOL_OPTIONS=-Xms256m -Xmx640m
-      - SPRING_APPLICATION_NAME=customerservice
-      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/customerService
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
     depends_on:
-      - mongodb
-      - eureka-server
-    
-    restart: always
+      mongodb:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx768m"
+      SPRING_APPLICATION_NAME: customerservice
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/customerService?connectTimeoutMS=30000&socketTimeoutMS=60000
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_CONNECTTIMEOUT: 30000
+      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_READTIMEOUT: 60000
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     networks:
       - app-network
+
+  # =========================================================
+  # BOOKING SERVICE
+  # =========================================================
 
   bookingservice:
-    build: ./bookingservice
+    build:
+      context: ./bookingservice
+      dockerfile: Dockerfile
+
     container_name: booking_service
+    restart: unless-stopped
+
     ports:
       - "9900:9900"
-    environment:
-      - JAVA_TOOL_OPTIONS=-Xms256m -Xmx768m
-      - SPRING_APPLICATION_NAME=bookingservice
-      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/customerAppointments
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
     depends_on:
-      - mongodb
-      - eureka-server
-    
-    restart: always
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1024m"
+      SPRING_APPLICATION_NAME: bookingservice
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/customerAppointments?connectTimeoutMS=30000&socketTimeoutMS=60000
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     networks:
       - app-network
+
+  # =========================================================
+  # CATEGORY SERVICE
+  # =========================================================
+
+  category-services:
+    build:
+      context: ./category-services
+      dockerfile: Dockerfile
+
+    container_name: category_service
+    restart: unless-stopped
+
+    ports:
+      - "8800:8800"
+
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx512m"
+      SPRING_APPLICATION_NAME: category-services
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/category-services?connectTimeoutMS=30000&socketTimeoutMS=60000
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - app-network
+
+  # =========================================================
+  # NOTIFICATION SERVICE
+  # =========================================================
 
   notification-service:
-    build: ./notification-service
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+
     container_name: notification_service
+    restart: unless-stopped
+
     ports:
       - "9909:9909"
-    environment:
-      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx384m
-      - SPRING_APPLICATION_NAME=notification-service
-      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/DermaCareNotifications
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
     depends_on:
-      - mongodb
-      - eureka-server
-    
-    restart: always
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx512m"
+      SPRING_APPLICATION_NAME: notification-service
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/DermaCareNotifications?connectTimeoutMS=30000&socketTimeoutMS=60000
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     networks:
       - app-network
 
-  pharmacy-management:
-    build: ./pharmacy-management
-    container_name: pharmacy_management_service
-    ports:
-      - "8801:8801"
-    environment:
-      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx256m
-      - SPRING_APPLICATION_NAME=pharmacy-management
-      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/PharmacyManagement
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
-    depends_on:
-      - mongodb
-      - eureka-server
-    
-    restart: always
-    networks:
-      - app-network
+
+  # =========================================================
+  # FRONTEND - CLINIC ADMIN
+  # =========================================================
 
   clinic-admin-web:
-    build: ./clinic-admin-web
+    build:
+      context: ./clinic-admin-web
+      dockerfile: Dockerfile
+
     container_name: clinic-admin-web-container
+    restart: unless-stopped
+
     ports:
       - "3000:80"
-    environment:
-      - HOST=3.111.28.174
-      - PORT=3000
-    
+
     depends_on:
       - apigateway
-    restart: always
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     networks:
       - app-network
+
+  # =========================================================
+  # FRONTEND - MAIN ADMIN
+  # =========================================================
 
   main-admin-web:
-    build: ./main-admin-web
+    build:
+      context: ./main-admin-web
+      dockerfile: Dockerfile
+
     container_name: main-admin-web-container
+    restart: unless-stopped
+
     ports:
       - "4000:80"
-    environment:
-      - HOST=3.111.28.174
-      - PORT=4000
-    
+
     depends_on:
       - apigateway
-    restart: always
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     networks:
       - app-network
+
+  # =========================================================
+  # FRONTEND - DOCTOR APP
+  # =========================================================
 
   doctor-app-web:
-    build: ./doctor-app-web
+    build:
+      context: ./doctor-app-web
+      dockerfile: Dockerfile
+
     container_name: doctor-app-web-container
+    restart: unless-stopped
+
     ports:
       - "5000:80"
-    environment:
-      - HOST=3.111.28.174
-      - PORT=5000
-    
+
     depends_on:
       - apigateway
-    restart: always
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     networks:
       - app-network
 
+  # =========================================================
+  # FRONTEND - THERAPY REPORT
+  # =========================================================
+
   therapy-report:
-    build: ./therapy-report
+    build:
+      context: ./therapy-report
+      dockerfile: Dockerfile
+
     container_name: therapyreport-container
+    restart: unless-stopped
+
     ports:
       - "5001:80"
-    environment:
-      - HOST=3.111.28.174
-      - PORT=5001
-    
+
     depends_on:
       - apigateway
-    restart: always
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - app-network
+
+  # =========================================================
+  # FRONTEND - PATIENT PHYSIO
+  # =========================================================
+
+  patient-physio-web:
+    build:
+      context: ./patient-physio-web
+      dockerfile: Dockerfile
+
+    container_name: patient-physio-web-container
+    restart: unless-stopped
+
+    ports:
+      - "5002:80"
+
+    depends_on:
+      - apigateway
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     networks:
       - app-network
 

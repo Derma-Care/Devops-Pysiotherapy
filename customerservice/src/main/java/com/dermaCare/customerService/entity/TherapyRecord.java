@@ -1,7 +1,12 @@
 package com.dermaCare.customerService.entity;
 
+import java.time.LocalDate;
+import java.util.List;
+
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+
+import com.dermaCare.customerService.dto.TherophyRecordListDTO;
 
 import lombok.*;
 
@@ -21,28 +26,16 @@ public class TherapyRecord {
 
     
     private String brnchid;
-
+    private String duration;
   
     private String patientid;
 
-  
-    private String name;
-
-   
-    private Integer setsdone;
     private String doctorid;
+    private String name;
+    private String status;
+    private String excerciseId;
+    private Integer sessioncountremaining;
+    private String frequancy;
    
-    private boolean repitationdone;
-
-   
-    private Boolean sessioncompleted;
-
-   
-    private byte[] notes;
-
-    
-    private byte[] image;
-
-    
-    private byte[] video;
+    private List<TherophyRecordList> therapyrecord;
 }
