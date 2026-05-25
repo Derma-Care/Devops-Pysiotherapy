@@ -3,76 +3,6 @@ version: '3.9'
 services:
 
   # =========================================================
-  # ZOOKEEPER
-  # =========================================================
-
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.0
-    container_name: zookeeper
-    restart: unless-stopped
-
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-
-    ports:
-      - "2181:2181"
-
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "2181"]
-      interval: 20s
-      timeout: 10s
-      retries: 5
-
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-    networks:
-      - app-network
-
-  # =========================================================
-  # KAFKA
-  # =========================================================
-
-  kafka:
-    image: confluentinc/cp-kafka:7.6.0
-    container_name: kafka
-    restart: unless-stopped
-
-    depends_on:
-      zookeeper:
-        condition: service_started
-
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_HEAP_OPTS: "-Xms256M -Xmx512M"
-
-    ports:
-      - "9092:9092"
-
-    healthcheck:
-      test: ["CMD", "bash", "-c", "nc -z localhost 9092"]
-      interval: 20s
-      timeout: 10s
-      retries: 5
-
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-    networks:
-      - app-network
-
-  # =========================================================
   # MONGODB
   # =========================================================
 
@@ -253,42 +183,6 @@ services:
       - app-network
 
   # =========================================================
-  # DOCTOR SERVICE
-  # =========================================================
-
-  doctor-service:
-    build:
-      context: ./doctor-service
-      dockerfile: Dockerfile
-
-    container_name: doctor_service
-    restart: unless-stopped
-
-    ports:
-      - "8082:8082"
-
-    depends_on:
-      mongodb:
-        condition: service_healthy
-      eureka-server:
-        condition: service_started
-
-    environment:
-      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx768m"
-      SPRING_APPLICATION_NAME: doctor-service
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/dermacaredoctor-db?connectTimeoutMS=30000&socketTimeoutMS=60000
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
-
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-    networks:
-      - app-network
-
-  # =========================================================
   # PHYSIOTHERAPY DOCTOR SERVICE
   # =========================================================
 
@@ -380,8 +274,6 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
-      kafka:
-        condition: service_started
       eureka-server:
         condition: service_started
 
@@ -389,7 +281,6 @@ services:
       JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1024m"
       SPRING_APPLICATION_NAME: bookingservice
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/customerAppointments?connectTimeoutMS=30000&socketTimeoutMS=60000
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
 
     logging:
@@ -401,41 +292,6 @@ services:
     networks:
       - app-network
 
-  # =========================================================
-  # CATEGORY SERVICE
-  # =========================================================
-
-  category-services:
-    build:
-      context: ./category-services
-      dockerfile: Dockerfile
-
-    container_name: category_service
-    restart: unless-stopped
-
-    ports:
-      - "8800:8800"
-
-    depends_on:
-      mongodb:
-        condition: service_healthy
-      eureka-server:
-        condition: service_started
-
-    environment:
-      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx512m"
-      SPRING_APPLICATION_NAME: category-services
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/category-services?connectTimeoutMS=30000&socketTimeoutMS=60000
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
-
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-    networks:
-      - app-network
 
   # =========================================================
   # NOTIFICATION SERVICE
@@ -455,8 +311,6 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
-      kafka:
-        condition: service_started
       eureka-server:
         condition: service_started
 
@@ -464,7 +318,6 @@ services:
       JAVA_TOOL_OPTIONS: "-Xms256m -Xmx512m"
       SPRING_APPLICATION_NAME: notification-service
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/DermaCareNotifications?connectTimeoutMS=30000&socketTimeoutMS=60000
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
 
     logging:

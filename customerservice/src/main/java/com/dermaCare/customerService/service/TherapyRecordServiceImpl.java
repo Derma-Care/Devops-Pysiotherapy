@@ -30,10 +30,8 @@ public class TherapyRecordServiceImpl implements TherapyRecordService{
 	        try {
 
 	            TherapyRecord therapyRecord = mapToEntity(dto);
-	            therapyRecord.setStatus("pending");
-	           
+	            //therapyRecord.setStatus("pending");	           
 	            TherapyRecord savedRecord = repository.save(therapyRecord);
-
 	            response.setMessage("Therapy record created successfully");
 	            response.setStatus(HttpStatus.CREATED.value());
 	            response.setSuccess(true);
@@ -56,7 +54,7 @@ public class TherapyRecordServiceImpl implements TherapyRecordService{
 	 
 	 @Override
 	 public ResponseEntity<?> updateTherapyRecord(
-	         String therapyrecordid,
+	         String therapyrecordid,String excerciseId,
 	         TherapyRecordDTO dto) {
 
 	     Response response = new Response();
@@ -64,7 +62,7 @@ public class TherapyRecordServiceImpl implements TherapyRecordService{
 	     try {
 
 	         Optional<TherapyRecord> optional =
-	                 repository.findByTherapyrecordid(therapyrecordid);
+	                 repository.findByTherapyrecordidAndExcerciseId(therapyrecordid,excerciseId);
 	         if (optional.isEmpty()) {
 
 	             response.setMessage("Therapy record not found");
@@ -129,7 +127,7 @@ public class TherapyRecordServiceImpl implements TherapyRecordService{
 	        	}
 
 	        	if (dto.getFrequancy() != null) {
-	        	    dto.setFrequancy(dto.getFrequancy());
+	        		existing.setFrequancy(dto.getFrequancy());
 	        	} else {
 	        		existing.setFrequancy("");
 	        	}
@@ -170,17 +168,20 @@ public class TherapyRecordServiceImpl implements TherapyRecordService{
 	                         if (recordDto.getSessioncount() != null) {
 	                        	 therapy.setSessioncount(
 	                                     recordDto.getSessioncount());
-	                        try {
-	                         TherophyRecordList lst = existing.getTherapyrecord().get(existing.getTherapyrecord().size()-1);
-	                         //System.out.println(lst);
-	                         int value = lst.getSession().intValue()-recordDto.getSessioncount().intValue();
-	                         if(value!=0) {  	 
-	                    	  existing.setStatus("Active");
-	                    	  existing.setSessioncountremaining(value);
-	                    	  }else {
-	                    		  existing.setStatus("Completed"); 
-	                    		  existing.setSessioncountremaining(value);
-	                    	  }}catch(Exception e) {}}
+								 try {
+									 TherophyRecordList lst = existing.getTherapyrecord().get(existing.getTherapyrecord().size()-1);
+									 int size = existing.getTherapyrecord().size();
+									// System.out.println(size);
+									 int add = size + recordDto.getSessioncount().intValue();
+									 int value = lst.getSession().intValue() - add;
+									// System.out.println(value);
+									 if(value!=0) {
+										 existing.setStatus("Active");
+										 existing.setSessioncountremaining(value);
+									 }else {
+										 existing.setStatus("Completed");
+										 existing.setSessioncountremaining(value);
+									 }}catch(Exception e) {}}
 	                         // ================= SESSION =================
 
 	                         if (recordDto.getSession() != null) {
@@ -557,6 +558,8 @@ public class TherapyRecordServiceImpl implements TherapyRecordService{
 	    public ResponseEntity<?> getTherapyRecordsByClinicAndBranchAndExercise(
 	            String clinicId,
 	            String branchId,
+	            String therapistid,
+	            String patientid,
 	            String exerciseId) {
 
 	        Response response = new Response();
@@ -564,9 +567,11 @@ public class TherapyRecordServiceImpl implements TherapyRecordService{
 	        try {
 
 	            List<TherapyRecord> records =
-	                    repository.findByClincinidAndBrnchidAndExcerciseId(
+	                    repository.findByClincinidAndBrnchidAndTherapyrecordidAndPatientidAndExcerciseId(
 	                            clinicId,
 	                            branchId,
+	                            therapistid,
+	                            patientid,
 	                            exerciseId);
 
 	            if (records.isEmpty()) {
@@ -596,6 +601,7 @@ public class TherapyRecordServiceImpl implements TherapyRecordService{
 	    }
 	    
 	    int sessioncompleted = 0;
+	    String status = null;
 	    private TherapyRecord mapToEntity(TherapyRecordDTO dto) {
 	    	
 	        List<TherophyRecordList> therapyList =
@@ -606,6 +612,7 @@ public class TherapyRecordServiceImpl implements TherapyRecordService{
 
 	        return TherapyRecord.builder()
 	                .therapyrecordid(dto.getTherapyrecordid())
+	                .status(status)
 	                .clincinid(dto.getClincinid())
 	                .brnchid(dto.getBrnchid())
 	                .patientid(dto.getPatientid())
@@ -621,9 +628,22 @@ public class TherapyRecordServiceImpl implements TherapyRecordService{
 	    private TherophyRecordList mapTherapyList(
 	            TherophyRecordListDTO dto) {
 	    	try {
-	    	sessioncompleted =  dto.getSession().intValue()-dto.getSessioncount().intValue();          	 
-         	
-	    	}catch(Exception e) {}
+	    	//sessioncompleted =  dto.getSession().intValue()-dto.getSessioncount().intValue();          	 
+         	if(dto.getSessioncount().intValue() != 0) {
+	    	status = "Active";
+         	}else {
+         		status = "pending";	
+         	}}catch(Exception e) {}
+	    	 try {
+				 int value = dto.getSession().intValue() - dto.getSessioncount().intValue();				
+				// System.out.println(value);
+				 if(value!=0) {
+					 status ="Active";
+					 sessioncompleted = value;
+				 }else {
+					 status = "Completed";
+					 sessioncompleted = value;
+				 }}catch(Exception e) {}
 	        return new TherophyRecordList(
 	                dto.getSetsdone(),
 	                dto.getRepitationdone(),
@@ -718,6 +738,7 @@ public class TherapyRecordServiceImpl implements TherapyRecordService{
 	                        therapyRecord.getTherapyrecordid())
 	                .clincinid(
 	                        therapyRecord.getClincinid())
+	                .id(therapyRecord.getId())
 	                .brnchid(
 	                        therapyRecord.getBrnchid())
 	                .patientid(
