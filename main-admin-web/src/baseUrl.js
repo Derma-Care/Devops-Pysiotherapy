@@ -213,3 +213,32 @@ export const updateProcedureDetails='admin/updateSubService'
 
 
 export const getSubService='admin/getSubService'
+
+// ─── Status API ───────────────────────────────────────────────────────────────
+// These endpoints trigger backend email notifications on status change.
+// If emails are not being received, the issue is in the backend email service
+// (e.g. SMTP config, email template, or the endpoint not sending emails).
+export const statusapi = {
+  /**
+   * Moves clinic to VERIFICATION_IN_PROGRESS.
+   * Backend should send a "verification started" email to clinic's emailAddress.
+   */
+  startClinic: (id) =>
+    axios.put(`${MainAdmin_URL}/start-verification/${id}`),
+
+  /**
+   * Moves clinic to VERIFIED.
+   * Backend should send a "congratulations, you are verified" email.
+   */
+  verifyClinic: (id) =>
+    axios.put(`${MainAdmin_URL}/verify/${id}`),
+
+  /**
+   * Moves clinic to REJECTED with a reason.
+   * Backend should send a "your clinic was rejected" email with the reason.
+   */
+  rejectClinic: (id, reason) =>
+    axios.put(`${MainAdmin_URL}/reject/${id}`, null, {
+      params: { reason },
+    }),
+}
