@@ -21,6 +21,7 @@ import com.dermaCare.customerService.dto.ConsultationDTO;
 import com.dermaCare.customerService.dto.CustomerDTO;
 import com.dermaCare.customerService.dto.CustomerLoginDTO;
 import com.dermaCare.customerService.dto.CustomerRatingDomain;
+import com.dermaCare.customerService.dto.ExerciseSessionsWithRecords;
 import com.dermaCare.customerService.dto.FavouriteDoctorsDTO;
 import com.dermaCare.customerService.dto.FirstVisitHistoryRequest;
 import com.dermaCare.customerService.dto.LoginDTO;
@@ -30,6 +31,7 @@ import com.dermaCare.customerService.dto.TherapistRecordRequest;
 import com.dermaCare.customerService.dto.VisitHistoryRequest;
 import com.dermaCare.customerService.entity.QuestionsByPartEntity;
 import com.dermaCare.customerService.service.CustomerService;
+import com.dermaCare.customerService.service.PhysiotherapyService;
 import com.dermaCare.customerService.util.GetByKey;
 import com.dermaCare.customerService.util.OtpUtil;
 import com.dermaCare.customerService.util.ResBody;
@@ -49,6 +51,8 @@ public class CustomerController {
 	private CustomerService customerService;
 	@Autowired
 	private GetByKey getByKey;
+	@Autowired
+	private PhysiotherapyService service;
 	
 	private static final Logger log = LoggerFactory.getLogger(CustomerController.class);
 		
@@ -454,63 +458,63 @@ public ResponseEntity<Response> getAverageRatingByDoctorId( @PathVariable String
    
    //CATEGORYANDSERVICES
    
-   @GetMapping("/getServiceById/{categoryId}")
-   public ResponseEntity<Object> getServiceById(@PathVariable String categoryId) {
-   	Response response = customerService.getServiceById(categoryId);
-   	if(response != null && response.getData() == null) {
-   		 return ResponseEntity.status(response.getStatus()).body(response);
-   	 }else if(response != null && response.getData() != null ) {
-   		 return ResponseEntity.status(response.getStatus()).body(response.getData());
-   	 }
-   	else {
-   			return null;}
-   }
-
-   
-   @GetMapping("/getSubServicesByServiceId/{serviceId}")
-   public ResponseEntity<?> getSubServicesByServiceId(@PathVariable String serviceId){
-   	Response response = customerService.getSubServicesByServiceId(serviceId);
-   	 if(response != null && response.getStatus() != 0) {
-   		 return ResponseEntity.status(response.getStatus()).body(response);
-   	 }else {
-   			return null;}
-       }
-  
-
-   @GetMapping("/getSubServiceInfo/{subServiceId}")
-   public ResponseEntity<Object> getSubServiceInfoBySubServiceId(@PathVariable String subServiceId)throws JsonProcessingException{
-	   Response response = customerService.getSubServiceInfoBySubServiceId(subServiceId);
-		if(response != null) {
-			 return ResponseEntity.status(response.getStatus()).body(response);
-			 }else{
-				 return null;
-			 }
-   }
-   
-    
-   
-   @GetMapping("/getBranchesInfoBySubServiceId/{clinicId}/{subServiceId}/{latitude}/{longtitude}")
-   public ResponseEntity<Object> getBranchesInfoBySubServiceId(@PathVariable String clinicId,@PathVariable String subServiceId,@PathVariable String latitude,@PathVariable String longtitude)throws JsonProcessingException{
-	   Response response = customerService.getBranchesInfoBySubServiceId(clinicId, subServiceId,latitude,longtitude);
-		if(response != null) {
-			 return ResponseEntity.status(response.getStatus()).body(response);
-			 }else{
-				 return null;
-			 }
-   }
-   
-   
-   @GetMapping("/getAllCategories")
-  	public ResponseEntity<?> getAllCategory() {
-      	Response response = customerService.getAllCategory();
-      	if(response != null && response.getData() == null) {
-  			 return ResponseEntity.status(response.getStatus()).body(response);
-  		 }else if(response != null && response.getData() != null ) {
-  			 return ResponseEntity.status(response.getStatus()).body(response.getData());
-  		 }
-  		else {
-  				return null;}}
-   
+//   @GetMapping("/getServiceById/{categoryId}")
+//   public ResponseEntity<Object> getServiceById(@PathVariable String categoryId) {
+//   	Response response = customerService.getServiceById(categoryId);
+//   	if(response != null && response.getData() == null) {
+//   		 return ResponseEntity.status(response.getStatus()).body(response);
+//   	 }else if(response != null && response.getData() != null ) {
+//   		 return ResponseEntity.status(response.getStatus()).body(response.getData());
+//   	 }
+//   	else {
+//   			return null;}
+//   }
+//
+//   
+//   @GetMapping("/getSubServicesByServiceId/{serviceId}")
+//   public ResponseEntity<?> getSubServicesByServiceId(@PathVariable String serviceId){
+//   	Response response = customerService.getSubServicesByServiceId(serviceId);
+//   	 if(response != null && response.getStatus() != 0) {
+//   		 return ResponseEntity.status(response.getStatus()).body(response);
+//   	 }else {
+//   			return null;}
+//       }
+//  
+//
+//   @GetMapping("/getSubServiceInfo/{subServiceId}")
+//   public ResponseEntity<Object> getSubServiceInfoBySubServiceId(@PathVariable String subServiceId)throws JsonProcessingException{
+//	   Response response = customerService.getSubServiceInfoBySubServiceId(subServiceId);
+//		if(response != null) {
+//			 return ResponseEntity.status(response.getStatus()).body(response);
+//			 }else{
+//				 return null;
+//			 }
+//   }
+//   
+//    
+//   
+//   @GetMapping("/getBranchesInfoBySubServiceId/{clinicId}/{subServiceId}/{latitude}/{longtitude}")
+//   public ResponseEntity<Object> getBranchesInfoBySubServiceId(@PathVariable String clinicId,@PathVariable String subServiceId,@PathVariable String latitude,@PathVariable String longtitude)throws JsonProcessingException{
+//	   Response response = customerService.getBranchesInfoBySubServiceId(clinicId, subServiceId,latitude,longtitude);
+//		if(response != null) {
+//			 return ResponseEntity.status(response.getStatus()).body(response);
+//			 }else{
+//				 return null;
+//			 }
+//   }
+//   
+//   
+//   @GetMapping("/getAllCategories")
+//  	public ResponseEntity<?> getAllCategory() {
+//      	Response response = customerService.getAllCategory();
+//      	if(response != null && response.getData() == null) {
+//  			 return ResponseEntity.status(response.getStatus()).body(response);
+//  		 }else if(response != null && response.getData() != null ) {
+//  			 return ResponseEntity.status(response.getStatus()).body(response.getData());
+//  		 }
+//  		else {
+//  				return null;}}
+//   
    
    //NOTIFICATION
    
@@ -633,6 +637,11 @@ public ResponseEntity<Response> getAverageRatingByDoctorId( @PathVariable String
 		   @RequestBody BookingRequset req) {
 
        return customerService.bookPhysioAppointment(req);
+   }
+   
+   @PostMapping("/getExerciseSessionsWithRecords")
+   public ResponseEntity<Response> getExerciseSessionsWithRecords(@RequestBody ExerciseSessionsWithRecords  dto) {
+       return service.getExerciseSessionsWithRecords(dto.getClinicId(), dto.getBranchId(), dto.getBookingId(), dto.getPatientId(), dto.getTherapistId(), dto.getTherapistRecordId());
    }
 
    

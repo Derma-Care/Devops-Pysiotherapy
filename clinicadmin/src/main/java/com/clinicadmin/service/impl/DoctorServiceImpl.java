@@ -61,7 +61,7 @@ import com.clinicadmin.entity.Doctors;
 import com.clinicadmin.feignclient.AdminServiceClient;
 import com.clinicadmin.feignclient.BookingFeign;
 import com.clinicadmin.feignclient.NotificationFeign;
-import com.clinicadmin.feignclient.ServiceFeignClient;
+//import com.clinicadmin.feignclient.ServiceFeignClient;
 import com.clinicadmin.repository.DoctorLoginCredentialsRepository;
 import com.clinicadmin.repository.DoctorSlotRepository;
 import com.clinicadmin.repository.DoctorsRepository;
@@ -119,7 +119,7 @@ public class DoctorServiceImpl implements DoctorService {
 
 	public DoctorServiceImpl(DoctorsRepository doctorsRepository,
 			DoctorLoginCredentialsRepository credentialsRepository, PasswordEncoder passwordEncoder,
-			DoctorSlotRepository slotRepository, ServiceFeignClient serviceFeignClient) {
+			DoctorSlotRepository slotRepository) {
 		this.doctorsRepository = doctorsRepository;
 		this.credentialsRepository = credentialsRepository;
 		this.passwordEncoder = passwordEncoder;
@@ -719,11 +719,27 @@ public class DoctorServiceImpl implements DoctorService {
 //				doctor.setConsultation(consultation);
 //			}
 
-			doctor.setDoctorAvailabilityStatus(dto.getDoctorAvailabilityStatus());
-			doctor.setRecommendation(dto.isRecommendation());
-			doctor.setAssociatedWithIADVC(dto.isAssociatedWithIADVC());
-			doctor.setAssociationsOrMemberships(dto.getAssociationsOrMemberships());
-			doctor.setBranches(dto.getBranches());
+			if (dto.getDoctorAvailabilityStatus() != null) {
+			    doctor.setDoctorAvailabilityStatus(dto.getDoctorAvailabilityStatus());
+			}
+
+			if (dto.isRecommendation() != doctor.isRecommendation()) {
+			    doctor.setRecommendation(dto.isRecommendation());
+			}
+
+			if (dto.isAssociatedWithIADVC() != doctor.isAssociatedWithIADVC()) {
+			    doctor.setAssociatedWithIADVC(dto.isAssociatedWithIADVC());
+			}
+
+			if (dto.getAssociationsOrMemberships() != null 
+			        && !dto.getAssociationsOrMemberships().isEmpty()) {
+			    doctor.setAssociationsOrMemberships(dto.getAssociationsOrMemberships());
+			}
+
+			if (dto.getBranches() != null 
+			        && !dto.getBranches().isEmpty()) {
+			    doctor.setBranches(dto.getBranches());
+			}
 
 			log.info("Saving updated doctor data for doctorId={}", doctorId);
 			Doctors updatedDoctor = doctorsRepository.save(doctor);

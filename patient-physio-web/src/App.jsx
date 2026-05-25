@@ -17,14 +17,16 @@ import Profile from './views/Profile';
 import ClinicDetails from './views/ClinicDetails';
 import HomeExercises from './views/HomeExercises';
 import Settings from './views/Settings';
-
+import './styles/theme.css'
+import VisitDetails from './views/VisitDetails';
+import PaymentDetails from './views/PaymentDetails';
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
     return (
       <div className="min-vh-100 d-flex justify-content-center align-items-center">
-        <CSpinner color="primary" variant="grow" />
+        <img src="/favicon.png" className="logo-spinner-grow" alt="Loading..." />
       </div>
     );
   }
@@ -39,7 +41,7 @@ const App = () => {
         <Suspense
           fallback={
             <div className="min-vh-100 d-flex justify-content-center align-items-center">
-              <CSpinner color="primary" variant="grow" />
+              <img src="/favicon.png" className="logo-spinner-grow" alt="Loading..." />
             </div>
           }
         >
@@ -60,9 +62,14 @@ const App = () => {
               <Route path="bookings/:id/history" element={<VisitHistory />} />
               <Route path="bookings/:id/sessions" element={<SessionTracking />} />
               <Route path="bookings/:id/home-exercises" element={<HomeExercises />} />
+              <Route path="bookings/:id/visit-details" element={<VisitDetails />} />
               <Route path="profile" element={<Profile />} />
               <Route path="clinic" element={<ClinicDetails />} />
               <Route path="settings" element={<Settings />} />
+              <Route
+                path="/payment/:bookingId"
+                element={<PaymentDetails />}
+              />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" />} />
           </Routes>
