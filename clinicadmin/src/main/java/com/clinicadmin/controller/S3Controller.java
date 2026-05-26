@@ -2,6 +2,8 @@ package com.clinicadmin.controller;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -74,7 +76,15 @@ public class S3Controller {
     // ─────────────────────────────────────────────
     private FieldConfig resolveConfig(String fieldName) {
         return switch (fieldName) {
-            case "certificate"  -> new FieldConfig("certificates",   MAX_IMAGE_SIZE, "5 MB",   IMAGE_EXTS, IMAGE_MIMES);
+        case "certificate" -> new FieldConfig(
+        	    "certificates",
+        	    MAX_PDF_SIZE,                                           // 10MB
+        	    "10 MB",
+        	    Stream.concat(IMAGE_EXTS.stream(), DOC_EXTS.stream())  // jpg+png+pdf
+        	          .collect(Collectors.toUnmodifiableSet()),
+        	    Stream.concat(IMAGE_MIMES.stream(), DOC_MIMES.stream())
+        	          .collect(Collectors.toUnmodifiableSet())
+        	);
             case "beforeImage"  -> new FieldConfig("before-images",  MAX_IMAGE_SIZE, "5 MB",   IMAGE_EXTS, IMAGE_MIMES);
             case "afterImage"   -> new FieldConfig("after-images",   MAX_IMAGE_SIZE, "5 MB",   IMAGE_EXTS, IMAGE_MIMES);
             case "beforeVideo"  -> new FieldConfig("before-videos",  MAX_VIDEO_SIZE, "100 MB", VIDEO_EXTS, VIDEO_MIMES);
