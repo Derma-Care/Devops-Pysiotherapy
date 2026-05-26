@@ -1,6 +1,6 @@
 import axios from 'axios';
 // Dev
-// const BASE_URL = 'http://3.7.216.95:9090';
+// const BASE_URL = 'http://3.111.28.174:9090';
 
 // test
 const BASE_URL = 'http://3.7.216.95:9090';
@@ -53,6 +53,11 @@ api.interceptors.response.use(
         baseURL: error.config?.baseURL,
       }
     });
+
+    if (!error.response || error.response.status >= 500 || error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
+      window.dispatchEvent(new CustomEvent('api-server-down'));
+    }
+
     return Promise.reject(error);
   }
 );
