@@ -10,6 +10,7 @@ services:
     image: mongo:6.0
     container_name: mongodb_service
     restart: always
+    stop_grace_period: 30s
 
     command: mongod --wiredTigerCacheSizeGB 0.25
 
@@ -51,6 +52,8 @@ services:
 
     container_name: eureka_service
     restart: always
+    stop_grace_period: 30s
+    stop_signal: SIGKILL
 
     ports:
       - "8761:8761"
@@ -94,6 +97,8 @@ services:
 
     container_name: apigateway_service
     restart: always
+    stop_grace_period: 30s
+    stop_signal: SIGKILL
 
     ports:
       - "9090:9090"
@@ -141,6 +146,8 @@ services:
 
     container_name: admin_service
     restart: always
+    stop_grace_period: 30s
+    stop_signal: SIGKILL
 
     ports:
       - "8081:8081"
@@ -191,6 +198,8 @@ services:
 
     container_name: clinicadmin_service
     restart: always
+    stop_grace_period: 30s
+    stop_signal: SIGKILL
 
     ports:
       - "8080:8080"
@@ -241,6 +250,8 @@ services:
 
     container_name: physiotherapydoctor_service
     restart: always
+    stop_grace_period: 30s
+    stop_signal: SIGKILL
 
     ports:
       - "8888:8888"
@@ -289,6 +300,8 @@ services:
 
     container_name: customer_service
     restart: always
+    stop_grace_period: 30s
+    stop_signal: SIGKILL
 
     ports:
       - "8083:8083"
@@ -339,6 +352,8 @@ services:
 
     container_name: booking_service
     restart: always
+    stop_grace_period: 30s
+    stop_signal: SIGKILL
 
     ports:
       - "9900:9900"
@@ -354,6 +369,7 @@ services:
       SPRING_APPLICATION_NAME: bookingservice
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/customerAppointments?connectTimeoutMS=30000&socketTimeoutMS=60000
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9900/actuator/health"]
@@ -387,6 +403,8 @@ services:
 
     container_name: notification_service
     restart: always
+    stop_grace_period: 30s
+    stop_signal: SIGKILL
 
     ports:
       - "9909:9909"
@@ -402,6 +420,7 @@ services:
       SPRING_APPLICATION_NAME: notification-service
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/DermaCareNotifications?connectTimeoutMS=30000&socketTimeoutMS=60000
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9909/actuator/health"]
@@ -435,6 +454,7 @@ services:
 
     container_name: clinic-admin-web-container
     restart: always
+    stop_grace_period: 10s
 
     ports:
       - "3000:80"
@@ -475,6 +495,7 @@ services:
 
     container_name: main-admin-web-container
     restart: always
+    stop_grace_period: 10s
 
     ports:
       - "4000:80"
@@ -515,6 +536,7 @@ services:
 
     container_name: doctor-app-web-container
     restart: always
+    stop_grace_period: 10s
 
     ports:
       - "5000:80"
@@ -555,6 +577,7 @@ services:
 
     container_name: therapyreport-container
     restart: always
+    stop_grace_period: 10s
 
     ports:
       - "5001:80"
@@ -595,6 +618,7 @@ services:
 
     container_name: patient-physio-web-container
     restart: always
+    stop_grace_period: 10s
 
     ports:
       - "5002:80"
