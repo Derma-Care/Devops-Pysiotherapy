@@ -2,651 +2,517 @@ version: '3.9'
 
 services:
 
-  # =========================================================
-  # MONGODB
-  # =========================================================
-
   mongodb:
     image: mongo:6.0
     container_name: mongodb_service
     restart: always
     stop_grace_period: 30s
-
-    command: mongod --wiredTigerCacheSizeGB 0.25
-
-    ports:
-      - "27017:27017"
-
+    command: mongod --wiredTigerCacheSizeGB 0.25 --auth
+    environment:
+      MONGO_INITDB_ROOT_USERNAME_FILE: /run/secrets/mongo_root_user
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongo_root_password
+    secrets:
+      - mongo_root_user
+      - mongo_root_password
     volumes:
       - mongodb_data:/data/db
-
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 20s
       timeout: 10s
       retries: 10
       start_period: 30s
-
     deploy:
       resources:
         limits:
           memory: 512m
-
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
     networks:
       - app-network
-
-  # =========================================================
-  # EUREKA SERVER
-  # =========================================================
 
   eureka-server:
     build:
       context: ./eureka-server
       dockerfile: Dockerfile
-
     container_name: eureka_service
     restart: always
     stop_grace_period: 30s
-    stop_signal: SIGKILL
-
+    stop_signal: SIGTERM
     ports:
       - "8761:8761"
-
     environment:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m"
-
     depends_on:
       mongodb:
         condition: service_healthy
-
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
       interval: 20s
       timeout: 10s
       retries: 10
       start_period: 90s
-
     deploy:
       resources:
         limits:
           memory: 384m
-
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
     networks:
       - app-network
-
-  # =========================================================
-  # API GATEWAY
-  # =========================================================
 
   apigateway:
     build:
       context: ./apigateway
       dockerfile: Dockerfile
-
     container_name: apigateway_service
     restart: always
     stop_grace_period: 30s
-    stop_signal: SIGKILL
-
+    stop_signal: SIGTERM
     ports:
       - "9090:9090"
-
     depends_on:
       eureka-server:
         condition: service_healthy
-
     environment:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m"
       SPRING_APPLICATION_NAME: apigateway
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRING_CLOUD_GATEWAY_HTTPCLIENT_CONNECT_TIMEOUT: 30000
       SPRING_CLOUD_GATEWAY_HTTPCLIENT_RESPONSE_TIMEOUT: 60s
-
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9090/actuator/health"]
       interval: 20s
       timeout: 10s
       retries: 10
       start_period: 90s
-
     deploy:
       resources:
         limits:
           memory: 512m
-
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
     networks:
       - app-network
-
-  # =========================================================
-  # ADMIN SERVICE
-  # =========================================================
 
   adminservice:
     build:
       context: ./adminservice
       dockerfile: Dockerfile
-
     container_name: admin_service
     restart: always
     stop_grace_period: 30s
-    stop_signal: SIGKILL
-
+    stop_signal: SIGTERM
     ports:
       - "8081:8081"
-
     depends_on:
       mongodb:
         condition: service_healthy
       eureka-server:
         condition: service_healthy
-
+    secrets:
+      - mongo_root_user
+      - mongo_root_password
     environment:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m"
       SPRING_APPLICATION_NAME: adminservice
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/AdminService?connectTimeoutMS=30000&socketTimeoutMS=60000
+      SPRING_DATA_MONGODB_URI: "mongodb://${MONGO_USER}:${MONGO_PASS}@mongodb:27017/AdminService?authSource=admin&connectTimeoutMS=30000&socketTimeoutMS=60000"
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_CONNECTTIMEOUT: 30000
       SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_READTIMEOUT: 60000
-
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
       interval: 20s
       timeout: 10s
       retries: 10
       start_period: 90s
-
     deploy:
       resources:
         limits:
           memory: 512m
-
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
     networks:
       - app-network
-
-  # =========================================================
-  # CLINIC ADMIN SERVICE
-  # =========================================================
 
   clinicadmin:
     build:
       context: ./clinicadmin
       dockerfile: Dockerfile
-
     container_name: clinicadmin_service
     restart: always
     stop_grace_period: 30s
-    stop_signal: SIGKILL
-
+    stop_signal: SIGTERM
     ports:
       - "8080:8080"
-
     depends_on:
       mongodb:
         condition: service_healthy
       eureka-server:
         condition: service_healthy
-
+    secrets:
+      - mongo_root_user
+      - mongo_root_password
     environment:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m"
       SPRING_APPLICATION_NAME: clinicadmin
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/clinicadminservice?connectTimeoutMS=30000&socketTimeoutMS=60000
+      SPRING_DATA_MONGODB_URI: "mongodb://${MONGO_USER}:${MONGO_PASS}@mongodb:27017/clinicadminservice?authSource=admin&connectTimeoutMS=30000&socketTimeoutMS=60000"
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_CONNECTTIMEOUT: 30000
       SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_READTIMEOUT: 60000
-
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
       interval: 20s
       timeout: 10s
       retries: 10
       start_period: 90s
-
     deploy:
       resources:
         limits:
           memory: 512m
-
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
     networks:
       - app-network
-
-  # =========================================================
-  # PHYSIOTHERAPY DOCTOR SERVICE
-  # =========================================================
 
   physiotherapydoctor-service:
     build:
       context: ./physiotherapydoctor-service
       dockerfile: Dockerfile
-
     container_name: physiotherapydoctor_service
     restart: always
     stop_grace_period: 30s
-    stop_signal: SIGKILL
-
+    stop_signal: SIGTERM
     ports:
       - "8888:8888"
-
     depends_on:
       mongodb:
         condition: service_healthy
       eureka-server:
         condition: service_healthy
-
+    secrets:
+      - mongo_root_user
+      - mongo_root_password
     environment:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m"
       SPRING_APPLICATION_NAME: physiotherapydoctor-service
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/physiotherapydoctorservice?connectTimeoutMS=30000&socketTimeoutMS=60000
+      SPRING_DATA_MONGODB_URI: "mongodb://${MONGO_USER}:${MONGO_PASS}@mongodb:27017/physiotherapydoctorservice?authSource=admin&connectTimeoutMS=30000&socketTimeoutMS=60000"
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
-
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
       interval: 20s
       timeout: 10s
       retries: 10
       start_period: 90s
-
     deploy:
       resources:
         limits:
           memory: 512m
-
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
     networks:
       - app-network
-
-  # =========================================================
-  # CUSTOMER SERVICE
-  # =========================================================
 
   customerservice:
     build:
       context: ./customerservice
       dockerfile: Dockerfile
-
     container_name: customer_service
     restart: always
     stop_grace_period: 30s
-    stop_signal: SIGKILL
-
+    stop_signal: SIGTERM
     ports:
       - "8083:8083"
-
     depends_on:
       mongodb:
         condition: service_healthy
       eureka-server:
         condition: service_healthy
-
+    secrets:
+      - mongo_root_user
+      - mongo_root_password
     environment:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m"
       SPRING_APPLICATION_NAME: customerservice
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/customerService?connectTimeoutMS=30000&socketTimeoutMS=60000
+      SPRING_DATA_MONGODB_URI: "mongodb://${MONGO_USER}:${MONGO_PASS}@mongodb:27017/customerService?authSource=admin&connectTimeoutMS=30000&socketTimeoutMS=60000"
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_CONNECTTIMEOUT: 30000
       SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_READTIMEOUT: 60000
-
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
       interval: 20s
       timeout: 10s
       retries: 10
       start_period: 90s
-
     deploy:
       resources:
         limits:
           memory: 512m
-
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
     networks:
       - app-network
-
-  # =========================================================
-  # BOOKING SERVICE
-  # =========================================================
 
   bookingservice:
     build:
       context: ./bookingservice
       dockerfile: Dockerfile
-
     container_name: booking_service
     restart: always
     stop_grace_period: 30s
-    stop_signal: SIGKILL
-
+    stop_signal: SIGTERM
     ports:
       - "9900:9900"
-
     depends_on:
       mongodb:
         condition: service_healthy
       eureka-server:
         condition: service_healthy
-
+    secrets:
+      - mongo_root_user
+      - mongo_root_password
     environment:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m"
       SPRING_APPLICATION_NAME: bookingservice
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/customerAppointments?connectTimeoutMS=30000&socketTimeoutMS=60000
+      SPRING_DATA_MONGODB_URI: "mongodb://${MONGO_USER}:${MONGO_PASS}@mongodb:27017/customerAppointments?authSource=admin&connectTimeoutMS=30000&socketTimeoutMS=60000"
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
-
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9900/actuator/health"]
       interval: 20s
       timeout: 10s
       retries: 10
       start_period: 90s
-
     deploy:
       resources:
         limits:
           memory: 512m
-
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
     networks:
       - app-network
-
-  # =========================================================
-  # NOTIFICATION SERVICE
-  # =========================================================
 
   notification-service:
     build:
       context: ./notification-service
       dockerfile: Dockerfile
-
     container_name: notification_service
     restart: always
     stop_grace_period: 30s
-    stop_signal: SIGKILL
-
+    stop_signal: SIGTERM
     ports:
       - "9909:9909"
-
     depends_on:
       mongodb:
         condition: service_healthy
       eureka-server:
         condition: service_healthy
-
+    secrets:
+      - mongo_root_user
+      - mongo_root_password
     environment:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m"
       SPRING_APPLICATION_NAME: notification-service
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/DermaCareNotifications?connectTimeoutMS=30000&socketTimeoutMS=60000
+      SPRING_DATA_MONGODB_URI: "mongodb://${MONGO_USER}:${MONGO_PASS}@mongodb:27017/DermaCareNotifications?authSource=admin&connectTimeoutMS=30000&socketTimeoutMS=60000"
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
-
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9909/actuator/health"]
       interval: 20s
       timeout: 10s
       retries: 10
       start_period: 90s
-
     deploy:
       resources:
         limits:
           memory: 384m
-
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
     networks:
       - app-network
-
-  # =========================================================
-  # FRONTEND - CLINIC ADMIN
-  # =========================================================
 
   clinic-admin-web:
     build:
       context: ./clinic-admin-web
       dockerfile: Dockerfile
-
     container_name: clinic-admin-web-container
     restart: always
     stop_grace_period: 10s
-
     ports:
       - "3000:80"
-
     depends_on:
       apigateway:
         condition: service_healthy
-
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 20s
       timeout: 10s
       retries: 5
       start_period: 30s
-
     deploy:
       resources:
         limits:
           memory: 128m
-
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
     networks:
       - app-network
-
-  # =========================================================
-  # FRONTEND - MAIN ADMIN
-  # =========================================================
 
   main-admin-web:
     build:
       context: ./main-admin-web
       dockerfile: Dockerfile
-
     container_name: main-admin-web-container
     restart: always
     stop_grace_period: 10s
-
     ports:
       - "4000:80"
-
     depends_on:
       apigateway:
         condition: service_healthy
-
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 20s
       timeout: 10s
       retries: 5
       start_period: 30s
-
     deploy:
       resources:
         limits:
           memory: 128m
-
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
     networks:
       - app-network
-
-  # =========================================================
-  # FRONTEND - DOCTOR APP
-  # =========================================================
 
   doctor-app-web:
     build:
       context: ./doctor-app-web
       dockerfile: Dockerfile
-
     container_name: doctor-app-web-container
     restart: always
     stop_grace_period: 10s
-
     ports:
       - "5000:80"
-
     depends_on:
       apigateway:
         condition: service_healthy
-
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 20s
       timeout: 10s
       retries: 5
       start_period: 30s
-
     deploy:
       resources:
         limits:
           memory: 128m
-
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
     networks:
       - app-network
-
-  # =========================================================
-  # FRONTEND - THERAPY REPORT
-  # =========================================================
 
   therapy-report:
     build:
       context: ./therapy-report
       dockerfile: Dockerfile
-
     container_name: therapyreport-container
     restart: always
     stop_grace_period: 10s
-
     ports:
       - "5001:80"
-
     depends_on:
       apigateway:
         condition: service_healthy
-
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 20s
       timeout: 10s
       retries: 5
       start_period: 30s
-
     deploy:
       resources:
         limits:
           memory: 128m
-
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
     networks:
       - app-network
-
-  # =========================================================
-  # FRONTEND - PATIENT PHYSIO
-  # =========================================================
 
   patient-physio-web:
     build:
       context: ./patient-physio-web
       dockerfile: Dockerfile
-
     container_name: patient-physio-web-container
     restart: always
     stop_grace_period: 10s
-
     ports:
       - "5002:80"
-
     depends_on:
       apigateway:
         condition: service_healthy
-
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 20s
       timeout: 10s
       retries: 5
       start_period: 30s
-
     deploy:
       resources:
         limits:
           memory: 128m
-
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
     networks:
       - app-network
+
+secrets:
+  mongo_root_user:
+    file: ./secrets/mongo_root_user.txt
+  mongo_root_password:
+    file: ./secrets/mongo_root_password.txt
 
 networks:
   app-network:
