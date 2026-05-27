@@ -20,15 +20,16 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+
 import com.dermacare.bookingService.dto.BookingRequset;
 import com.dermacare.bookingService.dto.BookingResponse;
 import com.dermacare.bookingService.dto.ConsultationFeesDTO;
@@ -56,6 +57,7 @@ import com.dermacare.bookingService.feign.PhysioDoctorFeign;
 //import com.dermacare.bookingService.producer.KafkaProducer;
 import com.dermacare.bookingService.repository.BookingServiceRepository;
 import com.dermacare.bookingService.service.BookingService_Service;
+import com.dermacare.bookingService.service.S3Service;
 import com.dermacare.bookingService.util.Response;
 import com.dermacare.bookingService.util.ResponseStructure;
 import com.dermacare.bookingService.util.geneateIds;
@@ -92,22 +94,10 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	@Autowired
 	private geneateIds sequenceGeneratorService;
 	
-	public DoctorSaveDetailsDTO saveDetails = new DoctorSaveDetailsDTO();
-	public DoctorSaveDetailsDTO sDetails = new DoctorSaveDetailsDTO();
-	public DoctorSaveDetailsDTO sd = new DoctorSaveDetailsDTO();
-
-	 private static final List<String> VALID_STATUS =
-		        Arrays.asList("PENDING","pending","confirmed","In-progress","IN-PROGRESS","CONFIRMED","due for Investigation","investigation done","session","follow-up pending","DUE FOR INVESTIGATION",
-		        		"INVESTIGATION DONE","SESSION","rescheduled","RESCHEDULED",
-		        		"follow-up pending",
-						"FOLLOW-UP PENDING","Follow-up Needed","FOLLOW-UP NEEDED","Cancelled","CANCELLED","DROP","Drop","No Reply","NO REPLY","No Follow-up","NO FOLLOW-UP","Completed","COMPLETED");
-		private static final List<String> VALID_WEEK_STATUS =
-		Arrays.asList("PENDING","pending","confirmed","In-progress","IN-PROGRESS","CONFIRMED","due for Investigation","investigation done","session","follow-up pending","DUE FOR INVESTIGATION",
-				"INVESTIGATION DONE","SESSION","rescheduled","RESCHEDULED",
-				"follow-up pending",
-				"FOLLOW-UP PENDING","Follow-up Needed","FOLLOW-UP NEEDED","Cancelled","CANCELLED","DROP","Drop","No Reply","NO REPLY","No Follow-up","NO FOLLOW-UP","Completed","COMPLETED");
-
-	 
+	@Autowired
+	private S3Service s3Service;
+	
+	
 	 @Override
 	 public ResponseEntity<?> addService(BookingResponse request) {
 	     ResponseStructure<FollowupBookingDto> response = new ResponseStructure<>();
@@ -302,6 +292,40 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	             }
 	         });
 	     }
+	     
+	     // ── S3 signed URLs ──────────────────────────────
+	     try {
+	         if (entity.getPartImage() != null && !entity.getPartImage().isEmpty()) {
+	             response.setPartImage(s3Service.generateSignedUrl(entity.getPartImage()));
+	         }
+	     } catch (Exception e) {
+	         System.out.println("partImage URL error: " + e.getMessage());
+	     }
+
+	     try {
+	         if (entity.getConsentFormPdf() != null && !entity.getConsentFormPdf().isEmpty()) {
+	             response.setConsentFormPdf(s3Service.generateSignedUrl(entity.getConsentFormPdf()));
+	         }
+	     } catch (Exception e) {
+	         System.out.println("consentFormPdf URL error: " + e.getMessage());
+	     }
+
+	     try {
+	         if (entity.getAttachments() != null && !entity.getAttachments().isEmpty()) {
+	             List<String> signedUrls = entity.getAttachments().stream()
+	                     .map(key -> {
+	                         try {
+	                             return s3Service.generateSignedUrl(key);
+	                         } catch (Exception ex) {
+	                             return key;
+	                         }
+	                     })
+	                     .collect(Collectors.toList());
+	             response.setAttachments(signedUrls);
+	         }
+	     } catch (Exception e) {
+	         System.out.println("attachments URL error: " + e.getMessage());
+	     }
 
 	     return response;
 	 }
@@ -319,19 +343,6 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 	         return null;
 	     }
 	 }
-
-	 
-	  private static String generatePatientId(String id) {	       
-	        String uuid = UUID.randomUUID().toString();
-	        String randomPart = uuid.replaceAll("-", "").substring(0, 6).toUpperCase();
-	        return id+"_"+"PT_" + randomPart;
-	    }
-	  
-	  private static String generateCustomerId(String branchId) {
-		    String uuid = UUID.randomUUID().toString();
-		    String randomPart = uuid.replaceAll("-", "").substring(0, 6).toUpperCase();
-		    return branchId + "_CR_" + randomPart;
-		}
 	
 	
 	private static String randomNumber() {
@@ -347,6 +358,43 @@ public class BookingService_ServiceImpl implements BookingService_Service {
          mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);	            
 		List<BookingResponse> res = mapper.convertValue(bookings,new TypeReference<List<BookingResponse>>(){});
 		for(BookingResponse bres : res) {
+			
+
+			 // ── S3 signed URLs ──────────────────────────────
+		     try {
+		    	 System.out.println(s3Service.generateSignedUrl(bres.getConsentFormPdf()));
+			     
+		         if (bres.getPartImage() != null && !bres.getPartImage().isEmpty()) {
+		        	 bres.setPartImage(s3Service.generateSignedUrl(bres.getPartImage()));
+		         }
+		     } catch (Exception e) {
+		         System.out.println("partImage URL error: " + e.getMessage());
+		     }
+
+		     try {
+		         if (bres.getConsentFormPdf() != null && !bres.getConsentFormPdf().isEmpty()) {
+		        	 bres.setConsentFormPdf(s3Service.generateSignedUrl(bres.getConsentFormPdf()));
+		           }
+		     } catch (Exception e) {
+		         System.out.println("consentFormPdf URL error: " + e.getMessage());
+		     }
+
+		     try {
+		         if (bres.getAttachments() != null && !bres.getAttachments().isEmpty()) {
+		             List<String> signedUrls = bres.getAttachments().stream()
+		                     .map(key -> {
+		                         try {
+		                             return s3Service.generateSignedUrl(key);
+		                         } catch (Exception ex) {
+		                             return key;
+		                         }
+		                     })
+		                     .collect(Collectors.toList());
+		             bres.setAttachments(signedUrls);
+		         }
+		     } catch (Exception e) {
+		         System.out.println("attachments URL error: " + e.getMessage());
+		     }
 			//System.out.println(bres.getBookingId());
 			DoctorSaveDetailsDTO dto = getPrescriptionpdf(bres.getBookingId());
 			//System.out.println(dto);
@@ -354,16 +402,7 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 			bres.setPrescriptionPdf(dto.getPrescriptionPdf());}}
 		return res;
 	}	
-	
-	
-	
-	
-//	 public ResponseEntity<?> physioAppointment() {
-//	     ResponseStructure<BookingResponse> response = new ResponseStructure<>();
-//	     List<Booking> existingBooking = repository.findByClinicIdAndBranchId(cId, bId);
-//	     LocalDa
-//	}
-	
+		
 	
 	@Override
 	 public ResponseEntity<?> physioAppointment(BookingRequset request) {
@@ -527,7 +566,7 @@ LocalDate bookingDate =
 LocalDate.parse(b.getServiceDate(), dateFormatter);
 
 if (bookingDate.equals(currentDate)
-&& b.getStatus().equalsIgnoreCase("Confirmed")) {
+&& b.getStatus().equalsIgnoreCase("Confirmed") || b.getStatus().equalsIgnoreCase("pending") ) {
 
 BookingResponse temp = toResponse(b);
 
@@ -668,7 +707,7 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 
 	                        if (add) {
 	                            BookingResponse temp = toResponse(b);
-	                            temp.setSubServiceName(treatmentName);
+	                           // temp.setSubServiceName(treatmentName);
 	                            temp.setServiceDate(d.getDate());
 	                            temp.setServicetime(b.getServicetime());
 	                            temp.setStatus(d.getStatus());
@@ -1430,8 +1469,8 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 		                    singleTreatment.setPendingSittings(treatment.getPendingSittings());
 		                    singleTreatment.setCurrentSitting(treatment.getCurrentSitting());
 
-		                    treatmentResponse.setTreatments(singleTreatment);
-		                    treatmentResponse.setSubServiceName(treatmentName); // Make subServiceName reflect this treatment
+		                   // treatmentResponse.setTreatments(singleTreatment);
+		                    ///treatmentResponse.setSubServiceName(treatmentName); // Make subServiceName reflect this treatment
 
 		                    bookingResponses.add(treatmentResponse);
 		                }
@@ -1554,13 +1593,13 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 		                    BookingResponse bookingResponse = new ObjectMapper().convertValue(booking, BookingResponse.class);
 
 		                    Map<String, TreatmentDetailsDTO> singleTreatment = new HashMap<>();
-		                    singleTreatment.put(treatmentName, treatment);
-		                    bookingResponse.getTreatments().setGeneratedData(singleTreatment);
-
-		                    bookingResponse.getTreatments().setTotalSittings(treatment.getTotalSittings());
-		                    bookingResponse.getTreatments().setTakenSittings(treatment.getTakenSittings());
-		                    bookingResponse.getTreatments().setPendingSittings(treatment.getPendingSittings());
-		                    bookingResponse.getTreatments().setCurrentSitting(treatment.getCurrentSitting());
+//		                    singleTreatment.put(treatmentName, treatment);
+//		                    bookingResponse.getTreatments().setGeneratedData(singleTreatment);
+//
+//		                    bookingResponse.getTreatments().setTotalSittings(treatment.getTotalSittings());
+//		                    bookingResponse.getTreatments().setTakenSittings(treatment.getTakenSittings());
+//		                    bookingResponse.getTreatments().setPendingSittings(treatment.getPendingSittings());
+//		                    bookingResponse.getTreatments().setCurrentSitting(treatment.getCurrentSitting());
 
 		                    // Attach prescription PDF if exists
 		                    DoctorSaveDetailsDTO dto = getPrescriptionpdf(booking.getBookingId());
@@ -2640,8 +2679,8 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 			        if (dto.getName() != null && !dto.getName().isEmpty())
 			            entity.setName(dto.getName());
 
-			        if (dto.getRelation() != null && !dto.getRelation().isEmpty())
-			            entity.setRelation(dto.getRelation());
+//			        if (dto.getRelation() != null && !dto.getRelation().isEmpty())
+//			            entity.setRelation(dto.getRelation());
 
 			        if (dto.getPatientMobileNumber() != null && !dto.getPatientMobileNumber().isEmpty())
 			            entity.setPatientMobileNumber(dto.getPatientMobileNumber());
@@ -2738,11 +2777,11 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 			            entity.setDoctorWebDeviceId(dto.getDoctorWebDeviceId());
 
 			        // -------- SERVICE --------
-			        if (dto.getSubServiceId() != null && !dto.getSubServiceId().isEmpty())
-			            entity.setSubServiceId(dto.getSubServiceId());
-
-			        if (dto.getSubServiceName() != null && !dto.getSubServiceName().isEmpty())
-			            entity.setSubServiceName(dto.getSubServiceName());
+//			        if (dto.getSubServiceId() != null && !dto.getSubServiceId().isEmpty())
+//			            entity.setSubServiceId(dto.getSubServiceId());
+//
+//			        if (dto.getSubServiceName() != null && !dto.getSubServiceName().isEmpty())
+//			            entity.setSubServiceName(dto.getSubServiceName());
 
 			        if (dto.getServiceDate() != null && !dto.getServiceDate().isEmpty())
 			            entity.setServiceDate(dto.getServiceDate());
@@ -2800,18 +2839,15 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 			        if (dto.getReasonForCancel() != null && !dto.getReasonForCancel().isEmpty())
 			            entity.setReasonForCancel(dto.getReasonForCancel());
 
-			        if (dto.getNotes() != null && !dto.getNotes().isEmpty())
-			            entity.setNotes(dto.getNotes());
+//			        if (dto.getNotes() != null && !dto.getNotes().isEmpty())
+//			            entity.setNotes(dto.getNotes());
 
 			        // -------- FILES --------
 			        if (dto.getAttachments() != null && !dto.getAttachments().isEmpty())
-			            entity.setAttachments(
-			                new ObjectMapper().convertValue(dto.getAttachments(),
-			                        new TypeReference<List<byte[]>>() {})
-			            );
+			            entity.setAttachments(dto.getAttachments());
 
 			        if (dto.getConsentFormPdf() != null && !dto.getConsentFormPdf().isEmpty())
-			            entity.setConsentFormPdf(Base64.getDecoder().decode(dto.getConsentFormPdf()));
+			            entity.setConsentFormPdf(dto.getConsentFormPdf());
 
 			        if (dto.getPrescriptionPdf() != null && !dto.getPrescriptionPdf().isEmpty())
 			            entity.setPrescriptionPdf(
@@ -2832,19 +2868,19 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 			            entity.setDoctorRefCode(dto.getDoctorRefCode());
 
 			        // -------- SITTINGS --------
-			        if (dto.getTotalSittings() != null)
-			            entity.setTotalSittings(dto.getTotalSittings());
-
-			        if (dto.getPendingSittings() != null)
-			            entity.setPendingSittings(dto.getPendingSittings());
-
-			        if (dto.getTakenSittings() != null)
-			            entity.setTakenSittings(dto.getTakenSittings());
-
-			        if (dto.getCurrentSitting() != null)
-			            entity.setCurrentSitting(dto.getCurrentSitting());
-                  
-			        // -------- BODY PART --------
+//			        if (dto.getTotalSittings() != null)
+//			            entity.setTotalSittings(dto.getTotalSittings());
+//
+//			        if (dto.getPendingSittings() != null)
+//			            entity.setPendingSittings(dto.getPendingSittings());
+//
+//			        if (dto.getTakenSittings() != null)
+//			            entity.setTakenSittings(dto.getTakenSittings());
+//
+//			        if (dto.getCurrentSitting() != null)
+//			            entity.setCurrentSitting(dto.getCurrentSitting());
+//                  
+//			        // -------- BODY PART --------
 			        if (dto.getBodyPartId() != null && !dto.getBodyPartId().isEmpty())
 			            entity.setBodyPartId(dto.getBodyPartId());
 
@@ -2852,7 +2888,7 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 			            entity.setBodyPartName(dto.getBodyPartName());
 
 			        if (dto.getPartImage() != null && !dto.getPartImage().isEmpty())
-			            entity.setPartImage(Base64.getDecoder().decode(dto.getPartImage()));
+			            entity.setPartImage(dto.getPartImage());
 			        if (dto.getReports() != null) {
 				            entity.setReports(new ObjectMapper().convertValue(
 				                    dto.getReports(),
@@ -2905,8 +2941,8 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 			            entity.setActivityLevels(dto.getActivityLevels());
 
 			        // -------- TREATMENTS --------
-			        if (dto.getTreatments() != null)
-			            entity.setTreatments(dto.getTreatments());
+//			        if (dto.getTreatments() != null)
+//			            entity.setTreatments(dto.getTreatments());
 			        if(dto.getFoc() != null)
 			           entity.setFoc(dto.getFoc());			        
 			        if (entity.getFreeFollowUps() != null && entity.getFreeFollowUps() == 0) {
@@ -3752,8 +3788,8 @@ try {
     if (dto.getName() != null && !dto.getName().isEmpty())
         entity.setName(dto.getName());
 
-    if (dto.getRelation() != null && !dto.getRelation().isEmpty())
-        entity.setRelation(dto.getRelation());
+//    if (dto.getRelation() != null && !dto.getRelation().isEmpty())
+//        entity.setRelation(dto.getRelation());
 
     if (dto.getPatientMobileNumber() != null && !dto.getPatientMobileNumber().isEmpty())
         entity.setPatientMobileNumber(dto.getPatientMobileNumber());
@@ -3830,11 +3866,11 @@ try {
         entity.setDoctorWebDeviceId(dto.getDoctorWebDeviceId());
 
     // -------- SERVICE --------
-    if (dto.getSubServiceId() != null && !dto.getSubServiceId().isEmpty())
-        entity.setSubServiceId(dto.getSubServiceId());
-
-    if (dto.getSubServiceName() != null && !dto.getSubServiceName().isEmpty())
-        entity.setSubServiceName(dto.getSubServiceName());
+//    if (dto.getSubServiceId() != null && !dto.getSubServiceId().isEmpty())
+//        entity.setSubServiceId(dto.getSubServiceId());
+//
+//    if (dto.getSubServiceName() != null && !dto.getSubServiceName().isEmpty())
+//        entity.setSubServiceName(dto.getSubServiceName());
 
     if (dto.getServiceDate() != null && !dto.getServiceDate().isEmpty())
         entity.setServiceDate(dto.getServiceDate());
@@ -3864,15 +3900,12 @@ try {
    if (dto.getStatus() != null) {entity.setStatus(dto.getStatus());}
 ///System.out.println(dto.getStatus());
     // -------- FILES --------
-    if (dto.getAttachments() != null && !dto.getAttachments().isEmpty())
-        entity.setAttachments(
-            new ObjectMapper().convertValue(dto.getAttachments(),
-                    new TypeReference<List<byte[]>>() {})
-        );
+   if (dto.getAttachments() != null && !dto.getAttachments().isEmpty())
+	    entity.setAttachments(dto.getAttachments());
 
-    if (dto.getConsentFormPdf() != null && !dto.getConsentFormPdf().isEmpty())
-        entity.setConsentFormPdf(Base64.getDecoder().decode(dto.getConsentFormPdf()));
 
+   if (dto.getConsentFormPdf() != null && !dto.getConsentFormPdf().isEmpty())
+	    entity.setConsentFormPdf(dto.getConsentFormPdf());
     // -------- PAYMENT --------
      if( dto.getPaymentType() != null && !dto.getPaymentType().isEmpty()) {
         	entity.setPaymentType(dto.getPaymentType());}
@@ -3893,7 +3926,7 @@ try {
         entity.setBodyPartName(dto.getBodyPartName());
 
     if (dto.getPartImage() != null && !dto.getPartImage().isEmpty())
-        entity.setPartImage(Base64.getDecoder().decode(dto.getPartImage()));
+        entity.setPartImage(dto.getPartImage());
 
     // -------- THERAPY --------
     if (dto.getTheraphyAnswers() != null)
