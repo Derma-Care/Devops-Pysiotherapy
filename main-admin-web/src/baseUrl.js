@@ -2,6 +2,8 @@
 // const ipUrl = 'localhost'
 // const ipUrl = '3.7.216.95:9090'
 
+import axios from 'axios';
+
 const ipUrl = '3.7.216.95:9090'
 
 export const BASE_URL = `http://${ipUrl}`
