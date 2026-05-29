@@ -3,6 +3,194 @@ import React from "react";
 import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer";
 import { capitalizeEachWord } from "./CaptalZeWord";
 
+const toImageSrc = (raw) => {
+  if (!raw) return null
+
+  const toDataUrl = (input) => {
+    let bytes
+    if (input instanceof Uint8Array) {
+      bytes = input
+    } else if (input instanceof ArrayBuffer) {
+      bytes = new Uint8Array(input)
+    } else if (typeof input === 'string') {
+      const s = input.trim().replace(/^'+|'+$/g, '')
+      try {
+        const decoded = atob(s)
+        if (btoa(decoded).replace(/=+$/, '') === s.replace(/=+$/, '')) {
+          bytes = new Uint8Array(decoded.length)
+          for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i)
+        }
+      } catch (e) {}
+      if (!bytes) {
+        bytes = new Uint8Array(s.length)
+        for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i) & 0xff
+      }
+    } else {
+      return null
+    }
+
+    let mime = 'image/*'
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) mime = 'image/png'
+    else if (bytes[0] === 0xff && bytes[1] === 0xd8) mime = 'image/jpeg'
+    else if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) mime = 'image/gif'
+    else if (bytes[0] === 0x42 && bytes[1] === 0x4d) mime = 'image/bmp'
+    else if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+             bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) mime = 'image/webp'
+
+    let bin = ''
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
+    return `data:${mime};base64,${btoa(bin)}`
+  }
+
+  if (typeof raw !== 'string') {
+    try {
+      return toDataUrl(raw)
+    } catch (e) {
+      return null
+    }
+  }
+
+  const trimmed = typeof raw === 'string' ? raw.trim() : ''
+  if (!trimmed) return null
+  if (trimmed.startsWith('data:')) return trimmed
+  if (trimmed.startsWith('blob:')) return trimmed
+
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    let urlWithoutQuery = trimmed
+    const queryIdx = trimmed.indexOf('?')
+    if (queryIdx !== -1) {
+      urlWithoutQuery = trimmed.substring(0, queryIdx)
+    }
+
+    let base64Part = ''
+    const awsIndex = urlWithoutQuery.lastIndexOf('amazonaws.com')
+    if (awsIndex !== -1) {
+      const remaining = urlWithoutQuery.substring(awsIndex + 'amazonaws.com'.length)
+      let extracted = ''
+      if (remaining.startsWith('/')) {
+        extracted = remaining.substring(1)
+      } else if (remaining.startsWith('%2F') || remaining.startsWith('%2f')) {
+        extracted = remaining.substring(3)
+      } else {
+        const slashIdx = remaining.indexOf('/')
+        const pctSlashIdx = remaining.toLowerCase().indexOf('%2f')
+        if (slashIdx !== -1 && (pctSlashIdx === -1 || slashIdx < pctSlashIdx)) {
+          extracted = remaining.substring(slashIdx + 1)
+        } else if (pctSlashIdx !== -1) {
+          extracted = remaining.substring(pctSlashIdx + 3)
+        } else {
+          extracted = remaining
+        }
+      }
+
+      const upperExtracted = extracted.toUpperCase()
+      const signatures = ['IVBOR', '/9J/', '9J/', 'R0LGO', 'JVBER', '%2F9J%2F']
+      let signatureIndex = -1
+      for (const sig of signatures) {
+        const idx = upperExtracted.indexOf(sig)
+        if (idx !== -1) {
+          signatureIndex = idx
+          break
+        }
+      }
+
+      if (signatureIndex !== -1) {
+        base64Part = extracted.substring(signatureIndex)
+      } else if (extracted.length > 500) {
+        base64Part = extracted
+      } else {
+        return trimmed // Normal short S3 URL
+      }
+    } else {
+      return trimmed // Not an amazonaws URL
+    }
+
+    if (base64Part) {
+      let decodedPart = base64Part
+      // Multi-pass percent decoding to handle single or double percent-encoding
+      for (let pass = 0; pass < 3; pass++) {
+        if (!decodedPart.includes('%')) break;
+        try {
+          decodedPart = decodeURIComponent(decodedPart)
+        } catch (e) {
+          const prev = decodedPart
+          decodedPart = decodedPart
+            .replace(/%2[bB]/g, '+')
+            .replace(/%2[fF]/g, '/')
+            .replace(/%3[dD]/g, '=')
+            .replace(/%25/g, '%')
+          if (decodedPart === prev) break
+        }
+      }
+
+      // Final cleanup of base64 characters
+      const cleanDecoded = decodedPart.trim()
+        .replace(/%2[bB]/g, '+')
+        .replace(/%2[fF]/g, '/')
+        .replace(/%3[dD]/g, '=')
+
+      const upperDecoded = cleanDecoded.toUpperCase()
+
+      // Direct base64 data URL assembly for known signatures
+      if (upperDecoded.startsWith('IVBOR')) {
+        return `data:image/png;base64,${cleanDecoded}`
+      }
+      if (upperDecoded.startsWith('/9J/') || upperDecoded.startsWith('9J/')) {
+        const fullBase64 = cleanDecoded.startsWith('9J') ? '/' + cleanDecoded : cleanDecoded
+        return `data:image/jpeg;base64,${fullBase64}`
+      }
+      if (upperDecoded.startsWith('R0LGO')) {
+        return `data:image/gif;base64,${cleanDecoded}`
+      }
+      if (upperDecoded.startsWith('JVBER')) {
+        return `data:application/pdf;base64,${cleanDecoded}`
+      }
+
+      if (cleanDecoded.length > 500 && !/\s/.test(cleanDecoded)) {
+        try {
+          return toDataUrl(cleanDecoded)
+        } catch (e) {
+          return `data:image/jpeg;base64,${cleanDecoded}`
+        }
+      }
+    }
+    return trimmed
+  }
+
+  if (trimmed.startsWith('/')) {
+    const upperTrimmed = trimmed.toUpperCase()
+    if (upperTrimmed.startsWith('/9J/')) {
+      return `data:image/jpeg;base64,${trimmed}`
+    }
+    return trimmed
+  }
+
+  // Pure Base64 strings: check signatures directly to prevent double-encoding bugs in toDataUrl
+  const upperTrimmed = trimmed.toUpperCase()
+  if (upperTrimmed.startsWith('IVBOR')) {
+    return `data:image/png;base64,${trimmed}`
+  }
+  if (upperTrimmed.startsWith('/9J/') || upperTrimmed.startsWith('9J/')) {
+    const fullBase64 = trimmed.startsWith('9J') ? '/' + trimmed : trimmed
+    return `data:image/jpeg;base64,${fullBase64}`
+  }
+  if (upperTrimmed.startsWith('R0LGO')) {
+    return `data:image/gif;base64,${trimmed}`
+  }
+  if (upperTrimmed.startsWith('JVBER')) {
+    return `data:application/pdf;base64,${trimmed}`
+  }
+
+  try {
+    return toDataUrl(trimmed)
+  } catch (e) {
+    if (trimmed.length > 100 && !/\s/.test(trimmed)) {
+      return `data:image/jpeg;base64,${trimmed}`
+    }
+    return trimmed
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  BRAND COLOR PALETTE  (matches your COLORS export)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,7 +257,7 @@ const L = {
 const S = StyleSheet.create({
   page: {
     fontSize: 8,
-    ily: "Helvetica",
+    fontFamily: "Helvetica",
     backgroundColor: C.white,
     padding: 0,
   },
@@ -98,7 +286,7 @@ const S = StyleSheet.create({
   hLeft: { flex: 1, paddingRight: 16 },
   hClinicName: {
     fontSize: 14,
-    ily: "Helvetica-Bold",
+    fontFamily: "Helvetica-Bold",
     color: C.white,
     letterSpacing: -0.2,
     marginBottom: 4,
@@ -114,7 +302,7 @@ const S = StyleSheet.create({
   hRight: { alignItems: "flex-end", flexShrink: 0 },
   hDocType: {
     fontSize: 7,
-    ily: "Helvetica-Bold",
+    fontFamily: "Helvetica-Bold",
     color: C.orange,
     letterSpacing: 3,
     textTransform: "uppercase",
@@ -128,7 +316,7 @@ const S = StyleSheet.create({
     paddingTop: 2, paddingBottom: 2,
     paddingLeft: 8, paddingRight: 8,
   },
-  hStatusTx: { fontSize: 6.5, ily: "Helvetica-Bold", letterSpacing: 1.2 },
+  hStatusTx: { fontSize: 6.5, fontFamily: "Helvetica-Bold", letterSpacing: 1.2 },
 
   // ── PATIENT BANNER ──
   patientBanner: {
@@ -155,8 +343,8 @@ const S = StyleSheet.create({
     borderTopColor: C.orange, borderRightColor: C.orange,
     borderBottomColor: C.orange, borderLeftColor: C.orange,
   },
-  pbAvatarTx: { fontSize: 12, ily: "Helvetica-Bold", color: C.orange },
-  pbName: { fontSize: 14, ily: "Helvetica-Bold", color: C.white, letterSpacing: -0.1 },
+  pbAvatarTx: { fontSize: 12, fontFamily: "Helvetica-Bold", color: C.orange },
+  pbName: { fontSize: 14, fontFamily: "Helvetica-Bold", color: C.white, letterSpacing: -0.1 },
   pbMeta: { fontSize: 7.5, color: C.gray300, marginTop: 3, letterSpacing: 0.2 },
   pbRight: { alignItems: "flex-end" },
   pbIdWrap: {
@@ -169,8 +357,8 @@ const S = StyleSheet.create({
     borderTopColor: C.orange, borderRightColor: C.orange,
     borderBottomColor: C.orange, borderLeftColor: C.orange,
   },
-  pbIdLbl: { fontSize: 6, color: C.gray400, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 2, ily: "Helvetica-Bold" },
-  pbIdVal: { fontSize: 9, ily: "Helvetica-Bold", color: C.orange, letterSpacing: 0.5 },
+  pbIdLbl: { fontSize: 6, color: C.gray400, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 2, fontFamily: "Helvetica-Bold" },
+  pbIdVal: { fontSize: 9, fontFamily: "Helvetica-Bold", color: C.orange, letterSpacing: 0.5 },
 
   // ── BODY ──
   bodyWrap: {
@@ -204,10 +392,10 @@ const S = StyleSheet.create({
     marginRight: 8,
     flexShrink: 0,
   },
-  secNum: { fontSize: 7, ily: "Helvetica-Bold", color: C.navyDeep },
+  secNum: { fontSize: 7, fontFamily: "Helvetica-Bold", color: C.navyDeep },
   secTitleWrap: { flex: 1, flexDirection: "row", alignItems: "center" },
   secTitle: {
-    fontSize: 8.5, ily: "Helvetica-Bold", color: C.white,
+    fontSize: 8.5, fontFamily: "Helvetica-Bold", color: C.white,
     textTransform: "uppercase", letterSpacing: 1.5,
   },
   secRule: {
@@ -222,10 +410,10 @@ const S = StyleSheet.create({
     paddingLeft: 8, paddingRight: 8,
     marginLeft: 8,
   },
-  secBadgeTx: { fontSize: 6, color: C.navyDeep, ily: "Helvetica-Bold", letterSpacing: 0.3 },
+  secBadgeTx: { fontSize: 6, color: C.navyDeep, fontFamily: "Helvetica-Bold", letterSpacing: 0.3 },
 
   subSecTitle: {
-    fontSize: 7, ily: "Helvetica-Bold", color: C.navy,
+    fontSize: 7, fontFamily: "Helvetica-Bold", color: C.navy,
     textTransform: "uppercase", letterSpacing: 1,
     marginBottom: 8, marginTop: 2,
     paddingBottom: 5,
@@ -287,15 +475,15 @@ const S = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.9,
     marginBottom: 3,
-    ily: "Helvetica-Bold",
+    fontFamily: "Helvetica-Bold",
     backgroundColor: C.gray100,       // subtle bg so it stands out
     paddingTop: 2, paddingBottom: 2,
     paddingLeft: 4, paddingRight: 4,
     borderRadius: 2,
   },
   val: { fontSize: 8, color: C.gray700, lineHeight: 1.5 },
-  valB: { fontSize: 8, color: C.navyDeep, ily: "Helvetica-Bold", lineHeight: 1.5 },
-  valXL: { fontSize: 12, color: C.navy, ily: "Helvetica-Bold" },
+  valB: { fontSize: 8, color: C.navyDeep, fontFamily: "Helvetica-Bold", lineHeight: 1.5 },
+  valXL: { fontSize: 12, color: C.navy, fontFamily: "Helvetica-Bold" },
 
   chipRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 3 },
   chip: {
@@ -306,7 +494,7 @@ const S = StyleSheet.create({
     borderTopWidth: 1, borderRightWidth: 1,
     borderBottomWidth: 1, borderLeftWidth: 1,
   },
-  chipTx: { fontSize: 6.5, ily: "Helvetica-Bold" },
+  chipTx: { fontSize: 6.5, fontFamily: "Helvetica-Bold" },
   // Brand chips
   chipNavy: { backgroundColor: C.navy, borderTopColor: C.navyDark, borderRightColor: C.navyDark, borderBottomColor: C.navyDark, borderLeftColor: C.navyDark },
   chipNavyTx: { color: C.white },
@@ -340,7 +528,7 @@ const S = StyleSheet.create({
     marginBottom: 6, paddingBottom: 6,
     borderBottomWidth: 1, borderBottomColor: C.gray50,
   },
-  checkLabel: { fontSize: 7.5, color: C.navy, ily: "Helvetica-Bold", width: 120, marginTop: 2, flexShrink: 0 },
+  checkLabel: { fontSize: 7.5, color: C.navy, fontFamily: "Helvetica-Bold", width: 120, marginTop: 2, flexShrink: 0 },
   checkPills: { flexDirection: "row", flexWrap: "wrap", flex: 1 },
   checkOn: {
     backgroundColor: C.navy, borderRadius: 3,
@@ -356,7 +544,7 @@ const S = StyleSheet.create({
     borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
     borderTopColor: C.gray150, borderRightColor: C.gray150, borderBottomColor: C.gray150, borderLeftColor: C.gray150,
   },
-  checkOnTx: { fontSize: 7, color: C.white, ily: "Helvetica-Bold" },
+  checkOnTx: { fontSize: 7, color: C.white, fontFamily: "Helvetica-Bold" },
   checkOffTx: { fontSize: 7, color: C.gray400 },
   checkNote: { fontSize: 6, color: C.gray500, fontStyle: "italic", marginTop: 3, flex: 1 },
 
@@ -370,7 +558,7 @@ const S = StyleSheet.create({
     paddingTop: 7, paddingBottom: 7, paddingLeft: 12, paddingRight: 12,
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
   },
-  qaHeadTx: { fontSize: 8, ily: "Helvetica-Bold", color: C.white },
+  qaHeadTx: { fontSize: 8, fontFamily: "Helvetica-Bold", color: C.white },
   qaHeadCount: { fontSize: 6.5, color: C.orange },
   qaRow: {
     flexDirection: "row", alignItems: "center",
@@ -383,7 +571,7 @@ const S = StyleSheet.create({
     backgroundColor: C.orangeLt, alignItems: "center", justifyContent: "center",
     marginRight: 8, flexShrink: 0,
   },
-  qaNumTx: { fontSize: 6, color: C.navyDeep, ily: "Helvetica-Bold" },
+  qaNumTx: { fontSize: 6, color: C.navyDeep, fontFamily: "Helvetica-Bold" },
   qaQ: { fontSize: 7.5, color: C.gray600, flex: 1, paddingRight: 12, lineHeight: 1.5 },
 
   tbl: {
@@ -396,7 +584,7 @@ const S = StyleSheet.create({
     backgroundColor: C.navy,
     paddingTop: 7, paddingBottom: 7, paddingLeft: 12, paddingRight: 12,
   },
-  tHCell: { fontSize: 6.5, color: C.orange, ily: "Helvetica-Bold", paddingRight: 6, letterSpacing: 0.5, textTransform: "uppercase" },
+  tHCell: { fontSize: 6.5, color: C.orange, fontFamily: "Helvetica-Bold", paddingRight: 6, letterSpacing: 0.5, textTransform: "uppercase" },
   tRow: {
     flexDirection: "row",
     borderTopWidth: 1, borderTopColor: C.gray100,
@@ -404,23 +592,23 @@ const S = StyleSheet.create({
   },
   tRowAlt: { backgroundColor: C.gray50 },
   tCell: { fontSize: 7.5, color: C.gray500, paddingRight: 6, lineHeight: 1.4 },
-  tCellB: { fontSize: 7.5, color: C.navyDeep, ily: "Helvetica-Bold", paddingRight: 6 },
-  tCellEm: { fontSize: 7.5, color: C.em600, ily: "Helvetica-Bold", paddingRight: 6 },
+  tCellB: { fontSize: 7.5, color: C.navyDeep, fontFamily: "Helvetica-Bold", paddingRight: 6 },
+  tCellEm: { fontSize: 7.5, color: C.em600, fontFamily: "Helvetica-Bold", paddingRight: 6 },
   tCellNum: { fontSize: 7, color: C.gray400, paddingRight: 6 },
 
   sevMild: { backgroundColor: C.em50, borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
   sevModerate: { backgroundColor: C.amber50, borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
   sevSevere: { backgroundColor: C.red50, borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
-  sevMildTx: { fontSize: 6.5, color: C.em700, ily: "Helvetica-Bold" },
-  sevModerateTx: { fontSize: 6.5, color: C.amber700, ily: "Helvetica-Bold" },
-  sevSevereTx: { fontSize: 6.5, color: C.red700, ily: "Helvetica-Bold" },
+  sevMildTx: { fontSize: 6.5, color: C.em700, fontFamily: "Helvetica-Bold" },
+  sevModerateTx: { fontSize: 6.5, color: C.amber700, fontFamily: "Helvetica-Bold" },
+  sevSevereTx: { fontSize: 6.5, color: C.red700, fontFamily: "Helvetica-Bold" },
 
   stageAcute: { backgroundColor: C.red50, borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
   stageSub: { backgroundColor: C.amber50, borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
   stageChronic: { backgroundColor: C.purple50, borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 },
-  stageAcuteTx: { fontSize: 6.5, color: C.red700, ily: "Helvetica-Bold" },
-  stageSubTx: { fontSize: 6.5, color: C.amber700, ily: "Helvetica-Bold" },
-  stageChronicTx: { fontSize: 6.5, color: C.purple700, ily: "Helvetica-Bold" },
+  stageAcuteTx: { fontSize: 6.5, color: C.red700, fontFamily: "Helvetica-Bold" },
+  stageSubTx: { fontSize: 6.5, color: C.amber700, fontFamily: "Helvetica-Bold" },
+  stageChronicTx: { fontSize: 6.5, color: C.purple700, fontFamily: "Helvetica-Bold" },
 
   // ── PACKAGE — navy themed ──
   pkgWrap: { marginBottom: 8 },
@@ -430,7 +618,7 @@ const S = StyleSheet.create({
     borderTopLeftRadius: L.cardR, borderTopRightRadius: L.cardR,
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
   },
-  pkgTitle: { fontSize: 9, ily: "Helvetica-Bold", color: C.white },
+  pkgTitle: { fontSize: 9, fontFamily: "Helvetica-Bold", color: C.white },
   pkgPrice: { fontSize: 7.5, color: C.orange },
   pkgBody: {
     borderTopWidth: 0,
@@ -447,7 +635,7 @@ const S = StyleSheet.create({
     borderTopLeftRadius: 3, borderTopRightRadius: 3,
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
   },
-  progTitle: { fontSize: 8, ily: "Helvetica-Bold", color: C.white },
+  progTitle: { fontSize: 8, fontFamily: "Helvetica-Bold", color: C.white },
   progBody: {
     borderTopWidth: 0,
     borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
@@ -466,7 +654,7 @@ const S = StyleSheet.create({
     borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 0, borderLeftWidth: 1,
     borderTopColor: C.orangeDk, borderRightColor: C.orangeDk, borderLeftColor: C.orangeDk,
   },
-  therapyTitle: { fontSize: 7.5, ily: "Helvetica-Bold", color: C.navyDeep },
+  therapyTitle: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: C.navyDeep },
   therapyBody: {
     borderTopWidth: 0,
     borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1,
@@ -493,7 +681,7 @@ const S = StyleSheet.create({
     width: "100%", marginBottom: 6, marginTop: 28,
   },
   sigRole: { fontSize: 6, color: C.gray400, textAlign: "center", textTransform: "uppercase", letterSpacing: 0.8 },
-  sigName: { fontSize: 9, ily: "Helvetica-Bold", color: C.navy, textAlign: "center", marginTop: 2 },
+  sigName: { fontSize: 9, fontFamily: "Helvetica-Bold", color: C.navy, textAlign: "center", marginTop: 2 },
   sigSub: { fontSize: 6.5, color: C.gray500, textAlign: "center", marginTop: 1 },
 
   footer: {
@@ -749,10 +937,10 @@ const PainBar = ({ scaleText }) => {
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
         <Text style={S.lbl}>Pain Scale</Text>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Text style={{ fontSize: 14, ily: "Helvetica-Bold", color }}>{num}</Text>
+          <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color }}>{num}</Text>
           <Text style={{ fontSize: 8, color: C.gray400 }}> / {max}  </Text>
           <View style={{ backgroundColor: bgColor, borderRadius: 2, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6 }}>
-            <Text style={{ fontSize: 6.5, color: labelColor, ily: "Helvetica-Bold", letterSpacing: 0.8 }}>{labelText}</Text>
+            <Text style={{ fontSize: 6.5, color: labelColor, fontFamily: "Helvetica-Bold", letterSpacing: 0.8 }}>{labelText}</Text>
           </View>
         </View>
       </View>
@@ -851,7 +1039,7 @@ const TherapyBlock = ({ therapy }) => (
     <View style={S.therapyHeader}>
       <Text style={S.therapyTitle}>{therapy.therapyName || "Therapy"}</Text>
       {therapy.totalPrice > 0 && (
-        <Text style={{ fontSize: 7, color: C.navyDeep, ily: "Helvetica-Bold" }}>Rs. {therapy.totalPrice}</Text>
+        <Text style={{ fontSize: 7, color: C.navyDeep, fontFamily: "Helvetica-Bold" }}>Rs. {therapy.totalPrice}</Text>
       )}
     </View>
     <View style={S.therapyBody}>
@@ -1181,9 +1369,7 @@ const PrescriptionPDF = (props) => {
                   <View style={{ marginTop: 8 }}>
                     <Text style={S.lbl}>Body Diagram</Text>
                     <Image
-                      src={String(complaints.painAssessmentImage).startsWith("data:")
-                        ? complaints.painAssessmentImage
-                        : `data:image/jpeg;base64,${complaints.painAssessmentImage}`}
+                      src={toImageSrc(complaints.painAssessmentImage)}
                       style={S.img}
                     />
                   </View>
@@ -1193,7 +1379,7 @@ const PrescriptionPDF = (props) => {
                     <Text style={S.lbl}>Report Images</Text>
                     <View style={S.imgContainer}>
                       {complaints.reportImages.slice(0, 4).map((img, i) => (
-                        <Image key={i} src={img} style={S.img} />
+                        <Image key={i} src={toImageSrc(img)} style={S.img} />
                       ))}
                     </View>
                   </View>

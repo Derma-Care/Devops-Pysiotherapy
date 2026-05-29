@@ -389,7 +389,7 @@ const CalendarModal = ({
               style={{
                 display: "grid",
                 gridTemplateColumns: `110px repeat(${dates.length}, minmax(90px, 1fr))`,
-                ily: "Segoe UI, Arial, sans-serif",
+                fontFamily: "Segoe UI, Arial, sans-serif",
                 fontSize: "13px",
               }}
             >

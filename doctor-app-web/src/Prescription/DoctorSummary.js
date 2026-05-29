@@ -47,7 +47,7 @@ const DoctorSummary = ({
   formData = {},
 }) => {
   const styles = StyleSheet.create({
-    page: { padding: 28, fontSize: 11 },
+    page: { padding: 28, fontSize: 11, fontFamily: 'Helvetica' },
 
     /* Header */
     header: {
@@ -202,7 +202,7 @@ const DoctorSummary = ({
         <head>
           <title>Patient Summary</title>
           <style>
-            body { margin: 20px; color: #000;   }
+            body { margin: 20px; color: #000; font-family: Segoe UI, Arial, sans-serif; }
             h3, h4, h5 { margin-top: 16px; font-size: 18px; }
             table { width: 100%; border-collapse: collapse; margin-top: 10px; }
             th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; }
@@ -313,6 +313,7 @@ const DoctorSummary = ({
       // ✅ Call API after saving template
       const payload = {
         bookingId: patientData.bookingId,
+        status: formData.overallStatus || patientData?.status || 'Completed',
         // doctorName: doctorDetails.doctorName,
         customerId: patientData?.customerId,
         clinicName: clinicDetails.name,
@@ -350,6 +351,7 @@ const DoctorSummary = ({
     // ✅ Call API after saving template
     const payload = {
       bookingId: patientData.bookingId,
+      status: formData.overallStatus || patientData?.status || 'Completed',
       doctorName: doctorDetails.doctorName,
       customerId: patientData?.customerId,
       clinicName: clinicDetails.name,
@@ -564,19 +566,19 @@ const DoctorSummary = ({
                                 <td>{d?.date ?? '—'}</td>
                                 <td>{d?.sitting ?? '—'}</td>
                                 <td style={{ textAlign: "center" }}>
-                                  <span
-                                    className={`badge ${d?.status === "Pending"
-                                      ? "bg-warning text-dark"
-                                      : d?.status === "Completed"
-                                        ? "bg-success"
-                                        : d?.status === "Cancelled"
-                                          ? "bg-danger"
-                                          : "bg-secondary"
-                                      }`}
-                                  >
-                                    {d?.status || "Pending"}
-                                  </span>
-                                </td>
+                              <span
+                                className={`badge ${d?.status === "Pending"
+                                    ? "bg-warning text-dark"
+                                    : d?.status === "Completed"
+                                      ? "bg-success"
+                                      : d?.status === "Cancelled"
+                                        ? "bg-danger"
+                                        : "bg-secondary"
+                                  }`}
+                              >
+                                {d?.status || "Pending"}
+                              </span>
+                            </td>
                               </tr>
                             ))}
                           </tbody>
