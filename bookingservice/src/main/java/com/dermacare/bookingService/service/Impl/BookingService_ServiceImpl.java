@@ -2675,223 +2675,323 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 public ResponseEntity<ResponseStructure<BookingResponse>> updateAppointmentBasedOnBookingId(
         BookingResponse dto) {
 
+    Booking updated = null;
+
     try {
 
         Booking entity = repository.findByBookingId(dto.getBookingId())
                 .orElseThrow(() -> new RuntimeException("Invalid Booking Id"));
 
         ObjectMapper mapper = new ObjectMapper();
-        mapper.registerModule(new JavaTimeModule());
-        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
         // -------- BASIC --------
 
-        if (dto.getBookingFor() != null && !dto.getBookingFor().isEmpty()) {
+        if (dto.getBookingFor() != null && !dto.getBookingFor().isEmpty())
             entity.setBookingFor(dto.getBookingFor());
-        }
 
-        if (dto.getName() != null && !dto.getName().isEmpty()) {
+        if (dto.getName() != null && !dto.getName().isEmpty())
             entity.setName(dto.getName());
-        }
-
-        if (dto.getPatientMobileNumber() != null
-                && !dto.getPatientMobileNumber().isEmpty()) {
-
-            entity.setPatientMobileNumber(dto.getPatientMobileNumber());
-        }
-
-        if (dto.getPatientId() != null && !dto.getPatientId().isEmpty()) {
-            entity.setPatientId(dto.getPatientId());
-        }
-
-        if (dto.getVisitType() != null && !dto.getVisitType().isEmpty()) {
-            entity.setVisitType(dto.getVisitType());
-        }
-
-        if (dto.getPatientAddress() != null
-                && !dto.getPatientAddress().isEmpty()) {
-
-            entity.setPatientAddress(dto.getPatientAddress());
-        }
-
-        if (dto.getAge() != null && !dto.getAge().isEmpty()) {
-            entity.setAge(dto.getAge());
-        }
-
-        if (dto.getGender() != null && !dto.getGender().isEmpty()) {
-            entity.setGender(dto.getGender());
-        }
-
-        if (dto.getMobileNumber() != null
-                && !dto.getMobileNumber().isEmpty()) {
-
-            entity.setMobileNumber(dto.getMobileNumber());
-        }
-
-        // -------- REPORTS --------
 
         if (dto.getReports() != null && !dto.getReports().isEmpty()) {
-
             entity.setReports(
-                    mapper.convertValue(
-                            dto.getReports(),
-                            new TypeReference<List<ReportsList>>() {
-                            }));
+                    mapper.convertValue(dto.getReports(),
+                            new TypeReference<List<ReportsList>>() {}));
         }
 
-        // -------- FOLLOWUP --------
+        if (dto.getPatientMobileNumber() != null && !dto.getPatientMobileNumber().isEmpty())
+            entity.setPatientMobileNumber(dto.getPatientMobileNumber());
 
-        if (dto.getFollowupStatus() != null
-                && !dto.getFollowupStatus().isEmpty()) {
+        if (dto.getPatientId() != null && !dto.getPatientId().isEmpty())
+            entity.setPatientId(dto.getPatientId());
 
+        if (dto.getVisitType() != null && !dto.getVisitType().isEmpty())
+            entity.setVisitType(dto.getVisitType());
+
+        if (dto.getPatientAddress() != null && !dto.getPatientAddress().isEmpty())
+            entity.setPatientAddress(dto.getPatientAddress());
+
+        if (dto.getAge() != null && !dto.getAge().isEmpty())
+            entity.setAge(dto.getAge());
+
+        if (dto.getGender() != null && !dto.getGender().isEmpty())
+            entity.setGender(dto.getGender());
+
+        if (dto.getMobileNumber() != null && !dto.getMobileNumber().isEmpty())
+            entity.setMobileNumber(dto.getMobileNumber());
+
+        if (dto.getCustomerId() != null && !dto.getCustomerId().isEmpty())
+            entity.setCustomerId(dto.getCustomerId());
+
+        if (dto.getCustomerDeviceId() != null && !dto.getCustomerDeviceId().isEmpty())
+            entity.setCustomerDeviceId(dto.getCustomerDeviceId());
+
+        // -------- FOLLOWUPS --------
+
+        if (dto.getFreeFollowUpsLeft() != null)
+            entity.setFreeFollowUpsLeft(dto.getFreeFollowUpsLeft());
+
+        if (dto.getFreeFollowUps() != null)
+            entity.setFreeFollowUps(dto.getFreeFollowUps());
+
+        if (dto.getFollowupDate() != null && !dto.getFollowupDate().isEmpty())
+            entity.setFollowupDate(dto.getFollowupDate());
+
+        if (dto.getFollowupStatus() != null)
             entity.setFollowupStatus(dto.getFollowupStatus());
-        }
 
         // -------- PROBLEM --------
 
-        if (dto.getProblem() != null && !dto.getProblem().isEmpty()) {
+        if (dto.getProblem() != null && !dto.getProblem().isEmpty())
             entity.setProblem(dto.getProblem());
-        }
 
-        if (dto.getSymptomsDuration() != null
-                && !dto.getSymptomsDuration().isEmpty()) {
-
+        if (dto.getSymptomsDuration() != null && !dto.getSymptomsDuration().isEmpty())
             entity.setSymptomsDuration(dto.getSymptomsDuration());
-        }
+
+        // -------- CLINIC --------
+
+        if (dto.getClinicId() != null && !dto.getClinicId().isEmpty())
+            entity.setClinicId(dto.getClinicId());
+
+        if (dto.getClinicName() != null && !dto.getClinicName().isEmpty())
+            entity.setClinicName(dto.getClinicName());
+
+        if (dto.getClinicDeviceId() != null && !dto.getClinicDeviceId().isEmpty())
+            entity.setClinicDeviceId(dto.getClinicDeviceId());
+
+        if (dto.getBranchId() != null && !dto.getBranchId().isEmpty())
+            entity.setBranchId(dto.getBranchId());
+
+        if (dto.getBranchname() != null && !dto.getBranchname().isEmpty())
+            entity.setBranchname(dto.getBranchname());
+
+        // -------- DOCTOR --------
+
+        if (dto.getDoctorId() != null && !dto.getDoctorId().isEmpty())
+            entity.setDoctorId(dto.getDoctorId());
+
+        if (dto.getDoctorName() != null && !dto.getDoctorName().isEmpty())
+            entity.setDoctorName(dto.getDoctorName());
+
+        if (dto.getDoctorMobileDeviceId() != null && !dto.getDoctorMobileDeviceId().isEmpty())
+            entity.setDoctorDeviceId(dto.getDoctorMobileDeviceId());
+
+        if (dto.getDoctorWebDeviceId() != null && !dto.getDoctorWebDeviceId().isEmpty())
+            entity.setDoctorWebDeviceId(dto.getDoctorWebDeviceId());
 
         // -------- SERVICE --------
 
-        if (dto.getServiceDate() != null
-                && !dto.getServiceDate().isEmpty()) {
-
+        if (dto.getServiceDate() != null && !dto.getServiceDate().isEmpty())
             entity.setServiceDate(dto.getServiceDate());
-        }
 
-        if (dto.getServicetime() != null
-                && !dto.getServicetime().isEmpty()) {
-
+        if (dto.getServicetime() != null && !dto.getServicetime().isEmpty())
             entity.setServicetime(dto.getServicetime());
-        }
 
-        if (dto.getConsultationType() != null
-                && !dto.getConsultationType().isEmpty()) {
-
+        if (dto.getConsultationType() != null && !dto.getConsultationType().isEmpty())
             entity.setConsultationType(dto.getConsultationType());
-        }
 
         // -------- CONSULTATION FEE --------
 
-        if (dto.getConsultationFee() > 0) {
+        if (dto.getConsultationFee() != 0.0) {
 
-            List<ConsultationFees> feeList = entity.getListOfConsultationFee();
-
-            if (feeList == null) {
-                feeList = new ArrayList<>();
-            }
+            List<ConsultationFees> list = entity.getListOfConsultationFee();
+            if (list == null) list = new ArrayList<>();
 
             ConsultationFees fee = new ConsultationFees();
             fee.setConsulationFee(dto.getConsultationFee());
             fee.setDATE_TIME(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
 
-            feeList.add(0, fee);
+            list.add(0, fee);
 
             entity.setConsultationFee(dto.getConsultationFee());
-            entity.setListOfConsultationFee(feeList);
+            entity.setListOfConsultationFee(list);
         }
+
+        if (dto.getListOfConsultationFee() != null && !dto.getListOfConsultationFee().isEmpty()) {
+
+            List<ConsultationFees> list = entity.getListOfConsultationFee();
+            if (list == null) list = new ArrayList<>();
+
+            for (ConsultationFeesDTO c : dto.getListOfConsultationFee()) {
+                ConsultationFees fee = mapper.convertValue(c, ConsultationFees.class);
+                list.add(fee);
+            }
+
+            entity.setListOfConsultationFee(list);
+        }
+
+        if (dto.getConsultationExpiration() != null && !dto.getConsultationExpiration().isEmpty())
+            entity.setConsultationExpiration(dto.getConsultationExpiration());
 
         // -------- STATUS --------
 
-        if (dto.getStatus() != null && !dto.getStatus().isEmpty()) {
+        if (dto.getStatus() != null) {
 
             entity.setStatus(dto.getStatus());
 
             List<Status> statusList = entity.getCurrentStatus();
+            if (statusList == null) statusList = new ArrayList<>();
 
-            if (statusList == null) {
-                statusList = new ArrayList<>();
-            }
+            Status s = new Status();
+            s.setStatus(dto.getStatus());
+            s.setDATE_TIME(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
 
-            Status status = new Status();
-            status.setStatus(dto.getStatus());
-            status.setDATE_TIME(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
-
-            statusList.add(0, status);
-
+            statusList.add(0, s);
             entity.setCurrentStatus(statusList);
         }
 
+        if (dto.getCurrentStatus() != null && !dto.getCurrentStatus().isEmpty()) {
+            entity.setCurrentStatus(
+                    mapper.convertValue(dto.getCurrentStatus(),
+                            new TypeReference<List<Status>>() {}));
+        }
+
+        if (dto.getReasonForCancel() != null && !dto.getReasonForCancel().isEmpty())
+            entity.setReasonForCancel(dto.getReasonForCancel());
+
+        // -------- FILES --------
+
+        if (dto.getAttachments() != null && !dto.getAttachments().isEmpty())
+            entity.setAttachments(dto.getAttachments());
+
+        if (dto.getConsentFormPdf() != null && !dto.getConsentFormPdf().isEmpty())
+            entity.setConsentFormPdf(dto.getConsentFormPdf());
+
+        if (dto.getPrescriptionPdf() != null && !dto.getPrescriptionPdf().isEmpty())
+            entity.setPrescriptionPdf(
+                    mapper.convertValue(dto.getPrescriptionPdf(),
+                            new TypeReference<List<byte[]>>() {}));
+
         // -------- PAYMENT --------
 
-        if (dto.getPaymentType() != null
-                && !dto.getPaymentType().isEmpty()) {
-
+        if (dto.getPaymentType() != null && !dto.getPaymentType().isEmpty())
             entity.setPaymentType(dto.getPaymentType());
-        }
 
-        if (dto.getPaymentStatus() != null
-                && !dto.getPaymentStatus().isEmpty()) {
-
+        if (dto.getPaymentStatus() != null && !dto.getPaymentStatus().isEmpty())
             entity.setPaymentStatus(dto.getPaymentStatus());
-        }
 
-        if (dto.getTotalFee() > 0) {
+        if (dto.getTotalFee() > 0)
             entity.setTotalFee(dto.getTotalFee());
-        }
+
+        if (dto.getDoctorRefCode() != null && !dto.getDoctorRefCode().isEmpty())
+            entity.setDoctorRefCode(dto.getDoctorRefCode());
 
         // -------- BODY PART --------
 
-        if (dto.getBodyPartId() != null
-                && !dto.getBodyPartId().isEmpty()) {
-
+        if (dto.getBodyPartId() != null && !dto.getBodyPartId().isEmpty())
             entity.setBodyPartId(dto.getBodyPartId());
-        }
 
-        if (dto.getBodyPartName() != null
-                && !dto.getBodyPartName().isEmpty()) {
-
+        if (dto.getBodyPartName() != null && !dto.getBodyPartName().isEmpty())
             entity.setBodyPartName(dto.getBodyPartName());
-        }
+
+        if (dto.getPartImage() != null && !dto.getPartImage().isEmpty())
+            entity.setPartImage(dto.getPartImage());
 
         // -------- THERAPY --------
 
         if (dto.getTheraphyAnswers() != null) {
-
             entity.setTheraphyAnswers(
-                    mapper.convertValue(
-                            dto.getTheraphyAnswers(),
-                            new TypeReference<Map<String,
-                                    List<TheraphyAnswersEntity>>>() {
-                            }));
+                    mapper.convertValue(dto.getTheraphyAnswers(),
+                            new TypeReference<Map<String, List<TheraphyAnswersEntity>>>() {}));
         }
 
-        // -------- SAVE --------
+        if (dto.getParts() != null && !dto.getParts().isEmpty())
+            entity.setParts(dto.getParts());
 
-        Booking updated = repository.save(entity);
+        if (dto.getPartAmount() > 0)
+            entity.setPartAmount(dto.getPartAmount());
+
+        if (dto.getDueAmount() >= 0)
+            entity.setDueAmount(dto.getDueAmount());
+
+        // -------- REFERRAL --------
+
+        if (dto.getReferredByType() != null && !dto.getReferredByType().isEmpty())
+            entity.setReferredByType(dto.getReferredByType());
+
+        if (dto.getReferredByName() != null && !dto.getReferredByName().isEmpty())
+            entity.setReferredByName(dto.getReferredByName());
+
+        // -------- MEDICAL --------
+
+        if (dto.getPreviousInjuries() != null && !dto.getPreviousInjuries().isEmpty())
+            entity.setPreviousInjuries(dto.getPreviousInjuries());
+
+        if (dto.getCurrentMedications() != null && !dto.getCurrentMedications().isEmpty())
+            entity.setCurrentMedications(dto.getCurrentMedications());
+
+        if (dto.getAllergies() != null && !dto.getAllergies().isEmpty())
+            entity.setAllergies(dto.getAllergies());
+
+        if (dto.getOccupation() != null && !dto.getOccupation().isEmpty())
+            entity.setOccupation(dto.getOccupation());
+
+        // -------- INSURANCE --------
+
+        if (dto.getInsuranceProvider() != null && !dto.getInsuranceProvider().isEmpty())
+            entity.setInsuranceProvider(dto.getInsuranceProvider());
+
+        if (dto.getPolicyNumber() != null && !dto.getPolicyNumber().isEmpty())
+            entity.setPolicyNumber(dto.getPolicyNumber());
+
+        // -------- ACTIVITY --------
+
+        if (dto.getActivityLevels() != null && !dto.getActivityLevels().isEmpty())
+            entity.setActivityLevels(dto.getActivityLevels());
+
+        // -------- FOC --------
+
+        if (dto.getFoc() != null)
+            entity.setFoc(dto.getFoc());
+
+        // -------- FOLLOWUP LOGIC --------
+
+        try {
+            int days = 0;
+
+            if (entity.getConsultationExpiration() != null)
+                days = Integer.parseInt(entity.getConsultationExpiration().replaceAll("[^0-9]", ""));
+
+            LocalDate serviceDate = LocalDate.parse(entity.getServiceDate());
+            LocalDate expiryDate = serviceDate.plusDays(days);
+            LocalDate today = LocalDate.now();
+
+            if (!today.isAfter(expiryDate)
+                    && entity.getFreeFollowUps() != null
+                    && entity.getFreeFollowUps() == 0) {
+
+                entity.setIsFollowupStatus(true);
+
+            } else if (today.isAfter(expiryDate)) {
+
+                entity.setIsFollowupStatus(true);
+
+            } else {
+                entity.setIsFollowupStatus(false);
+            }
+
+        } catch (Exception e) {
+            entity.setIsFollowupStatus(false);
+        }
+
+        updated = repository.save(entity);
 
         return new ResponseEntity<>(
-
-                ResponseStructure.buildResponse(
-                        toResponse(updated),
+                ResponseStructure.buildResponse(toResponse(updated),
                         "Updated Successfully",
                         HttpStatus.OK,
                         HttpStatus.OK.value()),
-
                 HttpStatus.OK);
 
     } catch (Exception e) {
 
         return new ResponseEntity<>(
-
-                ResponseStructure.buildResponse(
-                        null,
+                ResponseStructure.buildResponse(null,
                         e.getMessage(),
                         HttpStatus.INTERNAL_SERVER_ERROR,
                         HttpStatus.INTERNAL_SERVER_ERROR.value()),
-
                 HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
-
 
 			
 		

@@ -31,7 +31,7 @@ const diagInputStyle = {
   boxSizing: 'border-box',
   height: 38,
   outline: 'none',
-  ily: 'inherit',
+  fontFamily: 'inherit',
   transition: 'border-color 0.18s ease',
 }
 
@@ -172,7 +172,7 @@ const PrescriptionTab = ({ seed = {}, onNext, formData = {} }) => {
     <div
       className="container pb-5"
       style={{
-        ily: "'Segoe UI', system-ui, sans-serif",
+        fontFamily: "'Segoe UI', system-ui, sans-serif",
         backgroundColor: '#FFFFFF',
         minHeight: '100vh',
       }}
