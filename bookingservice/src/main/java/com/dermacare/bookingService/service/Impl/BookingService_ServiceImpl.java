@@ -445,7 +445,10 @@ public class BookingService_ServiceImpl implements BookingService_Service {
 			    }
 
 			    if (request.getServiceDate() == null || request.getServiceDate().trim().isEmpty()) {
-			        throw new RuntimeException("Service Date is mandatory");
+			        throw new RuntimeException("Service Date is mandatory");}
+			        
+			    if (request.getServicetime() == null || request.getServicetime().trim().isEmpty()) {
+				        throw new RuntimeException("Service Time is mandatory");
 			    }
 	     Booking entity = toEntity(request);
 	     //System.out.println(entity);
@@ -850,7 +853,7 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 		
 	public BookingResponse getBookedService(String bookingId) {
 		try {		
-		Booking entity = repository.findByBookingIdIgnoreCase(bookingId).get();	
+		Booking entity = repository.findByBookingId(bookingId).get();	
 		System.out.println(entity);
 		if(entity != null) {
 			BookingResponse res = toResponse(entity);
@@ -871,7 +874,7 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 	
 	public void deleteBookedServiceReports(String bookingId,String index) {
 		try {
-		Booking entity = repository.findByBookingIdIgnoreCase(bookingId).get();	
+		Booking entity = repository.findByBookingId(bookingId).get();	
 		if(entity != null && index.equalsIgnoreCase("null")) {
 			try {
 				entity.getReports().clear();
@@ -2671,7 +2674,7 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 			public ResponseEntity<ResponseStructure<BookingResponse>> updateAppointmentBasedOnBookingId(BookingResponse dto) {
 				Booking updated = null;
 				try {
-			        Booking entity = repository.findByBookingIdIgnoreCase(dto.getBookingId())
+			        Booking entity = repository.findByBookingId(dto.getBookingId())
 			                .orElseThrow(() -> new RuntimeException("Invalid Booking Id"));
 
 			        // -------- BASIC --------
@@ -2683,6 +2686,9 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 
 //			        if (dto.getRelation() != null && !dto.getRelation().isEmpty())
 //			            entity.setRelation(dto.getRelation());
+			        if(dto.getReports() != null || !dto.getReports().isEmpty()) {
+			        	entity.setReports(new ObjectMapper().convertValue(dto.getReports(), new TypeReference<List<ReportsList>>() {
+						}));}
 
 			        if (dto.getPatientMobileNumber() != null && !dto.getPatientMobileNumber().isEmpty())
 			            entity.setPatientMobileNumber(dto.getPatientMobileNumber());
@@ -2740,8 +2746,8 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 //				    					entity.setTreatments(treatmentResponseDTO);		
 //				    			}}}}catch(Exception e) {System.out.println(e.getMessage());}}
 			        if(dto.getFollowupStatus() != null ) {
-				        entity.setFollowupStatus(dto.getFollowupStatus());
-				        System.out.println(dto.getFollowupStatus()); }
+				        entity.setFollowupStatus(dto.getFollowupStatus());}
+				       // System.out.println(dto.getFollowupStatus()); }
 			        // -------- PROBLEM --------
 			        if (dto.getProblem() != null && !dto.getProblem().isEmpty())
 			            entity.setProblem(dto.getProblem());
@@ -2865,6 +2871,7 @@ return ResponseEntity.status(res.getStatusCode()).body(res);
 
 			        if (dto.getTotalFee() > 0)
 			            entity.setTotalFee(dto.getTotalFee());
+			        
 
 			        if (dto.getDoctorRefCode() != null && !dto.getDoctorRefCode().isEmpty())
 			            entity.setDoctorRefCode(dto.getDoctorRefCode());
@@ -3729,7 +3736,7 @@ public ResponseEntity<Response> getBookingByCustomRange(String clinicId,
 
 	public ResponseEntity<Response> getBookingById(String bookingId) {
 		try {			
-			Optional<Booking> booking = repository.findByBookingIdIgnoreCase(bookingId);
+			Optional<Booking> booking = repository.findByBookingId(bookingId);
 			if(booking.isPresent()) {
 				if(!booking.get().getFollwupBookings().isEmpty()) {
 					ObjectMapper mapper = new ObjectMapper();
@@ -3780,7 +3787,7 @@ public ResponseEntity<Response> getBookingByCustomRange(String clinicId,
 
 private Booking updateForFollowup(BookingResponse dto) {
 try {
-    Booking entity = repository.findByBookingIdIgnoreCase(dto.getBookingId())
+    Booking entity = repository.findByBookingId(dto.getBookingId())
             .orElseThrow(() -> new RuntimeException("Invalid Booking Id"));
 
     // -------- BASIC --------
