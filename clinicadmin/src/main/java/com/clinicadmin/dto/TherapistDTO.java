@@ -29,6 +29,7 @@ public class TherapistDTO {
     private List<String> treatmentTypes;
 
     private Availability availability;
+    private String emailId;
 
     private String bio;
 

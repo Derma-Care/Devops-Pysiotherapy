@@ -1,5 +1,5 @@
 package com.dermaCare.customerService.entity;
-
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,4 +12,6 @@ public class QuestionsEntity {
 	private long questionId;
 	private String question;
 	private String type;
+	private List<String> options;
+
 }

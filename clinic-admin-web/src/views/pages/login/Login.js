@@ -33,7 +33,7 @@ import DermaLogo from 'src/assets/images/DermaCare.png' // adjust path if needed
 import { COLORS } from '../../../Constant/Themes'
 import { toast, ToastContainer } from 'react-toastify'
 import { showCustomToast } from '../../../Utils/Toaster'
-import { getFCMToken } from '../../../firebase'
+// import { getFCMToken } from '../../../firebase'
 
 const Login = () => {
   const [activeTab, setActiveTab] = useState('clinic') // clinic | doctor
@@ -74,14 +74,14 @@ const Login = () => {
     try {
       // ✅ get FCM token first
       await Notification.requestPermission()
-      const fcmToken = await getFCMToken()
-      console.log(fcmToken)
+      // const fcmToken = await getFCMToken()
+      // console.log(fcmToken)
       let res
       const loginBody = {
         userName,
         password,
         role,
-        fcmToken: fcmToken || '',
+        // fcmToken: fcmToken || '',
         deviceType: 'web',
       }
 
@@ -92,7 +92,7 @@ const Login = () => {
         })
         res = resposnse
       } else {
-        const resposnse = await http.post(`/login`, loginBody, {
+        const resposnse = await http.post(`/loginUsingRoles`, loginBody, {
           headers: { 'Content-Type': 'application/json' },
         })
         res = resposnse.data
@@ -179,28 +179,21 @@ const Login = () => {
           localStorage.setItem('HospitalId', HospitalId)
           await fetchAllData(HospitalId)
           showCustomToast(res.data?.message || 'Login successful!', 'success')
-          // const physioType = res.data.physioType
-          // const therapistId = res.data.therapistId
-          // const therapistName = res.data.therapistName
-          // const permissions = res.data.permissions
-          // const theraphPayload = {
-          //   therapistId,
-          //   therapistName,
-          //   physioType,
-          //   permissions,
-          // }
+      
       if (
-  role.toLowerCase() === "therapist" ||
+  role.toLowerCase() === "physiotherapist" ||
   role.toLowerCase() === "intern"
 ) {
 
   const theraphPayload = {
-    therapistId: payload.therapistId,
-    therapistName: payload.therapistName,
-    physioType: payload.physioType,
+    therapistId: payload.staffId,
+    therapistName: payload.staffName,
+    // physioType: payload.physioType,
     permissions: payload.permissions,
     branchId: payload.branchId,
-    clinicId: payload.clinicId,
+    clinicId: payload.hospitalId,
+    role:role,
+    branchName: branchName
   }
 
   // save also in localStorage
@@ -356,7 +349,7 @@ const Login = () => {
                         >
                           <option value="admin">Admin</option>
                           <option value="receptionist">Receptionist</option>
-                          <option value="therapist">Therapist</option>
+                          <option value="physiotherapist">Therapist</option>
                           <option value="intern">Intern</option>
                           {/* <option value="lab_technician">Lab Technician</option>
                           <option value="pharmacist">Pharmacist</option> */}

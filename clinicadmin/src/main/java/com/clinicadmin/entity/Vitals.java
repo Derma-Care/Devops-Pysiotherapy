@@ -1,5 +1,7 @@
 package com.clinicadmin.entity;
 
+import java.time.LocalDateTime;
+
 import org.bson.types.ObjectId;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -22,5 +24,6 @@ public class Vitals {
 	private String temperature;
 	private String bmi;
 	private String bookingId;
+	private LocalDateTime  date;
 
 }

@@ -108,4 +108,10 @@ public interface DoctorService {
 
 	Response getRecommendedClinicsAndDoctors(String hospitalId, List<String> keyPointsFromUser, int consultationType);
 
+//	Response startVerificationProcess(String doctorId);
+//
+//	Response verifyDoctor(String doctorId);
+//
+//	Response rejectDoctor(String doctorId, String reason);
+
 }

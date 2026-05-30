@@ -38,6 +38,7 @@ import com.dermaCare.customerService.dto.DoctorsDTO;
 import com.dermaCare.customerService.dto.FavouriteDoctorsDTO;
 import com.dermaCare.customerService.dto.LoginDTO;
 import com.dermaCare.customerService.dto.NotificationToCustomer;
+import com.dermaCare.customerService.dto.QuestionsDTO;
 import com.dermaCare.customerService.dto.ReportsAndDoctorSaveDetailsDto;
 import com.dermaCare.customerService.dto.ReportsDtoList;
 import com.dermaCare.customerService.dto.ServicesDto;
@@ -92,6 +93,7 @@ public class CustomerServiceImpl implements CustomerService {
     private BookingFeign bookingFeign;
     
     @Autowired
+    private PhysiotherapyRepo physiotherapyRepo;
     private GetByKey getByKey;
     
     @Autowired
@@ -880,6 +882,16 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 	    ResponseEntity<ResponseStructure<BookingResponse>> res = null;
 	    try {
 	        log.debug("BOOK_SERVICE :: CALLING_BOOKING_SERVICE");
+//	        if(req.getBodyPartId() != null) {
+//	        for(QuestionsDTO dto:req.getQuestions()) {
+//	        //Optional<QuestionsEntity> entity = physiotherapyRepo.findByQuestionId(dto.getQuestionId());
+//	        if(entity.isPresent()) {
+//	        dto.setQuestion(entity.get().getQuestion());}}
+//	        res = bookingFeign.bookService(req);
+//	        bookingResponse = res.getBody().getData();
+//	        }else {
+//	        res = bookingFeign.bookService(req);
+//	        bookingResponse = res.getBody().getData();}
 	        if(req.getTheraphyAnswers()!= null) {
 	        
 	        	if (req.getTheraphyAnswers() != null && !req.getTheraphyAnswers().isEmpty()) {
@@ -900,7 +912,7 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 
 	        	        List<QuestionsEntity> questionsList = entity.getQuestionsByPart().get(key);
 
-	        	        if (questionsList == null) {
+	        	        if (questionsList == null || questionsList.isEmpty()  ) {
 	        	            continue;
 	        	        }
 
@@ -917,8 +929,6 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 	        	        }
 	        	    }
 	        	}
-	        double due = req.getTotalFee() - req.getPartAmount();
-	        req.setDueAmount(due);
 	        res = bookingFeign.bookService(req);
 	        bookingResponse = res.getBody().getData();
 	        }else {
@@ -1115,7 +1125,7 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 
 	    } catch (FeignException e) {
 	        log.error("GET_ALL_BOOKINGS :: FEIGN_ERROR", e);
-
+     System.out.println(e.getMessage());
 	        return new ResponseStructure<>(
 	                null,
 	                ExtractFeignMessage.clearMessage(e),
@@ -2179,13 +2189,23 @@ public Response getDoctorsByHospitalBranchAndSubService(
                         .filter(dto -> {
                             if (dto.getConsultation() == null) return false;
                             switch (consultationType) {
-                                case 1:
-                                    return dto.getConsultation().getInClinic() == 1;
-                                case 2:
-                                    return dto.getConsultation().getVideoOrOnline() == 2;
-                                case 3:
-                                    return dto.getConsultation().getServiceAndTreatments() == 3;
-                                default:
+//                                case 1:
+//                                    return dto.getConsultation().getInClinic() == 1;
+//                                case 2:
+//                                    return dto.getConsultation().getVideoOrOnline() == 2;
+//                                case 3:
+//                                    return dto.getConsultation().getServiceAndTreatments() == 3;
+//
+                            case 1:
+                                return Optional.ofNullable(dto.getConsultation().getInClinic()).orElse(0) == 1;
+
+                            case 2:
+                                return Optional.ofNullable(dto.getConsultation().getVideoOrOnline()).orElse(0) == 2;
+
+                            case 3:
+                                return Optional.ofNullable(dto.getConsultation().getServiceAndTreatments()).orElse(0) == 3;
+                            default:
+                            
                                     return false;
                             }
                         })

@@ -18,8 +18,8 @@ import './header/sidebar.css'
 import navigation from '../_nav'
 import { COLORS, SIZES } from '../Themes'
 import doctor from '../assets/images/doctor.jpg'
-import male from '../assets/images/male.png'
-import female from '../assets/images/female.png'
+import male from '../assets/images/male1.png'
+import female from '../assets/images/female1.png'
 import { useDoctorContext } from '../Context/DoctorContext'
 import { getClinicDetails, getDoctorDetails, averageRatings, getPatientVitals } from '../Auth/Auth'
 import { capitalizeEachWord, capitalizeFirst, capitalizeWords } from '../utils/CaptalZeWord'
@@ -88,7 +88,7 @@ const AppSidebar = () => {
     name: patientData?.name || '—',
     age: patientData?.age || '—',
     gender: patientData?.gender || '—',
-    mobile: patientData?.mobileNumber || '—',
+    mobile: patientData?.patientMobileNumber || '—',
     visitType: patientData?.visitType === null
       ? 0
       : patientData?.visitType ?? '—',

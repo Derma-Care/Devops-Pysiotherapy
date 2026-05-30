@@ -104,11 +104,8 @@ const CalendarModal = ({
     const fetchClinicTimings = async () => {
       try {
         const doctorData = await getDoctorDetails(); // ✅ Use your API helper
-
         if (doctorData?.availableTimes) {
-
           const [openTime, closeTime] = doctorData.availableTimes.split(" - ").map((t) => t.trim());
-
           if (openTime && closeTime) {
             const open = convertTo24Hr(openTime);
             const close = convertTo24Hr(closeTime);
@@ -187,19 +184,80 @@ const CalendarModal = ({
   return (
     <CModal visible={visible} onClose={onClose} size="xl">
       <CModalHeader closeButton>
-        <CModalTitle className="w-100 text-center" style={{ color: COLORS.black }}>
-          My Calendar{" "}
-          {clinicTimes.open && clinicTimes.close ? (
-            <>
-              (
-              {convertTo12Hr(clinicTimes.open)} - {convertTo12Hr(clinicTimes.close)}
-              )
-            </>
-          ) : (
-            "(Loading timings...)"
-          )}
-        </CModalTitle>
+        <CModalTitle
+          className="w-100"
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            position: "relative",
+            color: COLORS.black,
+          }}
+        >
+          {/* Centered Title */}
+          <div style={{ textAlign: "center", flex: "1" }}>
+            My Calendar{" "}
+            {clinicTimes.open && clinicTimes.close ? (
+              <>
+                (
+                {convertTo12Hr(clinicTimes.open)} - {convertTo12Hr(clinicTimes.close)}
+                )
+              </>
+            ) : (
+              "(Loading timings...)"
+            )}
+          </div>
 
+          {/* Legend on Right Corner */}
+          <div
+            style={{
+              position: "absolute",
+              right: "20px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              display: "flex",
+              alignItems: "center",
+              gap: "16px",
+              fontSize: "13px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div
+                style={{
+                  width: "14px",
+                  height: "14px",
+                  borderRadius: "4px",
+                  backgroundColor: "#7e3a93",
+                }}
+              ></div>
+              <span>Booked</span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div
+                style={{
+                  width: "14px",
+                  height: "14px",
+                  borderRadius: "4px",
+                  backgroundColor: "#f0ad4e",
+                }}
+              ></div>
+              <span>In-Progress</span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div
+                style={{
+                  width: "14px",
+                  height: "14px",
+                  borderRadius: "4px",
+                  backgroundColor: "#28a745",
+                }}
+              ></div>
+              <span>Completed</span>
+            </div>
+          </div>
+        </CModalTitle>
       </CModalHeader>
 
       <CModalBody style={{ padding: 0 }}>
@@ -276,28 +334,51 @@ const CalendarModal = ({
                         }}
                       >
                         {appointments.length > 0 ? (
-                          appointments.map((appt) => (
-                            <OverlayTrigger
-                              key={appt.bookingId}
-                              trigger={["hover", "focus"]}
-                              placement="right"
-                              overlay={generatePopover(appt)}
-                            >
-                              <div
-                                onClick={() => handleClick(appt)}
-                                style={{
-                                  fontSize: "12px",
-                                  borderRadius: "6px",
-                                  backgroundColor: "#7e3a93",
-                                  color: "#fff",
-                                  padding: "4px 6px",
-                                  cursor: "pointer",
-                                }}
+                          appointments.map((appt) => {
+                            const status = appt.status?.toLowerCase();
+                            let bgColor = "#7e3a93"; // default (Booked - purple)
+
+                            if (status === "in-progress" || status === "in progress") {
+                              bgColor = "#f0ad4e"; // orange for in-progress
+                            } else if (status === "completed") {
+                              bgColor = "#28a745"; // green for completed
+                            } else if (status === "cancelled" || status === "canceled") {
+                              bgColor = "#d9534f"; // red for cancelled
+                            }
+
+                            // Disable click only for completed appointments
+                            const isClickable = status !== "completed";
+
+                            return (
+                              <OverlayTrigger
+                                key={appt.bookingId}
+                                trigger={["hover", "focus"]}
+                                placement="right"
+                                overlay={generatePopover(appt)}
                               >
-                                Booked
-                              </div>
-                            </OverlayTrigger>
-                          ))
+                                <div
+                                  onClick={() => {
+                                    if (!isClickable) {
+                                      alert("This appointment is completed and cannot be opened.");
+                                      return;
+                                    }
+                                    handleClick(appt);
+                                  }}
+                                  style={{
+                                    fontSize: "12px",
+                                    borderRadius: "6px",
+                                    backgroundColor: bgColor,
+                                    color: "#fff",
+                                    padding: "4px 6px",
+                                    cursor: isClickable ? "pointer" : "not-allowed",
+                                    opacity: isClickable ? 1 : 0.6,
+                                  }}
+                                >
+                                  Booked
+                                </div>
+                              </OverlayTrigger>
+                            );
+                          })
                         ) : defaultBooked ? (
                           <div
                             style={{

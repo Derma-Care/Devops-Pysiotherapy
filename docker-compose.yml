@@ -125,6 +125,22 @@ services:
     networks:
       - app-network
   
+  physiotherapydoctor-service:
+    build: ./physiotherapydoctor-service
+    container_name: physiotherapydoctor_service
+    ports:
+      - "8888:8888"
+    environment:
+      - JAVA_TOOL_OPTIONS=-XX:-UseContainerSupport
+      - SPRING_APPLICATION_NAME=physiotherapydoctor-service
+      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/physiotherapydoctorservice
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      - mongodb
+      - eureka-server
+    networks:
+      - app-network
+  
   customerservice:
     build: ./customerservice
     container_name: customer_service

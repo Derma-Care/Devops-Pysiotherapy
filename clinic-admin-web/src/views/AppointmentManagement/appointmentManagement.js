@@ -21,9 +21,16 @@ import {
   CFormInput,
   CInputGroupText,
   CSpinner,
-} from '@coreui/react'
+  CDropdown,
+  CDropdownToggle,
+  CDropdownMenu,
+  CDropdownItem,
+
+}
+
+  from '@coreui/react'
 import { CBadge } from '@coreui/react'
-import { cilSearch } from '@coreui/icons'
+import { cilEyedropper, cilPrint, cilSearch } from '@coreui/icons'
 import CIcon from '@coreui/icons-react'
 import { AppointmentData } from './appointmentAPI'
 import { useNavigate } from 'react-router-dom'
@@ -31,11 +38,14 @@ import axios from 'axios'
 import { GetBookingByClinicIdData } from './appointmentAPI'
 import { GetBookingBy_ClinicId } from '../../baseUrl'
 import BookAppointmentModal from './BookAppointmentModal '
-
+import Select from 'react-select'
 import { COLORS } from '../../Constant/Themes'
 import { useGlobalSearch } from '../Usecontext/GlobalSearchContext'
 import LoadingIndicator from '../../Utils/loader'
 import Pagination from '../../Utils/Pagination'
+import PrintLetterHead from '../../Utils/PrintLetterHead'
+
+import { Edit2, Eye, Loader, Printer, Trash2 } from "lucide-react"
 const appointmentManagement = () => {
   const [viewService, setViewService] = useState(null)
   const [selectedServiceTypes, setSelectedServiceTypes] = useState([])
@@ -43,6 +53,7 @@ const appointmentManagement = () => {
   const [filteredData, setFilteredData] = useState([])
   const [availableServiceTypes, setAvailableServiceTypes] = useState([])
   const [availableConsultationTypes, setAvailableConsultationTypes] = useState([])
+  const [selectedDate, setSelectedDate] = useState('')
   const { searchQuery } = useGlobalSearch()
   const consultationTypeLabels = {
     'In-clinic': 'In-clinic',
@@ -55,12 +66,25 @@ const appointmentManagement = () => {
   const [rowsPerPage, setRowsPerPage] = useState(5)
   const [loading, setLoading] = useState(true)
   const [visible, setVisible] = useState(false)
-
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false)
   const itemsPerPage = 7
   const navigate = useNavigate()
   const [sortOrder, setSortOrder] = useState('asc')
   const role = localStorage.getItem('role') // or from context/state
+  const [showDropdown, setShowDropdown] = useState(false)
 
+  const STATUS_OPTIONS = [
+    { label: 'Pending', value: 'Pending' },
+    { label: 'Active', value: 'In-Progress' },
+    { label: 'Completed', value: 'Completed' },
+    { label: 'Confirmed', value: 'Confirmed' },
+    { label: 'Due for Investigation', value: 'Due-Investigation' },
+    { label: 'Investigation Done', value: 'Investigation-Done' },
+    { label: 'Follow Up', value: 'Follow-Up' },
+    { label: 'Cancelled', value: 'Cancelled' },
+    { label: 'Rescheduled', value: 'Rescheduled' },
+    { label: 'Dropped', value: 'Dropped' },
+  ]
 
   const fetchAppointments = async () => {
     try {
@@ -110,7 +134,7 @@ const appointmentManagement = () => {
   //       return 'dark'
   //   }
   // }
-
+  const [printData, setPrintData] = useState(null)
   useEffect(() => {
     const hospitalId = localStorage.getItem('HospitalId')
     if (hospitalId) {
@@ -121,9 +145,10 @@ const appointmentManagement = () => {
   //filtering
   useEffect(() => {
     let filtered = [...bookings]
-    console.log('Initial bookings:', filtered)
+
     const normalize = (val) => val?.toLowerCase().trim()
 
+    // Search
     if (searchQuery.trim() !== '') {
       filtered = filtered.filter((item) =>
         Object.values(item).some((val) =>
@@ -132,50 +157,24 @@ const appointmentManagement = () => {
       )
     }
 
-    // Filter by status (use 'status', not 'bookedStatus')
+    // Status filter
     if (statusFilters.length > 0) {
       filtered = filtered.filter((item) =>
         statusFilters.some((status) => normalize(status) === normalize(item.status)),
       )
-      console.log('After status filter:', filtered)
-    }
-    const consultationTypeMap = {
-      'Service & Treatment': 'services & treatments',
-      'Tele Consultation': 'Tele consultation',
-      'In-clinic': 'in-clinic consultation',
     }
 
-    // Filter by consultation type (only one at a time)
-    if (filterTypes.length === 1) {
-      const selectedType = filterTypes[0]
-
-      if (selectedType === 'Tele Consultation') {
-        filtered = filtered.filter(
-          (item) =>
-            normalize(item.consultationType) === 'tele consultation' ||
-            normalize(item.consultationType) === 'online consultation',
-        )
-        console.log(`After ${selectedType} filter:`, filtered)
-      } else {
-        const mappedType = consultationTypeMap[selectedType]
-        if (mappedType) {
-          filtered = filtered.filter((item) => normalize(item.consultationType) === mappedType)
-          console.log(`After ${selectedType} filter:`, filtered)
-        }
-      }
-    }
-    if (searchQuery.trim()) {
+    // ✅ DATE FILTER (only when selected)
+    if (selectedDate !== '') {
       filtered = filtered.filter(
-        (item) =>
-          item.name?.toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
-          item.patientId?.toLowerCase().includes(searchQuery.toLowerCase().trim()),
+        (item) => item.serviceDate === selectedDate
       )
     }
 
     setFilteredData(filtered)
     setCurrentPage(1)
-  }, [bookings, filterTypes, statusFilters, searchQuery])
 
+  }, [bookings, statusFilters, searchQuery, selectedDate])
   const statusLabelMap = {
     'In-Progress': 'Active',
     Completed: 'Completed',
@@ -229,11 +228,11 @@ const appointmentManagement = () => {
   const handleStatusChange = (e) => {
     const value = e.target.value
 
-    if (statusFilters.includes(value)) {
-      setStatusFilters([]) // Deselect if the same one is clicked
-    } else {
-      setStatusFilters([value]) // Allow only one selection
-    }
+    setStatusFilters((prev) =>
+      prev.includes(value)
+        ? prev.filter((item) => item !== value)
+        : [...prev, value]
+    )
   }
   // const sortedAppointments = [...appointments].sort((a, b) => {
   //   const dateA = new Date(a.date)
@@ -270,55 +269,164 @@ const appointmentManagement = () => {
     setFilteredData(filtered)
   }, [searchQuery])
 
+  const PrintContent = ({ data }) => {
+    if (!data) return null
+
+    return (
+      <PrintLetterHead>
+        <div style={{ padding: 20, fontFamily: 'Arial' }}>
+
+          {/* TITLE */}
+          <h2 style={{ textAlign: 'center', marginBottom: 10 }}>
+            CONSULTATION RECEIPT
+          </h2>
+
+          {/* RECEIPT META */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: 14,
+            marginBottom: 10
+          }}>
+            <div><strong>Booking Id:</strong> {data.bookingId || '---'}</div>
+            <div><strong>Date:</strong> {data.serviceDate}</div>
+          </div>
+
+          <hr />
+
+          {/* PATIENT DETAILS */}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: 14, color: "black" }}  >
+            <p style={{ color: "black" }}><strong>Patient ID:</strong> {data.patientId}</p>
+            <p style={{ color: "black" }}><strong>Name:</strong> {data.name}</p>
+            <p style={{ color: "black" }}><strong>Doctor:</strong> {data.doctorName}</p>
+            <p style={{ color: "black" }}><strong>Time:</strong> {data.slot || data.servicetime}</p>
+          </div>
+
+          <hr />
+
+          {/* BILL TABLE */}
+          <table style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            marginTop: 10
+          }}>
+            <thead>
+              <tr style={{ background: '#f2f2f2' }}>
+                <th style={thStyle}>#</th>
+                <th style={thStyle}>Description</th>
+                <th style={thStyle}>Amount (₹)</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr>
+                <td style={tdStyle}>1</td>
+                <td style={tdStyle}>Consultation Fee</td>
+                <td style={tdStyle}>{data.consultationFee ?? 0}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* TOTAL */}
+          <div style={{
+            marginTop: 15,
+            display: 'flex',
+            justifyContent: 'flex-end'
+          }}>
+            <div style={{
+              border: '1px solid black',
+              padding: '10px 20px',
+              fontWeight: 'bold'
+            }}>
+              Total: ₹ {data.consultationFee ?? 0}
+            </div>
+          </div>
+
+          {/* FOOTER NOTE */}
+          <div style={{
+            marginTop: 20,
+            fontSize: 12,
+            textAlign: 'center',
+            color: 'gray'
+          }}>
+            * This is a computer-generated receipt. No signature required.
+          </div>
+
+        </div>
+      </PrintLetterHead>
+    )
+  }
+
+  // styles
+  const thStyle = {
+    border: '1px solid black',
+    padding: '8px',
+    textAlign: 'center'
+  }
+
+  const tdStyle = {
+    border: '1px solid black',
+    padding: '8px',
+    textAlign: 'center'
+  }
+  const handlePrint = (item) => {
+    console.log("PRINT DATA:", item)
+    setPrintData(item)
+
+
+  }
+  useEffect(() => {
+    if (printData) {
+      const timer = setTimeout(() => {
+        window.print()
+
+        // ✅ IMPORTANT: clear after print
+        setTimeout(() => {
+          setPrintData(null)
+        }, 300)
+      }, 500)
+
+      return () => clearTimeout(timer)
+    }
+  }, [printData])
   return (
     <div style={{ overflow: 'hidden' }}>
       <div className="container ">
-        <h5>Appointments</h5>
+        <h2 className='mb-4'>Appointments</h2>
         <div className="mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-          {/* <CInputGroup style={{ width: '300px' }}>
-            <CFormInput
-              type="text"
-              placeholder="Search by Patient Name or ID"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <CInputGroupText>
-              <CIcon icon={cilSearch} />
-            </CInputGroupText>
-          </CInputGroup> */}
-        </div>
 
-        <div className="d-flex gap-2 mb-3">
-          <CButton
-            style={{ backgroundColor: 'var(--color-black)', color: COLORS.white }}
-            onClick={() => {
-              setSelectedServiceTypes([])
-              setSelectedConsultationTypes([])
-              setFilterTypes([])
-              setStatusFilters([])
-            }}
-          >
-            All
-          </CButton>
-          <button
-            onClick={() => toggleFilter('Service & Treatment')}
-            className={`btn ${
-              filterTypes.includes('Service & Treatment') ? 'btn-selected' : 'btn-unselected'
-            }`}
-          >
-            Services & Treatment
-          </button>
 
-          <button
-            onClick={() => toggleFilter('In-clinic')}
-            className={`btn ${
-              filterTypes.includes('In-clinic') ? 'btn-selected' : 'btn-unselected'
-            }`}
-          >
-            In-Clinic Consultation
-          </button>
 
-          {/* <button
+          <div className="d-flex gap-2 ">
+            <CButton
+              style={{ backgroundColor: 'var(--color-black)', color: COLORS.white }}
+              onClick={() => {
+                setSelectedServiceTypes([])
+                setSelectedConsultationTypes([])
+                setFilterTypes([])
+                setStatusFilters([])
+              }}
+            >
+              All
+            </CButton>
+            <button
+              onClick={() => toggleFilter('Service & Treatment')}
+              className={`btn ${filterTypes.includes('Service & Treatment') ? 'btn-selected' : 'btn-unselected'
+                }`}
+            >
+              Therapies
+            </button>
+
+            <button
+              onClick={() => toggleFilter('In-clinic')}
+              className={`btn ${filterTypes.includes('In-clinic') ? 'btn-selected' : 'btn-unselected'
+                }`}
+            >
+              Consultation
+            </button>
+
+            {/* <button
             onClick={() => toggleFilter('Tele Consultation')}
             className={`btn ${
               filterTypes.includes('Tele Consultation') ? 'btn-selected' : 'btn-unselected'
@@ -326,67 +434,77 @@ const appointmentManagement = () => {
           >
             Tele Consultation
           </button> */}
-        </div>
-
-        <div className="mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-          <div className="d-flex gap-2 flex-wrap" style={{ color: 'var(--color-black)' }}>
-            {/* <CFormCheck
-              label="Pending"
-              value="Pending"
-              onChange={handleStatusChange}
-              checked={statusFilters.includes('Pending')}
-            /> */}
-            <CFormCheck
-              style={{ color: 'var(--color-black)' }}
-              label="Active" // UI
-              value="In-Progress" //Backend value
-              onChange={handleStatusChange}
-              checked={statusFilters.includes('In-Progress')}
-            />
-
-            <CFormCheck
-              style={{ color: 'var(--color-black)' }}
-              label="Completed"
-              value="Completed"
-              onChange={handleStatusChange}
-              checked={statusFilters.includes('Completed')}
-            />
-            <CFormCheck
-              style={{ color: 'var(--color-black)' }}
-              label="Confirmed"
-              value="Confirmed"
-              onChange={handleStatusChange}
-              checked={statusFilters.includes('Confirmed')}
-            />
-            {/* <CFormCheck
-              label="Rejected"
-              value="Rejected"
-              onChange={handleStatusChange}
-              checked={statusFilters.includes('Rejected')}
-            /> */}
           </div>
-         {(role == 'admin' || role == 'receptionist') && (
-  <CButton
-    style={{
-      backgroundColor: 'var(--color-black)',
-      color: 'white',
-      marginLeft: '325px',
-    }}
-    onClick={() => setVisible(true)} // open modal
-  >
-    Book Appointment
-  </CButton>
-)}
 
+          <div className=" d-flex justify-content-end align-items-center flex-wrap gap-2">
+            <div className="d-flex align-items-center justify-content-between">
 
-          {/* Modal imported from separate file */}
-          <BookAppointmentModal visible={visible} onClose={() => setVisible(false)} />
+              {/* LEFT SIDE → Date Input */}
+              <div style={{ position: 'relative', width: '200px' }} className='mx-2'>
+                <CFormInput
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  style={{ paddingRight: '30px' }}
+                />
+
+                {/* ❌ Clear Icon */}
+                {selectedDate && (
+                  <span
+                    onClick={() => setSelectedDate('')}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      color: 'gray',
+                    }}
+                  >
+                    ✕
+                  </span>
+                )}
+              </div>
+
+              {/* RIGHT SIDE → Button */}
+              {(role === 'admin' || role === 'receptionist') && (
+                <CButton
+                  style={{
+                    backgroundColor: 'var(--color-black)',
+                    color: 'white',
+                  }}
+                  onClick={() => setVisible(true)}
+                >
+                  Book Appointment
+                </CButton>
+              )}
+
+            </div>
+            {/* Modal imported from separate file */}
+            <BookAppointmentModal visible={visible} onClose={() => setVisible(false)} />
+          </div>
         </div>
-
+        <CCol md={4} className='mb-2'>
+          <Select
+            isMulti
+            options={STATUS_OPTIONS}
+            value={STATUS_OPTIONS.filter(option =>
+              statusFilters.includes(option.value)
+            )}
+            onChange={(selectedOptions) =>
+              setStatusFilters(selectedOptions.map(opt => opt.value))
+            }
+            placeholder="Select Filter By Status"
+            className="basic-multi-select"
+            classNamePrefix="select"
+          />
+        </CCol>
         <CTable striped hover responsive>
           <CTableHead className="pink-table  w-auto">
             <CTableRow>
               <CTableHeaderCell>S.No</CTableHeaderCell>
+              <CTableHeaderCell>Booking ID</CTableHeaderCell>
               <CTableHeaderCell>Patient_ID</CTableHeaderCell>
               <CTableHeaderCell>Name</CTableHeaderCell>
               <CTableHeaderCell>Doctor Name</CTableHeaderCell>
@@ -407,21 +525,22 @@ const appointmentManagement = () => {
           <CTableBody>
             {loading ? (
               // Show loading row while fetching
-              <CTableRow>
-                <CTableDataCell
-                  colSpan="9"
-                  className="text-center  "
-                  style={{ color: 'var(--color-black)' }}
-                >
-                  <div className="d-flex justify-content-center align-items-center">
-                    <LoadingIndicator message="Loading appointments..." />
-                  </div>
-                </CTableDataCell>
-              </CTableRow>
+
+              <CTableDataCell
+                colSpan="9"
+                className="text-center  "
+                style={{ color: 'var(--color-black)' }}
+              >
+                <div className="d-flex justify-content-center align-items-center">
+                  <LoadingIndicator message="Loading appointments..." />
+                </div>
+              </CTableDataCell>
+
             ) : paginatedData.length > 0 ? (
               paginatedData.map((item, index) => (
                 <CTableRow key={`${item.id}-${index}`} className="pink-table">
                   <CTableDataCell> {(currentPage - 1) * itemsPerPage + index + 1}</CTableDataCell>
+                  <CTableDataCell>{item.bookingId}</CTableDataCell>
                   <CTableDataCell>{item.patientId}</CTableDataCell>
                   <CTableDataCell>{item.name}</CTableDataCell>
                   <CTableDataCell>{item.doctorName}</CTableDataCell>
@@ -438,18 +557,31 @@ const appointmentManagement = () => {
                   </CTableDataCell>
 
                   <CTableDataCell>
-                    <CButton
-                      style={{ backgroundColor: 'var(--color-black)' }}
-                      className="text-white"
-                      size="sm"
-                      onClick={() =>
-                        navigate(`/appointment-details/${item.bookingId}`, {
-                          state: { appointment: item },
-                        })
-                      }
-                    >
-                      View
-                    </CButton>
+                    <div className="d-flex align-items-center gap-2">
+
+                      <CButton
+                        style={{ backgroundColor: 'var(--color-black)' }}
+                        className="text-white d-flex align-items-center justify-content-center"
+                        size="sm"
+                        onClick={() =>
+                          navigate(`/appointment-details/${item.bookingId}`, {
+                            state: { appointment: item },
+                          })
+                        }
+                      >
+                        <Eye size={18} />
+                      </CButton>
+
+                      <CButton
+                        style={{ backgroundColor: 'var(--color-black)' }}
+                        className="text-white d-flex align-items-center justify-content-center"
+                        size="sm"
+                        onClick={() => handlePrint(item)}
+                      >
+                        <Printer size={18} />
+                      </CButton>
+
+                    </div>
                   </CTableDataCell>
                 </CTableRow>
               ))
@@ -500,7 +632,22 @@ const appointmentManagement = () => {
           </div>
         )} */}
       </div>
-    </div>
+      <div
+        id="print-area"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          background: 'white',
+          zIndex: 9999,
+          display: printData ? 'block' : 'none', // ✅ hide when no data
+        }}
+      >
+        {printData && <PrintContent data={printData} />}
+      </div>
+
+    </div >
   )
 }
 

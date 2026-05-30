@@ -1,6 +1,7 @@
 package com.AdminService.dto;
 
 import java.util.List;
+import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
@@ -46,6 +47,7 @@ public class BookingResponse {
 	private String serviceDate;
 	private String servicetime;
 	private String consultationType;
+	private List<ConsultationFeesDTO> listOfConsultationFee;
 	private double consultationFee;
 	private Integer visitCount;
 	private String channelId;
@@ -66,4 +68,31 @@ public class BookingResponse {
 	private Integer takenSittings;
 	private Integer currentSitting;
 	private String followupDate;
+	private String bodyPartId;
+	private String bodyPartName;
+	private String partImage;
+	private Map<String,List<TheraphyAnswersDTO>> theraphyAnswers;
+	private List<String> parts;
+	private double partAmount;
+	private double dueAmount;
+	private String paymentStatus;
+	private String previousInjuries;
+	private String currentMedications;
+	private String allergies;
+	private String occupation;
+	private String insuranceProvider;
+	private String policyNumber;
+	private List<String> activityLevels;
+	private String reasonforVisit;
+	private boolean isFollowupStatus;
+	private Session session;
+	
+	public void setIsFollowupStatus(boolean followupStatus) {
+	    isFollowupStatus = followupStatus;
+	}
+	
+
+	public boolean getIsFollowupStatus() {
+	    return isFollowupStatus;
+	}
 }
