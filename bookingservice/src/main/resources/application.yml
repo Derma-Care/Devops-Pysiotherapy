@@ -18,7 +18,7 @@ spring:
 #      properties:
 #        delivery.timeout.ms: 120000
 #        request.timeout.ms: 30000
-
+ 
   cloud:
     openfeign:
       client:
