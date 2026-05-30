@@ -49,11 +49,32 @@ const AppHeaderDropdown = () => {
       >
         <CAvatar
           src={
-            clinic?.hospitalLogo
-              ? `data:image/png;base64,${clinic.hospitalLogo}`
-              : avatar8
+            (() => {
+              let logo = clinic?.hospitalLogo;
+              if (logo && typeof logo === 'string' && logo !== 'null' && logo !== 'undefined' && logo.trim() !== '') {
+                if (logo.includes('amazonaws.com/data%3Aimage')) {
+                  try {
+                    const decoded = decodeURIComponent(logo);
+                    const dataIdx = decoded.indexOf('data:image');
+                    if (dataIdx !== -1) {
+                      logo = decoded.substring(dataIdx).split('?')[0];
+                    }
+                  } catch (e) {
+                    console.error('Error decoding image URL', e);
+                  }
+                }
+                return logo.startsWith('http://') || logo.startsWith('https://') || logo.startsWith('data:image')
+                  ? logo
+                  : `data:image/png;base64,${logo}`;
+              }
+              return avatar8;
+            })()
           }
           className="profile-image"
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = avatar8;
+          }}
         />
       </CDropdownToggle>
 

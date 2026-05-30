@@ -156,9 +156,25 @@ const AppSidebar = () => {
   //   setPatientData(null)
   // }, [setPatientData])
 
-  const rawImg = doctorDetails?.doctorPicture || doctorDetails?.profilePicture || clinicDetails?.hospitalLogo || clinicDetails?.clinicLogo;
+  let rawImg = doctorDetails?.doctorPicture || doctorDetails?.profilePicture || clinicDetails?.hospitalLogo || clinicDetails?.clinicLogo;
+  if (typeof rawImg === 'string' && (rawImg === 'null' || rawImg === 'undefined' || rawImg.trim() === '')) {
+    rawImg = null;
+  }
+  
+  if (rawImg && rawImg.includes('amazonaws.com/data%3Aimage')) {
+    try {
+      const decoded = decodeURIComponent(rawImg);
+      const dataIdx = decoded.indexOf('data:image');
+      if (dataIdx !== -1) {
+        rawImg = decoded.substring(dataIdx).split('?')[0];
+      }
+    } catch (e) {
+      console.error('Error decoding image URL', e);
+    }
+  }
+
   const doctorImage = rawImg
-    ? (rawImg.startsWith('data:image')
+    ? (rawImg.startsWith('data:image') || rawImg.startsWith('http://') || rawImg.startsWith('https://')
       ? rawImg
       : `data:image/jpeg;base64,${rawImg}`)
     : null;
@@ -308,6 +324,10 @@ const AppSidebar = () => {
                       objectFit: 'cover',
                       backgroundColor: 'rgba(255,255,255,0.1)'
                     }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = doctor;
+                    }}
                   />
 
                   {/*                  
@@ -346,14 +366,14 @@ const AppSidebar = () => {
                       {clinicDetails.name}
                     </h6>
                   )}
-                  {clinicDetails?.address && (
+                  {/* {clinicDetails?.address && (
                     <span
                       className="text-center mt-1"
                       style={{ color: COLORS.white, fontSize: '11px', opacity: 0.7, padding: '0 10px', display: 'block' }}
                     >
                       📍 {clinicDetails.address}
                     </span>
-                  )}
+                  )} */}
                 </div>
               </>
             )}
