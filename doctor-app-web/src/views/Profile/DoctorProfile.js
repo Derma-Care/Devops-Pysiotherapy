@@ -43,7 +43,7 @@ const STYLES = `
   }
 
   .dp-wrapper {
-    font-family: 'Outfit', sans-serif;
+    
     padding: 0 0 60px;
   }
 
@@ -66,7 +66,7 @@ const STYLES = `
     border-radius: 10px;
     background: transparent;
     color: #6b7280;
-    font-family: 'Outfit', sans-serif;
+    
     font-size: 13.5px;
     font-weight: 500;
     cursor: pointer;
@@ -295,7 +295,7 @@ const STYLES = `
     cursor: pointer;
     transition: all .2s;
     min-width: 70px; text-align: center;
-    font-family: 'Outfit', sans-serif;
+    
   }
   .dp-date-btn:hover { border-color: #1B4F8A; background: rgba(27,79,138,0.04); }
   .dp-date-btn.selected {
@@ -314,7 +314,7 @@ const STYLES = `
     font-size: 13px; font-weight: 600; color: #1B4F8A;
     cursor: pointer;
     transition: all .18s;
-    font-family: 'Outfit', sans-serif;
+    
   }
   .dp-slot:hover:not(:disabled) {
     background: #1B4F8A; color: #fff;
@@ -477,8 +477,19 @@ const DoctorProfile = () => {
           setDoctorDetails(data)
           const clinicStored = localStorage.getItem('clinicDetails')
           const clinicParsed = clinicStored ? JSON.parse(clinicStored) : null
-          const rawPic = data.doctorPicture || data.profilePicture || clinicParsed?.hospitalLogo || clinicParsed?.clinicLogo
-          if (rawPic) {
+          let rawPic = data.doctorPicture || data.profilePicture || clinicParsed?.hospitalLogo || clinicParsed?.clinicLogo
+          if (rawPic && typeof rawPic === 'string' && rawPic !== 'null' && rawPic !== 'undefined' && rawPic.trim() !== '') {
+            if (rawPic.includes('amazonaws.com/data%3Aimage')) {
+              try {
+                const decoded = decodeURIComponent(rawPic);
+                const dataIdx = decoded.indexOf('data:image');
+                if (dataIdx !== -1) {
+                  rawPic = decoded.substring(dataIdx).split('?')[0];
+                }
+              } catch (e) {
+                console.error('Error decoding image URL', e);
+              }
+            }
             setDoctorImage(rawPic.startsWith('data:image') || rawPic.startsWith('http')
               ? rawPic
               : `data:image/jpeg;base64,${rawPic}`)
@@ -589,7 +600,21 @@ const DoctorProfile = () => {
               <div className="dp-hero-strip" />
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
                 {doctorImage
-                  ? <img src={doctorImage} alt="Doctor" className="dp-avatar-ring" />
+                  ? (
+                      <>
+                        <img 
+                          src={doctorImage} 
+                          alt="Doctor" 
+                          className="dp-avatar-ring" 
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            const fallback = document.getElementById('doctor-profile-fallback');
+                            if (fallback) fallback.style.display = 'flex';
+                          }} 
+                        />
+                        <div id="doctor-profile-fallback" className="dp-avatar-placeholder" style={{ display: 'none' }}>No Image</div>
+                      </>
+                    )
                   : <div className="dp-avatar-placeholder">No Image</div>
                 }
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -636,13 +661,17 @@ const DoctorProfile = () => {
                         }
                       }}
                       style={{
-                        background: doctorDetails?.doctorAvailabilityStatus ? COLORS.rose : COLORS.green,
+                        background: doctorDetails?.doctorAvailabilityStatus ? COLORS.primary : COLORS.primary,
                         color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px',
                         fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s'
                       }}
                     >
                       {doctorDetails?.doctorAvailabilityStatus ? '⭕ Set Inactive' : '🟢 Set Active'}
                     </button>
+                      <div className="dp-hero-stat">
+                      <div className="dp-hero-stat-val">₹{doctorDetails?.doctorFees?.inClinicFee || 0}</div>
+                      <div className="dp-hero-stat-lbl">In-clinic fee</div>
+                    </div>
 
                     {/* <button 
                       onClick={() => setShowPassModal(true)}
@@ -677,9 +706,9 @@ const DoctorProfile = () => {
 
                 {/* Stat tiles */}
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignSelf: 'center' }}>
-                  <div className="dp-hero-stat">
+                  {/* <div className="dp-hero-stat">
                     <div className="dp-hero-stat-val">₹{doctorDetails?.doctorFees?.inClinicFee || 0}</div>
-                    <div className="dp-hero-stat-lbl">In-clinic fee</div>
+                    <div className="dp-hero-stat-lbl">In-clinic fee</div> */}
                   </div>
                   {/* <div className="dp-hero-stat">
                     <div className="dp-hero-stat-val">₹{doctorDetails?.doctorFees?.vedioConsultationFee || 0}</div>
@@ -687,7 +716,7 @@ const DoctorProfile = () => {
                   </div> */}
                 </div>
               </div>
-            </div>
+            {/* </div> */}
 
             {/* Contact & Availability */}
             <div className="dp-card" style={{ animationDelay: '.08s' }}>
@@ -714,13 +743,31 @@ const DoctorProfile = () => {
                 {/* Signature */}
                 <div style={{ marginTop: 20 }}>
                   <div className="dp-section-label">Doctor Signature</div>
-                  {doctorDetails?.doctorSignature
-                    ? <div className="dp-sig-box">
-                      <img src={doctorDetails.doctorSignature} alt="Signature"
-                        style={{ height: 56, display: 'block' }} />
-                    </div>
-                    : <span style={{ fontSize: 13, color: '#9ca3af' }}>No signature uploaded</span>
-                  }
+                  {(() => {
+                    let sig = doctorDetails?.doctorSignature;
+                    if (!sig || typeof sig !== 'string' || sig === 'null' || sig === 'undefined' || sig.trim() === '') {
+                      return <span style={{ fontSize: 13, color: '#9ca3af' }}>No signature uploaded</span>;
+                    }
+                    if (sig.includes('amazonaws.com/data%3Aimage')) {
+                      try {
+                        const decoded = decodeURIComponent(sig);
+                        const dataIdx = decoded.indexOf('data:image');
+                        if (dataIdx !== -1) {
+                          sig = decoded.substring(dataIdx).split('?')[0];
+                        }
+                      } catch (e) {
+                        console.error('Error decoding signature URL', e);
+                      }
+                    }
+                    const finalSrc = (sig.startsWith('data:image') || sig.startsWith('http://') || sig.startsWith('https://'))
+                      ? sig : `data:image/png;base64,${sig}`;
+                    return (
+                      <div className="dp-sig-box">
+                        <img src={finalSrc} alt="Signature" style={{ height: 56, display: 'block' }} 
+                          onError={(e) => { e.target.style.display = 'none'; }} />
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
