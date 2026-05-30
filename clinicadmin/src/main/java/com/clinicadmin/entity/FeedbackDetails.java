@@ -1,13 +1,12 @@
 package com.clinicadmin.entity;
 
-import java.util.Date;
 import java.util.List;
 
-import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.LastModifiedDate;
 
 import com.clinicadmin.dto.ServiceInfo;
+
+//import com.clinicadmin.dto.ServiceInfo;
 
 import lombok.Data;
 
