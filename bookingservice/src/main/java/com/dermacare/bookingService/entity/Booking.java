@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-import com.dermacare.bookingService.dto.TreatmentResponseDTO;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -76,7 +75,7 @@ public class Booking  {
 //    private Integer currentSitting;
     private String foc;
     // ------------------- NEW: Treatments and dates -------------------
-    private TreatmentResponseDTO treatments; // treatmentName -> treatment details
+    ///private TreatmentResponseDTO treatments; // treatmentName -> treatment details
     private String bodyPartId;
    	private String bodyPartName;
    	private String partImage;
@@ -159,6 +158,6 @@ public class Booking  {
 //        this.pendingSittings = booking.getPendingSittings();
 //        this.takenSittings = booking.getTakenSittings();
 //        this.currentSitting = booking.getCurrentSitting();
-        this.treatments = booking.getTreatments();
+       /// this.treatments = booking.getTreatments();
     }
 }
