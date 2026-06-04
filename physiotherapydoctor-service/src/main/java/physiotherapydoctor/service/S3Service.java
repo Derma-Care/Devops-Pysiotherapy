@@ -1,4 +1,4 @@
-package com.dermacare.bookingService.service;
+package physiotherapydoctor.service;
 
 import java.time.Duration;
 import java.util.Map;
@@ -33,7 +33,7 @@ public class S3Service {
     // Presigned URL expiry constants
     // ─────────────────────────────────────────────
     private static final Duration PUT_URL_EXPIRY = Duration.ofMinutes(15); // upload window
-    private static final Duration GET_URL_EXPIRY = Duration.ofHours(1);    // ← reduced from 7 days to 1 hour (more secure)
+    private static final Duration GET_URL_EXPIRY = Duration.ofHours(1);    // ← 1 hour (more secure)
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             // images
@@ -59,7 +59,7 @@ public class S3Service {
     private S3Presigner s3Presigner;
 
     // ─────────────────────────────────────────────
-    // Step 1: Generate presigned PUT URL
+    // NEW FLOW (Step 1): Generate presigned PUT URL
     // → frontend uploads directly to S3
     //
     // Security layers added:
@@ -67,7 +67,6 @@ public class S3Service {
     //   ✅ Content-Type locked into signature
     //   ✅ STANDARD storage class explicitly set
     //   ✅ 15-min expiry on upload URL
-    //   ✅ Null/blank validation on extension
     // ─────────────────────────────────────────────
     public Map<String, String> generatePresignedPutUrl(String folder, String extension) {
 
@@ -106,18 +105,16 @@ public class S3Service {
         return Map.of(
                 "uploadUrl",   uploadUrl,
                 "fileKey",     fileName,
-                "contentType", contentType,
-                "expiresIn",   "15 minutes"
+                "contentType", contentType   // ← frontend MUST use this exact value
         );
     }
 
     // ─────────────────────────────────────────────
-    // Step 2: Generate signed GET URL
+    // NEW FLOW (Step 2): Generate signed GET URL
     //
     // Security layers:
-    //   ✅ Reduced expiry from 7 days → 1 hour
+    //   ✅ Reduced expiry to 1 hour
     //   ✅ Access only via signed URL (no public read)
-    //   ✅ Null/blank validation on fileName
     // ─────────────────────────────────────────────
     public String generateSignedUrl(String fileName) {
 
@@ -131,7 +128,7 @@ public class S3Service {
                 .build();
 
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-                .signatureDuration(GET_URL_EXPIRY)   // ← 1 hour (was 7 days)
+                .signatureDuration(GET_URL_EXPIRY)   // ← 1 hour
                 .getObjectRequest(getObjectRequest)
                 .build();
 
@@ -166,8 +163,8 @@ public class S3Service {
             return Map.of(
                     "contentType",    metadata.contentType(),
                     "contentLength",  metadata.contentLength(),
-                    "isEncrypted",    metadata.serverSideEncryption() != null,       // ← NEW
-                    "encryptionType", metadata.serverSideEncryptionAsString() != null // ← NEW
+                    "isEncrypted",    metadata.serverSideEncryption() != null,
+                    "encryptionType", metadata.serverSideEncryptionAsString() != null
                             ? metadata.serverSideEncryptionAsString()
                             : "NONE"
             );
@@ -183,7 +180,7 @@ public class S3Service {
     }
 
     // ─────────────────────────────────────────────
-    // extension → Content-Type
+    // SHARED HELPER: extension → Content-Type
     // ─────────────────────────────────────────────
     private String resolveContentType(String extension) {
         return switch (extension.toLowerCase()) {
