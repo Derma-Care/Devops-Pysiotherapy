@@ -55,10 +55,7 @@
     "react-select": "^5.10.2",
     "react-toastify": "^11.0.5",
     "redux": "5.0.1",
-    "simplebar-react": "^3.3.0",
-    "workbox": "^0.0.0",
-    "workbox-core": "^7.3.0",
-    "workbox-expiration": "^7.3.0"
+    "simplebar-react": "^3.3.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
