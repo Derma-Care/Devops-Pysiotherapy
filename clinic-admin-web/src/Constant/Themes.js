@@ -9,7 +9,6 @@ export const COLORS = {
   bgcolor: '#1B4F8A',
   black: '#F0F6FF',
   logocolor: '#000',
-  sideColor: "#1a3a6b"
 }
 
 export const FONT_SIZES = {

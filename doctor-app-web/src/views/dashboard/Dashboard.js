@@ -20,7 +20,6 @@ import { useDoctorContext } from '../../Context/DoctorContext';
 import { getTodayAppointments, getTodayFutureAppointments } from '../../Auth/Auth';
 import CalendarModal from '../../utils/CalenderModal';
 import { useNavigate } from 'react-router-dom';
-import SkeletonLoader from '../../components/SkeletonLoader';
 
 const capitalizeFirst = (str) => str?.charAt(0).toUpperCase() + str?.slice(1);
 
@@ -38,12 +37,10 @@ const Dashboard = () => {
   const [futureAppointments, setFutureAppointments] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingCalendar, setLoadingCalendar] = useState(false);
-  const [loading, setLoading] = useState(true);
 
 
 
   const fetchAppointments = useCallback(async () => {
-    setLoading(true);
     try {
       const response = await getTodayAppointments();
       if (response.statusCode === 200) {
@@ -52,8 +49,6 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching appointments:', error);
-    } finally {
-      setLoading(false);
     }
   }, [doctorDetails?.id, setTodayAppointments]);
 
@@ -293,13 +288,7 @@ const Dashboard = () => {
           </CTableHead>
 
           <CTableBody>
-            {loading ? (
-              <CTableRow>
-                <CTableDataCell colSpan="11" className="p-0 border-0">
-                  <SkeletonLoader type="table" count={1} />
-                </CTableDataCell>
-              </CTableRow>
-            ) : currentPatients.length === 0 ? (
+            {currentPatients.length === 0 ? (
               <CTableRow>
                 <CTableDataCell
                   colSpan="11"

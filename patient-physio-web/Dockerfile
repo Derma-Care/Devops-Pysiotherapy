@@ -1,40 +1,30 @@
-# =========================================================
-# Stage 1: Build Application
-# =========================================================
+# -------- Stage 1: Build --------
 FROM node:24-alpine AS build
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy dependency files
+COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source code
 COPY . .
 
-# Build application
+# Build app
 RUN npm run build
 
-# Verify build output (optional, useful for debugging)
-RUN ls -la
 
-# =========================================================
-# Stage 2: Nginx
-# =========================================================
+# -------- Stage 2: Nginx --------
 FROM nginx:alpine
 
-# Remove default nginx content
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copy build output
-# Change this to /app/dist if your build creates dist folder
-COPY --from=build /app/dev-dist/ /usr/share/nginx/html/
+COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 80
+EXPOSE 5002
 
 CMD ["nginx", "-g", "daemon off;"]

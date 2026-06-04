@@ -468,21 +468,12 @@ const WidgetsDropdown = (props) => {
 
             {/* Search Doctors */}
             {
-              role?.toLowerCase() === "admin" && (
-                <button
-                  className="wd-nav-btn"
-                  onClick={() => navigate('/employee-management/doctor')}
-                >
-                  <span className="wd-count-badge">{totalDoctorsCount}</span>
+              role.toLowerCase() == "admin" && <button className="wd-nav-btn" onClick={() => navigate('/employee-management/doctor')}>
+                <span className="wd-count-badge">{totalDoctorsCount}</span>
+                Search Doctors
+                <CIcon icon={cilArrowRight} style={{ width: '13px', height: '13px' }} />
+              </button>
 
-                  Search Doctors
-
-                  <CIcon
-                    icon={cilArrowRight}
-                    style={{ width: '13px', height: '13px' }}
-                  />
-                </button>
-              )
             }
 
             {/* Attendance Tracker */}
@@ -506,7 +497,6 @@ const WidgetsDropdown = (props) => {
                 <CTableHeaderCell className="wd-th">Date</CTableHeaderCell>
                 <CTableHeaderCell className="wd-th">Time</CTableHeaderCell>
                 <CTableHeaderCell className="wd-th">Visit Type</CTableHeaderCell>
-                <CTableHeaderCell className="wd-th"  >Payment Type</CTableHeaderCell>
                 <CTableHeaderCell className="wd-th">Status</CTableHeaderCell>
                 <CTableHeaderCell className="wd-th" style={{ width: 100 }}>Action</CTableHeaderCell>
               </CTableRow>
@@ -641,11 +631,9 @@ const WidgetsDropdown = (props) => {
                           </CTableDataCell>
                           <CTableDataCell className="wd-td">
                             {item.slot || item.visitType}
-                          </CTableDataCell><CTableDataCell className="wd-td">
-                            {item.paymentType}
                           </CTableDataCell>
                           <CTableDataCell className="wd-td" style={{ position: 'relative', overflow: 'visible' }}>
-                            {item.status?.toLowerCase() === 'pending' || item.paymentType == "Not Paid" ? (
+                            {item.status?.toLowerCase() === 'pending' ? (
                               <div
                                 className="wd-pay-dropdown"
                                 ref={openPayDropdown === item.bookingId ? payDropdownRef : null}
