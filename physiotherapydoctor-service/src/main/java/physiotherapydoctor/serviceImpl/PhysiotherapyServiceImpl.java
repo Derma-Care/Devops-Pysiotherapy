@@ -60,7 +60,6 @@ import physiotherapydoctor.feign.ClinicAdminFeign;
 import physiotherapydoctor.repository.PaymentRepository;
 import physiotherapydoctor.repository.PhysiotherapydoctorRespository;
 import physiotherapydoctor.service.PhysiotherapyService;
-import physiotherapydoctor.service.S3Service;
 import physiotherapydoctor.util.ExtractFeignMessage;
 
 @Service
@@ -80,9 +79,6 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 
 	@Autowired
 	private ObjectMapper objectMapper;
-	
-	@Autowired
-	private   S3Service s3Service;
 
 	@Override
 	public Response create(PhysiotherapyRecordDTO dto) {
@@ -443,13 +439,8 @@ public class PhysiotherapyServiceImpl implements PhysiotherapyService {
 			return response;
 		}
 
-		PhysiotherapyRecord record = optional.get();
-		if (record.getPrescriptionPdf() != null && !record.getPrescriptionPdf().isBlank()) {
-		    record.setPrescriptionPdf(s3Service.generateSignedUrl(record.getPrescriptionPdf()));
-		}
-
 		response.setSuccess(true);
-		response.setData(record);
+		response.setData(optional.get());
 		response.setMessage("Success");
 		response.setStatus(200);
 
@@ -762,20 +753,14 @@ System.out.println(records);
 			return response;
 		}
 
-		records.forEach(r -> {
-		    if (r.getPrescriptionPdf() != null && !r.getPrescriptionPdf().isBlank()) {
-		        r.setPrescriptionPdf(s3Service.generateSignedUrl(r.getPrescriptionPdf()));
-		    }
-		});
-
 		response.setSuccess(true);
 		response.setData(records);
 		response.setMessage("Records fetched successfully");
 		response.setStatus(200);
 
 		return response;
-	}	
-	
+	}
+
 	@Override
 	public Response getAssignedPatients(String clinicId, String branchId, String therapistId, Integer overallStatus) {
 
@@ -1841,12 +1826,6 @@ System.out.println(records);
 			return response;
 		}
 
-		record.forEach(r -> {
-		    if (r.getPrescriptionPdf() != null && !r.getPrescriptionPdf().isBlank()) {
-		        r.setPrescriptionPdf(s3Service.generateSignedUrl(r.getPrescriptionPdf()));
-		    }
-		});
-
 		response.setSuccess(true);
 		response.setData(record);
 		response.setMessage("Records fetched successfully");
@@ -1854,6 +1833,7 @@ System.out.println(records);
 
 		return response;
 	}
+
 	@Override
 	public Response getPatientHistory(String patientId) {
 
@@ -2181,7 +2161,7 @@ System.out.println(records);
 			    map.setVisitNumber( String.valueOf(i + 1));
 				map.setVisitDate(record.getCreatedAt());
 				map.setVisitTime(record.getCreatedTime());
-				PhysiotherapyDoctorData data = mapToPhysiotherapyDoctorData(record,s3Service);
+				PhysiotherapyDoctorData data = mapToPhysiotherapyDoctorData(record);
 				map.setPhysiotherapyDoctorData(data);
 				result.add(map);
 			}
@@ -2205,7 +2185,7 @@ System.out.println(records);
 	}
 	
 	public static PhysiotherapyDoctorData mapToPhysiotherapyDoctorData(
-			PhysiotherapyRecord entity ,S3Service s3Service) {
+			PhysiotherapyRecord entity) {
 
 	    if (entity == null) {
 	        return null;
@@ -2219,11 +2199,8 @@ System.out.println(records);
 	    dto.setBranchId(entity.getBranchId());
 	    dto.setCreatedAt(entity.getCreatedAt());
 	    dto.setUpdatedAt(entity.getUpdatedAt());
-	    dto.setPrescriptionPdf(
-	    	    entity.getPrescriptionPdf() != null && !entity.getPrescriptionPdf().isBlank()
-	    	        ? s3Service.generateSignedUrl(entity.getPrescriptionPdf())
-	    	        : entity.getPrescriptionPdf()
-	    	);	    dto.setCreatedTime(entity.getCreatedTime());
+	    dto.setPrescriptionPdf(entity.getPrescriptionPdf());
+	    dto.setCreatedTime(entity.getCreatedTime());
 
 	    // PatientInfo Mapping
 	    if (entity.getPatientInfo() != null) {

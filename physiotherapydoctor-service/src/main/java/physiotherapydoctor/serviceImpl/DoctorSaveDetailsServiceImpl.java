@@ -51,7 +51,6 @@ import physiotherapydoctor.feign.BookingFeignClient;
 import physiotherapydoctor.feign.ClinicAdminFeign;
 import physiotherapydoctor.repository.DoctorSaveDetailsRepository;
 import physiotherapydoctor.service.DoctorSaveDetailsService;
-import physiotherapydoctor.service.S3Service;
 import physiotherapydoctor.util.VisitTypeUtil;
 
 @Service
@@ -71,13 +70,10 @@ public class DoctorSaveDetailsServiceImpl implements DoctorSaveDetailsService {
     
     @Autowired 
     private AdminFeignClient adminFeignClient;
-    
-    @Autowired
-    private S3Service s3Service;
 
 
 
-    @Override    
+    @Override
     public Response saveDoctorDetails(DoctorSaveDetailsDTO dto) {
         try {
             // ----------------------- Step 0: Validate Booking ID -----------------------
@@ -597,11 +593,12 @@ public class DoctorSaveDetailsServiceImpl implements DoctorSaveDetailsService {
                                         : null)
                                 .build()
                         : null)
+                // prescriptionPdf (store as-is or base64 string depending on upstream)
                 .prescriptionPdf(dto.getPrescriptionPdf() != null
-                ? dto.getPrescriptionPdf().stream()
-                        .map(this::decodeIfBase64)
-                        .collect(Collectors.toList())
-                : null)
+                        ? dto.getPrescriptionPdf().stream()
+                                .map(this::decodeIfBase64)
+                                .collect(Collectors.toList())
+                        : null)
                 // Tests
                 .tests(dto.getTests() != null ?
                         TestDetails.builder()
@@ -731,10 +728,12 @@ public class DoctorSaveDetailsServiceImpl implements DoctorSaveDetailsService {
                         : null)
 
                 .prescriptionPdf(entity.getPrescriptionPdf() != null
-                ? entity.getPrescriptionPdf().stream()
-                      .map(key -> s3Service.generateSignedUrl(key))
+                ? entity.getPrescriptionPdf()
+                      .stream()
+                      .map(this::encodeIfNotBase64) // same as attachments
                       .collect(Collectors.toList())
-                : null)
+                : null
+            )
 
 
               

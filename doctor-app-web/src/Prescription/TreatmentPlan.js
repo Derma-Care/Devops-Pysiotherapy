@@ -170,11 +170,10 @@ const TherapistMultiSearch = ({ therapists, loading, selectedTherapists, onChang
 
   const toggleTherapist = (t) => {
     if (isSelected(t.therapistId)) {
-      onChange([])
+      onChange(selectedTherapists.filter(st => st.therapistId !== t.therapistId))
     } else {
-      onChange([t])
+      onChange([...selectedTherapists, t])
     }
-    setOpen(false)
   }
 
   const removeTherapist = (id) => {
@@ -2087,7 +2086,7 @@ const TherapySession = ({ seed = {}, onNext, patientData }) => {
         {/* ══ 3. ASSIGN THERAPIST — moved to bottom ══ */}
         <CCard style={{ ...cardStyle, borderColor: errors.therapist ? '#fecaca' : '#b6cfe8' }}>
           <CCardBody style={{ padding: '22px 28px' }}>
-            <SectionHeader emoji="👤" title="Assign Therapist" subtitle="Required *" />
+            <SectionHeader emoji="👤" title="Assign Therapist" subtitle="Required — multiple therapists allowed *" />
             <TherapistMultiSearch
               therapists={therapists}
               loading={loadingTherapists}

@@ -43,7 +43,6 @@ public class Booking  {
     private String clinicDeviceId;
     private String doctorId;
     private String doctorName;
-    private String focReason;
     private String doctorDeviceId;
     private String doctorWebDeviceId;
 //    private String subServiceId;

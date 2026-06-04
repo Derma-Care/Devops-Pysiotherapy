@@ -1,33 +1,37 @@
-# -------- Stage 1: Build --------
-FROM node:20-alpine AS build
+# Stage 1: Build React App
+FROM node:20 AS build
 
+# Set working directory
 WORKDIR /app
 
-# Copy only dependency files first (better caching)
-COPY package.json package-lock.json ./
+# Copy package.json and package-lock.json to install dependencies
+COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
-# Copy remaining source code
+# Copy the entire project
 COPY . .
 
-# Build Vite app → outputs to /dist
+# Build the React app
 RUN npm run build
 
-
-# -------- Stage 2: Nginx --------
+# Stage 2: Serve with Nginx
 FROM nginx:alpine
 
-# Remove default files
-RUN rm -rf /usr/share/nginx/html/*
+# Set working directory (optional, for clarity)
+WORKDIR /usr/share/nginx/html
 
-# Copy built app
-COPY --from=build /app/dist /usr/share/nginx/html
+# Copy build output from Stage 1 to Nginx's web root directory
+COPY --from=build /app/build .
 
-# Copy nginx config
+# Copy a custom Nginx configuration to use port 3000
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# Expose port 3000 for the Nginx server
 EXPOSE 3000
 
+# Start Nginx in the foreground
 CMD ["nginx", "-g", "daemon off;"]
+
+ 

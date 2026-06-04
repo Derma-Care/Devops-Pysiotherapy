@@ -2,12 +2,32 @@ spring:
   application:
     name: notification-service
 
+#  kafka:
+#    bootstrap-servers: localhost:9092
+#
+#    consumer:
+#      group-id: notificationgroup
+#      enable-auto-commit: true
+#      auto-offset-reset: latest
+#
+#      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+#      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+#      properties:
+#        spring:
+#          json:
+#            trusted:
+#              packages: com.dermacare.notification_service.entity
+#            value:
+#              default:
+#                type: com.dermacare.notification_service.entity.Booking
+
     listener:
       concurrency: 1
 
   data:
     mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://mongodb:27017/DermaCareNotifications}
+      uri: mongodb://mongodb:27017/DermaCareNotifications?connectTimeoutMS=30000&socketTimeoutMS=60000
 
   mvc:
     async:
@@ -49,11 +69,10 @@ eureka:
 # ===============================
 # Actuator
 # ===============================
-# CORRECT
 management:
-  server:
-    base-path: /
-
+ server:
+  base-path: / 
+ 
   endpoints:
     web:
       exposure:
@@ -62,8 +81,12 @@ management:
   endpoint:
     health:
       show-details: always
-      probes:
-        enabled: true
+
+ endpoint:
+  health:
+   show-details: always
+   probes:
+    enabled: true  
 
 # ===============================
 # App Info

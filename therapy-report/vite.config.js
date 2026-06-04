@@ -2,9 +2,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-
-import removeConsole from 'vite-plugin-remove-console'
-import { COLORS } from './src/Constant/Themes'
 export default defineConfig({
   plugins: [
     react(),
@@ -14,18 +11,18 @@ export default defineConfig({
         name: 'Therapist App',
         short_name: 'Therapist',
         description: 'Therapy Booking and Management App',
-        theme_color: COLORS.primary,
+        theme_color: '#0d6efd',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
         icons: [
           {
-            src: './src/assets/Kinetixwhitelogo.png',
+            src: './src/assets/vite.svg',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: './src/assets/Kinetixwhitelogo.png',
+            src: './src/assets/vite.svg',
             sizes: '512x512',
             type: 'image/png'
           },
@@ -34,20 +31,12 @@ export default defineConfig({
       }, devOptions: {
         enabled: true   // ✅ ADD THIS
       },
-    }),
-
-    removeConsole(),
+    })
   ],
 
   // ✅ CORRECT PLACE
   server: {
     port: 3000,
     strictPort: true
-  },
-  hmr: {
-    host: 'localhost',
-    protocol: 'ws',
-    port: 3001,
-  },
+  }
 })
-
