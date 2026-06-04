@@ -21,7 +21,8 @@ FROM nginx:alpine
 
 RUN rm -rf /usr/share/nginx/html/*
 
-COPY --from=build /app/dist /usr/share/nginx/html
+# Change this to /app/dist if your build creates dist folder
+COPY --from=build /app/dev-dist/ /usr/share/nginx/html/
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
