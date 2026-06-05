@@ -5,7 +5,7 @@ spring:
 
   data:
     mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://mongodb:27017/customerAppointments}
+      uri: mongodb://mongodb:27017/customerAppointments?connectTimeoutMS=30000&socketTimeoutMS=60000
 
 #  kafka:
 #    bootstrap-servers: kafka:9092
