@@ -4,17 +4,17 @@
 
 import axios from 'axios';
 
-const ipUrl = '3.7.216.95:9090'
+const ipUrl = 'api.ccmstestserver.online'
 
-export const BASE_URL = `http://${ipUrl}`
-export const CLINIC_ADMIN_URL = `http://${ipUrl}`
+export const BASE_URL = `https://${ipUrl}`
+export const CLINIC_ADMIN_URL = `https://${ipUrl}`
 export const MainAdmin_URL = `${BASE_URL}/admin`
-export const Procedure_URL=`http://${ipUrl}`
+export const Procedure_URL=`https://${ipUrl}`
 export const ClinicBase_url=`${BASE_URL}/admin`
 // export let wifiUrl = '192.168.1.7'
 
 // export const CUSTOMER_SERVICE_URL = `http://${ipUrl}:8083/api`
-export const Booking_service_Url = `http://${ipUrl}/api`
+export const Booking_service_Url = `https://${ipUrl}/api`
 
 // export const BOOKING_SERVICE_URL = `http://${ipUrl}:8087/api/v1`
 // export const BASE_URLS = `http://${ipUrl}:8080/api/v1`
@@ -22,7 +22,7 @@ export const Booking_service_Url = `http://${ipUrl}/api`
 export const SERVICE_URL = `admin/updateByServiceId`
 
 //sub-service
-export const subService_URL = `http://${ipUrl}/admin`
+export const subService_URL = `https://${ipUrl}/admin`
 export const ADD_SERVICE = 'addService'
 export const GET_ALL_SERVICES = 'getAllServices'
 export const DELETE_SERVICE_URL = `deleteService`
