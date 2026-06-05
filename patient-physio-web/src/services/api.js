@@ -74,6 +74,10 @@ export const customerService = {
     const response = await api.get(`/api/customer/bookings/customerId/${customerId}`); //TODO:remove branch Id here hardcoded here
     return response.data;
   },
+  getCompletedBookings: async (customerId) => {
+    const response = await api.get(`/api/customer/booking/completed/customerId/${customerId}`);
+    return response.data;
+  },
   getBookingById: async (bookingId) => {
     const response = await api.get(`/clinic-admin/getBookedServiceById/${bookingId}`);
     return response.data;
