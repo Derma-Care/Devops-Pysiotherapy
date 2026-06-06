@@ -1047,12 +1047,12 @@ const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formDa
   // API shape  : record.treatmentPlan → { doctorId, doctorName, therapistId, therapistName, manualTherapy, modalitiesUsed[], patientResponse, precautions[] }
   const treatmentPlanObj = record.treatmentPlan ?? {}
 
-  const topTherapistId = treatmentPlanObj.therapistId ?? formData?.therapySessions?.therapistId ?? ''
-  const topTherapistName = treatmentPlanObj.therapistName ?? formData?.therapySessions?.therapistName ?? ''
-  const manualTherapy = treatmentPlanObj.manualTherapy ?? formData?.therapySessions?.manualTherapy ?? ''
-  const precautionsArr = Array.isArray(treatmentPlanObj.precautions) ? treatmentPlanObj.precautions : Array.isArray(formData?.therapySessions?.precautions) ? formData.therapySessions.precautions : []
-  const modalitiesArr = Array.isArray(treatmentPlanObj.modalitiesUsed) ? treatmentPlanObj.modalitiesUsed : Array.isArray(formData?.therapySessions?.modalitiesUsed) ? formData.therapySessions.modalitiesUsed : []
-  const patientResponse = treatmentPlanObj.patientResponse ?? formData?.therapySessions?.patientResponse ?? ''
+  const topTherapistId = formData?.therapySessions?.therapistId || treatmentPlanObj.therapistId || ''
+  const topTherapistName = formData?.therapySessions?.therapistName || treatmentPlanObj.therapistName || ''
+  const manualTherapy = formData?.therapySessions?.manualTherapy || treatmentPlanObj.manualTherapy || ''
+  const precautionsArr = Array.isArray(formData?.therapySessions?.precautions) && formData.therapySessions.precautions.length > 0 ? formData.therapySessions.precautions : Array.isArray(treatmentPlanObj.precautions) ? treatmentPlanObj.precautions : []
+  const modalitiesArr = Array.isArray(formData?.therapySessions?.modalitiesUsed) && formData.therapySessions.modalitiesUsed.length > 0 ? formData.therapySessions.modalitiesUsed : Array.isArray(treatmentPlanObj.modalitiesUsed) ? treatmentPlanObj.modalitiesUsed : []
+  const patientResponse = formData?.therapySessions?.patientResponse || treatmentPlanObj.patientResponse || ''
 
   const treatmentPlanDisplay = {
     doctorId, doctorName,
@@ -1749,10 +1749,10 @@ const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formDa
 
       {/* ── Sticky Bottom Bar ── */}
       <div style={{ position: 'fixed', bottom: 0, left: sidebarWidth ? `${sidebarWidth}px` : 0, width: sidebarWidth ? `calc(100vw - ${sidebarWidth}px)` : '100vw', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '8px 24px', zIndex: 999, boxShadow: '0 -2px 10px rgba(27,79,138,0.12)', borderTop: '2px solid #1B4F8A' }}>
-        {/* <Button customColor="#1B4F8A" color="#FFFFFF" style={{ borderRadius: '20px', fontWeight: 700, padding: '5px 20px', fontSize: 12, boxShadow: '0 2px 8px rgba(27,79,138,0.30)', border: '1.5px solid #1B4F8A' }}
+        <Button customColor="#1B4F8A" color="#FFFFFF" style={{ borderRadius: '20px', fontWeight: 700, padding: '5px 20px', fontSize: 12, boxShadow: '0 2px 8px rgba(27,79,138,0.30)', border: '1.5px solid #1B4F8A' }}
           onClick={() => { setClickedSaveTemplate(true); onSaveTemplate?.(); info('Template saved!', { title: 'Template' }) }}>
           {!updateTemplate ? '💾 Save as Template' : '🔄 Update Template'}
-        </Button> */}
+        </Button>
         {saving && <CSpinner size="sm" style={{ color: '#1B4F8A' }} />}
         <Button customColor="#1B4F8A" color="#FFFFFF" style={{ borderRadius: '20px', fontWeight: 700, padding: '5px 20px', fontSize: 12, boxShadow: '0 2px 8px rgba(27,79,138,0.30)', border: '1.5px solid #1B4F8A' }}
           onClick={() => { setPendingAction(ACTIONS.SAVE); clickedSaveTemplate ? doSave() : setShowTemplateModal(true) }} disabled={saving}>
