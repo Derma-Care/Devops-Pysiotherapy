@@ -17,9 +17,19 @@ services:
 
     volumes:
       - mongodb_data:/data/db
+      - ./mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD}
 
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh",
+             "-u", "${MONGO_ROOT_USERNAME}",
+             "-p", "${MONGO_ROOT_PASSWORD}",
+             "--authenticationDatabase", "admin",
+             "--eval", "db.adminCommand('ping')"]
       interval: 20s
       timeout: 10s
       retries: 10
@@ -73,7 +83,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 384m
+          memory: 512m
 
     logging:
       driver: json-file
@@ -159,7 +169,7 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m"
       SPRING_APPLICATION_NAME: adminservice
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/AdminService?connectTimeoutMS=30000&socketTimeoutMS=60000
+      SPRING_DATA_MONGODB_URI: mongodb://admin_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/AdminService?authSource=AdminService&connectTimeoutMS=30000&socketTimeoutMS=60000
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_CONNECTTIMEOUT: 30000
       SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_READTIMEOUT: 60000
@@ -211,7 +221,7 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m"
       SPRING_APPLICATION_NAME: clinicadmin
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/clinicadminservice?connectTimeoutMS=30000&socketTimeoutMS=60000
+      SPRING_DATA_MONGODB_URI: mongodb://clinicadmin_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/clinicadminservice?authSource=clinicadminservice&connectTimeoutMS=30000&socketTimeoutMS=60000
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_CONNECTTIMEOUT: 30000
       SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_READTIMEOUT: 60000
@@ -239,8 +249,6 @@ services:
 
   # =========================================================
   # PHYSIOTHERAPY DOCTOR SERVICE
-  # ✅ FIXED: /actuator/health was returning 404
-  #           Using port-open check until developer adds actuator
   # =========================================================
 
   physiotherapydoctor-service:
@@ -265,7 +273,7 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m"
       SPRING_APPLICATION_NAME: physiotherapydoctor-service
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/physiotherapydoctorservice?connectTimeoutMS=30000&socketTimeoutMS=60000
+      SPRING_DATA_MONGODB_URI: mongodb://physio_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/physiotherapydoctorservice?authSource=physiotherapydoctorservice&connectTimeoutMS=30000&socketTimeoutMS=60000
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
 
     healthcheck:
@@ -291,8 +299,6 @@ services:
 
   # =========================================================
   # CUSTOMER SERVICE
-  # ✅ FIXED: /actuator/health was returning 404
-  #           Using port-open check until developer adds actuator
   # =========================================================
 
   customerservice:
@@ -317,7 +323,7 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m"
       SPRING_APPLICATION_NAME: customerservice
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/customerService?connectTimeoutMS=30000&socketTimeoutMS=60000
+      SPRING_DATA_MONGODB_URI: mongodb://customer_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/customerService?authSource=customerService&connectTimeoutMS=30000&socketTimeoutMS=60000
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_CONNECTTIMEOUT: 30000
       SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_READTIMEOUT: 60000
@@ -343,11 +349,9 @@ services:
     networks:
       - app-network
 
-  # =========================================================
+  # ==========================================================
   # BOOKING SERVICE
-  # ✅ FIXED: /actuator/health was returning 404
-  #           Using port-open check until developer adds actuator
-  # =========================================================
+  # ==========================================================
 
   bookingservice:
     build:
@@ -371,7 +375,7 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m"
       SPRING_APPLICATION_NAME: bookingservice
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/customerAppointments?connectTimeoutMS=30000&socketTimeoutMS=60000
+      SPRING_DATA_MONGODB_URI: mongodb://booking_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/customerAppointments?authSource=customerAppointments&connectTimeoutMS=30000&socketTimeoutMS=60000
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
 
@@ -398,8 +402,6 @@ services:
 
   # =========================================================
   # NOTIFICATION SERVICE
-  # ✅ FIXED: /actuator/health was returning 404
-  #           Using port-open check until developer adds actuator
   # =========================================================
 
   notification-service:
@@ -424,7 +426,7 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m"
       SPRING_APPLICATION_NAME: notification-service
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/DermaCareNotifications?connectTimeoutMS=30000&socketTimeoutMS=60000
+      SPRING_DATA_MONGODB_URI: mongodb://notification_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/DermaCareNotifications?authSource=DermaCareNotifications&connectTimeoutMS=30000&socketTimeoutMS=60000
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
 
@@ -438,7 +440,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 384m
+          memory: 512m
 
     logging:
       driver: json-file
@@ -449,9 +451,9 @@ services:
     networks:
       - app-network
 
-  # =========================================================
+  # ========================================================
   # FRONTEND - CLINIC ADMIN
-  # =========================================================
+  # ========================================================
 
   clinic-admin-web:
     build:
