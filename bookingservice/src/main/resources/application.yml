@@ -6,19 +6,6 @@ spring:
   data:
     mongodb:
       uri: ${SPRING_DATA_MONGODB_URI:mongodb://mongodb:27017/customerAppointments}
-
-#  kafka:
-#    bootstrap-servers: kafka:9092
-#
-#    producer:
-#      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-#      value-serializer: org.apache.kafka.common.serialization.StringSerializer
-#      retries: 3
-#      acks: all
-#      properties:
-#        delivery.timeout.ms: 120000
-#        request.timeout.ms: 30000
- 
   
   cloud:
     openfeign:
@@ -143,4 +130,3 @@ logging:
 
   level:
     root: INFO
-    org.springframework.kafka: INFO
