@@ -1498,10 +1498,11 @@ private void updateStatuses(PaymentRecord record) {
 
 			PaymentRecord record = repo
 					.findByClinicIdAndBranchIdAndBookingIdAndPatientIdAndTherapistIdAndTherapistRecordId(clinicId,
-							branchId, bookingId, patientId, therapistId, therapistRecordId)
-					.orElseThrow(() -> new RuntimeException("Payment record not found"));
+							branchId, bookingId, patientId, therapistId, therapistRecordId).get();
+					
 
 			List<Object> exerciseList = new ArrayList<>();
+			if(record != null) {
 
 			for (TherapyWithSessions pkg : record.getTherapyWithSessions()) {
 
@@ -1564,15 +1565,16 @@ private void updateStatuses(PaymentRecord record) {
 						}
 					}
 				}
-			}
 
-			response.setSuccess(true);
-			response.setStatus(200);
-			response.setMessage("All exercises fetched successfully");
-			response.setData(exerciseList);
-
-		} catch (Exception e) {
-
+				response.setSuccess(true);
+				response.setStatus(200);
+				response.setMessage("All exercises fetched successfully");
+				response.setData(exerciseList);
+				}}else {
+					response.setSuccess(false);
+					response.setStatus(200);
+					response.setMessage("Record not found");				
+				}}catch (Exception e) {
 			response.setSuccess(false);
 			response.setStatus(500);
 			response.setMessage(e.getMessage());

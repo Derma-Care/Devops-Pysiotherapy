@@ -22,7 +22,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.PathVariable;
-
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import com.dermaCare.customerService.dto.BookingRequset;
 import com.dermaCare.customerService.dto.BookingResponse;
 import com.dermaCare.customerService.dto.BranchDTO;
@@ -40,6 +41,7 @@ import com.dermaCare.customerService.dto.FavouriteDoctorsDTO;
 import com.dermaCare.customerService.dto.FirstVisitHistoryRequest;
 import com.dermaCare.customerService.dto.LoginDTO;
 import com.dermaCare.customerService.dto.NotificationToCustomer;
+import com.dermaCare.customerService.dto.PatientFeedbackDTO;
 import com.dermaCare.customerService.dto.ReportsAndDoctorSaveDetailsDto;
 import com.dermaCare.customerService.dto.ReportsDtoList;
 import com.dermaCare.customerService.dto.ServicesDto;
@@ -2377,5 +2379,33 @@ public ResponseEntity<Response> getStaffInfo(
         response.setSuccess(false);
     } return ResponseEntity.status(response.getStatus()).body(response);}
 
+
+
+@Override
+public Response createFeedback(
+        PatientFeedbackDTO dto){
+    Response response = new Response();
+    try {
+    	return clinicAdminFeign.createFeedback(dto);  
+    } catch (FeignException e) {      
+        response.setStatus(e.status());
+        response.setMessage(ExtractFeignMessage.clearMessage(e));
+        response.setSuccess(false);
+    } return response;}
+
+
+@Override
+public ResponseEntity<Response> getByClinicIdAndBranchId(
+      String clinicId,
+      String branchId,
+      String patientId){
+    Response res = new Response();
+    try {
+    	return clinicAdminFeign.getByClinicIdAndBranchIdAndPatirntId(clinicId, branchId, patientId);  
+    } catch (FeignException e) {      
+        res.setStatus(e.status());
+        res.setMessage(ExtractFeignMessage.clearMessage(e));
+        res.setSuccess(false);
+    } return ResponseEntity.status(res.getStatus()).body(res);}
 
 }
