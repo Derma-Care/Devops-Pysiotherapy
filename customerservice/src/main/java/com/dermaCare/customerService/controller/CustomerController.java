@@ -26,6 +26,7 @@ import com.dermaCare.customerService.dto.FavouriteDoctorsDTO;
 import com.dermaCare.customerService.dto.FirstVisitHistoryRequest;
 import com.dermaCare.customerService.dto.LoginDTO;
 import com.dermaCare.customerService.dto.NotificationToCustomer;
+import com.dermaCare.customerService.dto.PatientFeedbackDTO;
 import com.dermaCare.customerService.dto.TempBlockingSlot;
 import com.dermaCare.customerService.dto.TherapistRecordRequest;
 import com.dermaCare.customerService.dto.VisitHistoryRequest;
@@ -652,13 +653,26 @@ public ResponseEntity<Response> getAverageRatingByDoctorId( @PathVariable String
        return service.getExerciseSessionsWithRecords(dto.getClinicId(), dto.getBranchId(), dto.getBookingId(), dto.getPatientId(), dto.getTherapistId(), dto.getTherapistRecordId());
    }
    
-   @GetMapping("/clinic-admin/staff-info/{hospitalId}/{branchId}")
+   @GetMapping("/staff-info/{hospitalId}/{branchId}")
    public ResponseEntity<Response> getStaffInfo(
 	        @PathVariable String hospitalId,
 	        @PathVariable String branchId){
    return customerService.getStaffInfo(hospitalId, branchId);
    }
 
+   @PostMapping("/createPatientFeedback")
+   public ResponseEntity<Response> createFeedback(
+           @RequestBody PatientFeedbackDTO dto) {
+	   Response res = customerService.createFeedback(dto);
+	   return ResponseEntity.status(res.getStatus()).body(res);
+   }
    
+   @GetMapping("/getByPatientFeedbackClinicIdAndBranchId/{clinicId}/{branchId}/{patientId}")
+   public ResponseEntity<Response> getByClinicIdAndBranchId(
+           @PathVariable String clinicId,
+           @PathVariable String branchId,
+           @PathVariable String patientId){
+	   return customerService.getByClinicIdAndBranchId(clinicId, branchId,patientId);
+   }
 
 }

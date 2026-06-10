@@ -14,6 +14,7 @@ import com.dermaCare.customerService.dto.FavouriteDoctorsDTO;
 import com.dermaCare.customerService.dto.FirstVisitHistoryRequest;
 import com.dermaCare.customerService.dto.LoginDTO;
 import com.dermaCare.customerService.dto.NotificationToCustomer;
+import com.dermaCare.customerService.dto.PatientFeedbackDTO;
 import com.dermaCare.customerService.dto.TempBlockingSlot;
 import com.dermaCare.customerService.dto.TherapistRecordRequest;
 import com.dermaCare.customerService.dto.VisitHistoryRequest;
@@ -152,6 +153,13 @@ public interface CustomerService {
 		       String hospitalId,
 		        String branchId);
 
+	public Response createFeedback(
+	        PatientFeedbackDTO dto);
+	
+	public ResponseEntity<Response> getByClinicIdAndBranchId(
+		      String clinicId,
+		      String branchId,
+		      String patientId);
 
 
 }

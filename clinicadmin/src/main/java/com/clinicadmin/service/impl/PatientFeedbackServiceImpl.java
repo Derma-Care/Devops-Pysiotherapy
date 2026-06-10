@@ -109,6 +109,29 @@ public class PatientFeedbackServiceImpl implements PatientFeedbackService {
 
         return response;
     }
+    
+    @Override
+    public Response getByClinicIdAndBranchIdAndPatientId(String clinicId,
+                                             String branchId,String patientId) {
+
+        List<PatientFeedback> feedbackList = repository
+                .findByClinicIdAndBranchIdAndPatientId(clinicId, branchId,patientId);
+
+        List<PatientFeedbackDTO> list = feedbackList
+                .stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+
+        Response response = new Response();
+
+        response.setSuccess(true);
+        response.setMessage("Feedbacks fetched successfully");
+        response.setStatus(HttpStatus.OK.value());
+        response.setData(list);
+
+        return response;
+    }
+
     // ================= UPDATE =================
 
     @Override

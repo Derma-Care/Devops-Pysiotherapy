@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import com.dermaCare.customerService.dto.CustomerLoginDTO;
 import com.dermaCare.customerService.dto.DoctorsDTO;
+import com.dermaCare.customerService.dto.PatientFeedbackDTO;
 import com.dermaCare.customerService.dto.TempBlockingSlot;
 import com.dermaCare.customerService.dto.TherapistRecordRequest;
 import com.dermaCare.customerService.util.Response;
@@ -80,6 +81,18 @@ public interface ClinicAdminFeign {
 		        @PathVariable String hospitalId,
 		        @PathVariable String branchId);
 	 
+
+	 @PostMapping("/clinic-admin/createPatientFeedback")
+	    public Response createFeedback(
+	            @RequestBody PatientFeedbackDTO dto);
+	 
+	   @GetMapping("/clinic-admin/getByPatientFeedbackClinicIdAndBranchId/{clinicId}/{branchId}/{patientId}")
+	    public ResponseEntity<Response> getByClinicIdAndBranchIdAndPatirntId(
+	            @PathVariable String clinicId,
+	            @PathVariable String branchId,
+	            @PathVariable String patientId );
+
+
 //	 @PostMapping("/clinic-admin/customers/login")
 //	    public ResponseEntity<Response> login(@RequestBody CustomerLoginDTO dto);
 //	    

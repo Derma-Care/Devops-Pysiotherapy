@@ -67,10 +67,26 @@ public class PatientFeedbackController {
 
         return service.deleteFeedback(id);
     }
+
     @GetMapping("/getByPatientFeedbackClinicIdAndBranchId/{clinicId}/{branchId}")
     public ResponseEntity<Response> getByClinicIdAndBranchId(
             @PathVariable String clinicId,
             @PathVariable String branchId) {
+
+        Response response = service
+                .getByClinicIdAndBranchId(clinicId, branchId);
+
+        return new ResponseEntity<>(
+                response,
+                HttpStatus.valueOf(response.getStatus()));
+    }
+    
+
+    @GetMapping("/getByPatientFeedbackClinicIdAndBranchId/{clinicId}/{branchId}/{patientId}")
+    public ResponseEntity<Response> getByClinicIdAndBranchIdAndPatirntId(
+            @PathVariable String clinicId,
+            @PathVariable String branchId,
+            @PathVariable String patientId ) {
 
         Response response = service
                 .getByClinicIdAndBranchId(clinicId, branchId);
