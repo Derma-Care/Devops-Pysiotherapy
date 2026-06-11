@@ -35,6 +35,14 @@ spring.lifecycle:
   timeout-per-shutdown-phase: 30s
 
 # =========================================================
+# WHATSAPP
+# =========================================================
+whatsapp:
+  auth-key: ${WHATSAPP_AUTH_KEY}
+  phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID}
+  message-id: ${WHATSAPP_MESSAGE_ID}
+
+# =========================================================
 # AWS S3
 # =========================================================
 
