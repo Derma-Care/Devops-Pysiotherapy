@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { CCard, CCardBody, CContainer, CAlert } from '@coreui/react'
+import { useNavigate } from 'react-router-dom'
 import Button from '../components/CustomButton/CustomButton'
 import CreatableSelect from 'react-select/creatable'
-import { addLabTest, getLabTests, updateAppointmentBasedOnBookingId, SavePatientPrescription } from '../../src/Auth/Auth'
+import { addLabTest, getLabTests, updateAppointmentBasedOnBookingId, SavePatientPrescription, UpdatePatientPrescription } from '../../src/Auth/Auth'
 import { COLORS } from '../Themes'
 import { useDoctorContext } from '../Context/DoctorContext'
-
+import PrescriptionPDF from '../utils/PdfGenerator'
+import { uploadPrescriptionPdf } from '../utils/S3UploadServices'
+import { pdf } from '@react-pdf/renderer'
 /* ─── Styles ──────────────────────────────────────────────────────────────── */
 const inputStyle = {
   border: '1.5px solid #b6cfe8',
@@ -85,7 +88,8 @@ function escapeHtml(str) {
 /* ══════════════════════════════════════════════════════════════════════════
    COMPONENT
 ══════════════════════════════════════════════════════════════════════════ */
-const Investigation = ({ seed = {}, onNext, setFormData, formData }) => {
+const Investigation = ({ seed = {}, onNext, setFormData, formData, patientData: patientDataProp }) => {
+  const navigate = useNavigate()
   const [selectedTests, setSelectedTests] = useState(seed.selectedTests ?? [])
   const [selectedTestOption, setSelectedTestOption] = useState(null)
   const [notes, setNotes] = useState(seed.notes ?? '')
@@ -95,7 +99,10 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData }) => {
 
   const seedRef = useRef(null)
 
-  const { patientData, clinicDetails, doctorDetails } = useDoctorContext()
+  const context = useDoctorContext()
+  const patientData = patientDataProp || context?.patientData
+  const clinicDetails = context?.clinicDetails
+  const doctorDetails = context?.doctorDetails
 
   // ── Seed sync ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -134,12 +141,13 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData }) => {
     setSelectedTestOption(null)
   }
 
-  const buildPhysioRecordPayload = () => {
+  const buildPhysioRecordPayload = (prescriptionPdf = '') => {
     const record = formData ?? {}
+    const existingRecordId = record.id || record._id || record.therapyRecordId || record.therapyrecordid || (record.therapistRecordId !== 'TR001' ? record.therapistRecordId : null)
     
     // Top-level IDs
     const bookingId = record.bookingId || patientData?.bookingId || ''
-    const clinicId = record.clinicId || patientData?.clinicId || clinicDetails?.hospitalId || ''
+   const clinicId = record.clinicId || patientData?.clinicId || clinicDetails?.hospitalId || ''
     const branchId = record.branchId || patientData?.branchId || ''
     const doctorId = doctorDetails?.doctorId || patientData?.doctorId || ''
     const doctorName = doctorDetails?.name || doctorDetails?.fullName || patientData?.doctorName || ''
@@ -236,14 +244,22 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData }) => {
     // Diagnosis
     const diag = record.diagnosis || {}
     let firstDiag = {}
-    if (Array.isArray(diag.diagnosisRows) && diag.diagnosisRows.length) {
-      firstDiag = diag.diagnosisRows[0] || {}
+    if (diag.physioDiagnosis) {
+      firstDiag = diag
+    } else if (Array.isArray(diag.diagnosisRows) && diag.diagnosisRows.length) {
+      const first = diag.diagnosisRows[0] || {}
+      if (first.physioDiagnosis) {
+        firstDiag = first
+      } else {
+        firstDiag = diag
+      }
     } else {
       firstDiag = diag
     }
 
     return {
-      therapistRecordId: record.therapistRecordId || "TR001",
+      therapistRecordId: existingRecordId || undefined,
+      therapyRecordId: existingRecordId || undefined,
       bookingId,
       clinicId,
       branchId,
@@ -357,27 +373,46 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData }) => {
         reviewNotes: '',
         modifications: '',
       },
-      prescriptionPdf: '',
+      prescription: record.prescription || formData?.prescription || {},
+      prescriptionPdf: prescriptionPdf || record.prescriptionPdf || formData?.prescriptionPdf || '',
     }
   }
 
   // ── updateStatus helper ────────────────────────────────────────────────
   const updateStatus = (status) => {
-    const bookingId = patientData?.bookingId
-    if (!bookingId) return Promise.resolve()
+    const bookingId = formData?.bookingId || patientData?.bookingId
+    console.log(`[Investigation.jsx] updateStatus called: status="${status}", bookingId="${bookingId}"`)
+    if (!bookingId) {
+      console.warn('[Investigation.jsx] Skipping status update because bookingId is missing!', { formData, patientData })
+      return Promise.resolve()
+    }
+    const setPatientData = context?.setPatientData
     return updateAppointmentBasedOnBookingId({ data: { bookingId, status } })
+      .then((res) => {
+        if (patientData && setPatientData) {
+          console.log(`[Investigation.jsx] updateStatus success, updating context patientData status to: "${status}"`)
+          setPatientData({ ...patientData, status })
+        }
+        return res
+      })
   }
 
   const handleNext = () => {
     const payload = { investigation: { selectedTests, notes } }
     setFormData?.((prev) => ({ ...prev, investigation: { selectedTests, notes } }))
-    const nextStatus = selectedTests.length > 0 ? 'Due for Investigation' : 'On-Going'
-    updateStatus(nextStatus)
-      .then(() => onNext?.(payload))
-      .catch(err => {
-        console.error('Failed to update appointment status:', err)
-        onNext?.(payload) // still navigate even if status update fails
-      })
+        onNext?.(payload)
+
+    // const nextStatus = 'On-Going'
+    // console.log(`[Investigation.jsx] handleNext triggered: nextStatus="${nextStatus}", selectedTestsCount=${selectedTests.length}`)
+    // // updateStatus(nextStatus)
+    //   .then(() => {
+    //     console.log('[Investigation.jsx] handleNext status update succeeded. Navigating...')
+    //     onNext?.(payload)
+    //   })
+    //   .catch(err => {
+    //     console.error('[Investigation.jsx] handleNext status update failed:', err)
+    //     onNext?.(payload) // still navigate even if status update fails
+    //   })
   }
 
   // ── handleSend ─────────────────────────────────────────────────────────
@@ -388,19 +423,58 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData }) => {
     }
 
     setSending(true)
+    let savedId = null
     try {
+      const response = await updateStatus('Due for Investigation')
+      console.log('Appointment status updated to Due for Investigation:', response)
+
       // ── API call to SavePatientPrescription ──
       const payloadRecord = buildPhysioRecordPayload()
-      console.log('Sending investigation payload to create record:', payloadRecord)
-      await SavePatientPrescription(payloadRecord)
+      const createPayload = { ...payloadRecord }
+      delete createPayload.therapyRecordId
+      delete createPayload.status
+      delete createPayload.therapistRecordId
+
+      console.log('Sending investigation payload to create record:', createPayload)
+      if(response.status == 200) {
+              const res = await SavePatientPrescription(createPayload)
+      console.log('SavePatientPrescription response:', res)
+       const savedRecord = res?.data || res
+        if (savedRecord) {
+        savedId = savedRecord.therapistRecordId || savedRecord.therapyRecordId || savedRecord.id || savedRecord._id || savedRecord.therapyrecordid
+      }
+     else
+      showSnackbar(response.message||'Failed to save prescription record. Investigation not sent.', 'error')
+
+
+
+      }
+    
 
       // MOCK: simulate network delay
       await new Promise((resolve) => setTimeout(resolve, 900))
 
       showSnackbar('Investigation sent to Lab Technician successfully! ✉️', 'success')
-      const payload = { investigation: { selectedTests, notes } }
-      setFormData?.((prev) => ({ ...prev, investigation: { selectedTests, notes } }))
-      await updateStatus('Due for Investigation')
+      
+      const payload = {
+        uptoInvestigation: true,
+        therapyRecordId: savedId || undefined,
+        investigation: { selectedTests, notes }
+      }
+
+      setFormData?.((prev) => {
+        const nextFormData = {
+          ...prev,
+          uptoInvestigation: true,
+          investigation: { selectedTests, notes }
+        }
+        if (savedId) {
+          nextFormData.therapyRecordId = savedId
+          nextFormData.id = savedId
+        }
+        return nextFormData
+      })
+
       onNext?.(payload)
     } catch (err) {
       console.error('Failed to send investigation:', err)
@@ -412,104 +486,90 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData }) => {
 
   // ── handlePrint ────────────────────────────────────────────────────────
   const handlePrint = async () => {
-    const today = new Date()
-    const dateStr = today.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-
-    const testsHtml = selectedTests.length > 0
-      ? selectedTests.map(t => `
-          <div style="display:inline-flex;align-items:center;background:#dbeafe;border:1px solid #b6cfe8;
-            border-radius:20px;padding:4px 12px;font-size:13px;color:#1a3a5c;font-weight:600;margin:3px;">
-            ${escapeHtml(t)}
-          </div>`).join('')
-      : '<span style="color:#8aaac8;font-size:13px;">No tests selected.</span>'
-
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
-<title>Investigation – ${escapeHtml(patientData?.name ?? '')}</title>
-<style>
-:root{--ink:#0f172a;--muted:#6b7280;--line:#e5e7eb;--accent:#1B4F8A;--bg:#fff;}
-*{box-sizing:border-box;}html,body{margin:0;padding:0;}
-body{color:var(--ink);background:var(--bg);-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-@page{size:A4;margin:12mm;}
-.page{padding:20px 24px;border:1px solid var(--line);border-radius:10px;}
-header{display:flex;align-items:center;gap:16px;padding-bottom:14px;margin-bottom:18px;border-bottom:2px solid var(--line);}
-.logo{width:110px;height:72px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
-.logo img{max-width:100%;max-height:100%;object-fit:contain;}
-.clinic-name{font-size:20px;font-weight:700;}.clinic-meta{font-size:13px;color:var(--muted);margin-top:4px;}
-.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin-bottom:16px;}
-.kv{display:flex;flex-direction:column;margin-bottom:10px;}.kv .label{font-size:12px;color:var(--muted);}.kv .value{font-size:14px;font-weight:600;padding-top:2px;}
-.section-card{border:1px solid var(--line);border-radius:10px;padding:14px;background:#fff;margin-bottom:14px;}
-.section-title{font-size:14px;font-weight:700;margin:0 0 12px 0;color:#1B4F8A;padding-bottom:8px;border-bottom:1px solid var(--line);}
-.notes-box{background:#f5f9ff;border:1px solid #b6cfe8;border-radius:8px;padding:10px 14px;font-size:14px;line-height:1.6;color:#1a3a5c;white-space:pre-wrap;}
-.footer{margin-top:22px;padding-top:12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-size:12px;color:var(--muted);}
-@media print{.no-print{display:none!important;}.page{border:none;padding:0;}}
-</style></head><body><div class="page">
-
-<header>
-  <div class="logo">${clinicDetails?.hospitalLogo ? `<img src="data:image/png;base64,${clinicDetails.hospitalLogo}" alt="Logo"/>` : ''}</div>
-  <div>
-    <div class="clinic-name">${escapeHtml(clinicDetails?.name ?? '')}</div>
-    <div class="clinic-meta">${escapeHtml(clinicDetails?.address ?? '')} • ${escapeHtml(clinicDetails?.contactNumber ?? '')}</div>
-  </div>
-</header>
-
-<div class="meta-grid">
-  <div class="kv"><div class="label">Patient Name</div><div class="value">${escapeHtml(patientData?.name ?? '-')}</div></div>
-  <div class="kv"><div class="label">Date</div><div class="value">${escapeHtml(dateStr)}</div></div>
-  <div class="kv"><div class="label">Doctor</div><div class="value">${escapeHtml(doctorDetails?.doctorName ?? '-')}</div></div>
-  <div class="kv"><div class="label">Licence No</div><div class="value">${escapeHtml(doctorDetails?.doctorLicence ?? '-')}</div></div>
-</div>
-
-<div class="section-card">
-  <div class="section-title">🔬 Recommended Investigations</div>
-  <div style="margin-bottom:${notes ? '16px' : '0'};display:flex;flex-wrap:wrap;gap:4px;">
-    ${testsHtml}
-  </div>
-  ${notes ? `
-  <div style="margin-top:12px;">
-    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Notes / Reason for Recommendation</div>
-    <div class="notes-box">${escapeHtml(notes)}</div>
-  </div>` : ''}
-</div>
-
-<div class="footer">
-  <div>Generated on ${escapeHtml(dateStr)}</div>
-  <div>${escapeHtml(clinicDetails?.name ?? '')}</div>
-</div>
-
-<div style="text-align:right;margin-top:40px;">
-  ${doctorDetails?.doctorSignature ? `<img src="${doctorDetails.doctorSignature}" alt="Signature" style="max-height:60px;"/>` : ''}
-  <div style="font-size:12px;color:#374151;margin-top:4px;">Doctor's Signature</div>
-</div>
-
-<div class="no-print" style="margin-top:12px;text-align:right;">
-  <button onclick="window.print()" style="background:#1B4F8A;color:#fff;border:0;padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer;">Print</button>
-</div>
-
-</div></body></html>`
-
-    const win = window.open('', '_blank', 'width=900,height=700')
-    if (!win) { alert('Please allow pop-ups to print.'); return }
-    win.document.open()
-    win.document.write(html)
-    win.document.close()
-    win.onload = () => { win.focus(); win.print() }
-
-    try {
-      const payloadRecord = buildPhysioRecordPayload()
-      console.log('Printing investigation payload to create record:', payloadRecord)
-      await SavePatientPrescription(payloadRecord)
-    } catch (e) {
-      console.error('Failed to save record during print:', e)
+    const patientName = patientData?.name || patientData?.fullName || 'Record'
+    const safeName = patientName.replace(/[^\w\-]+/g, '_')
+    
+    // We should make sure the generated PDF has the updated investigation tests and notes.
+    const updatedFormData = {
+      ...formData,
+      investigation: {
+        tests: selectedTests,
+        reason: notes,
+      }
     }
 
-    const payload = { investigation: { selectedTests, notes } }
-    setFormData?.((prev) => ({ ...prev, investigation: { selectedTests, notes } }))
-    updateStatus('Due for Investigation')
-      .then(() => onNext?.(payload))
-      .catch(err => {
-        console.error('Failed to update appointment status:', err)
-        onNext?.(payload) // still navigate even if status update fails
+    let savedId = null
+    try {
+      // 1. Generate PDF blob
+      const blob = await pdf(
+        <PrescriptionPDF
+          doctorData={doctorDetails}
+          clicniData={clinicDetails}
+          formData={updatedFormData}
+          patientData={patientData}
+        />
+      ).toBlob()
+
+      // 2. Upload PDF to S3
+      const pdfFile = new File([blob], `${safeName}.pdf`, { type: 'application/pdf' })
+      const prescriptionPdfKey = await uploadPrescriptionPdf(pdfFile)
+
+      // 3. Update status
+      const response = await updateStatus('Due for Investigation')
+      console.log('Appointment status updated to Due for Investigation:', response)
+
+      // 4. Build payload with S3 key and save/update record
+      const payloadRecord = buildPhysioRecordPayload(prescriptionPdfKey)
+      const record = formData ?? {}
+      const existingRecordId = record.id || record._id || record.therapyRecordId || record.therapyrecordid || (record.therapistRecordId !== 'TR001' ? record.therapistRecordId : null)
+      const shouldUpdate = !!existingRecordId
+
+      let res
+      if (shouldUpdate) {
+        console.log('Calling Update API in handlePrint with S3 key:', payloadRecord)
+        res = await UpdatePatientPrescription(payloadRecord)
+      } else {
+        const createPayload = { ...payloadRecord }
+        delete createPayload.therapyRecordId
+        delete createPayload.status
+        delete createPayload.therapistRecordId
+        console.log('Calling Save API in handlePrint with S3 key:', createPayload)
+        res = await SavePatientPrescription(createPayload)
+      }
+
+      console.log('Save/Update response:', res)
+      const savedRecord = res?.data || res
+      if (savedRecord) {
+        savedId = savedRecord.therapistRecordId || savedRecord.therapyRecordId || savedRecord.id || savedRecord._id || savedRecord.therapyrecordid
+      }
+
+      // 5. Open PDF blob in a new tab/window for print/preview
+      const url = URL.createObjectURL(blob)
+      const win = window.open(url, '_blank')
+      if (!win) {
+        alert('Please allow pop-ups to print.')
+      }
+
+      // 6. Update local form data
+      setFormData?.((prev) => {
+        const nextFormData = {
+          ...prev,
+          uptoInvestigation: true,
+          investigation: { selectedTests, notes }
+        }
+        if (savedId) {
+          nextFormData.therapyRecordId = savedId
+          nextFormData.id = savedId
+        }
+        return nextFormData
       })
+
+      // 7. Navigate back to dashboard
+      navigate('/dashboard', { replace: true })
+    } catch (e) {
+      console.error('Failed to generate/save/print record:', e)
+      showSnackbar('Failed to generate PDF. Please try again.', 'error')
+    }
   }
 
   /* ── RENDER ──────────────────────────────────────────────────────────── */
@@ -710,7 +770,7 @@ header{display:flex;align-items:center;gap:16px;padding-bottom:14px;margin-botto
         </Button>
 
         {/* Send to Lab Technician */}
-        <Button
+        {/* <Button
           style={{
             background: sending ? '#e8f0fb' : '#FFFFFF',
             color: sending ? '#8aaac8' : '#1B4F8A',
@@ -740,7 +800,7 @@ header{display:flex;align-items:center;gap:16px;padding-bottom:14px;margin-botto
           ) : (
             '✉️ Send'
           )}
-        </Button>
+        </Button> */}
 
         {/* Next */}
         <Button

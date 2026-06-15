@@ -31,6 +31,7 @@ import {
   bookingDetailsUrl,
   therapistUrl,
   therapyExercisesUrl,
+  bookingsByPatientIdUrl,
   programUrl,
   programAllUrl,
   therapyUrl,
@@ -226,6 +227,70 @@ export const SavePatientPrescription = async (prescriptionData) => {
     return result ? result : null
   } catch (error) {
     console.error('❌ Error saving prescription:', error)
+    return null
+  }
+}
+
+export const UpdatePatientPrescription = async (prescriptionData) => {
+  try {
+    if (Array.isArray(prescriptionData)) {
+      throw new Error('Expected a single object, but received an array.')
+    }
+    const id = prescriptionData.therapistRecordId || prescriptionData.therapyRecordId || prescriptionData.id || prescriptionData._id || prescriptionData.therapyrecordid
+    const response = await axios.put(
+      `${savePrescriptionbaseUrl}/updateById/${id}`,
+      prescriptionData,
+    )
+    const result = response?.data
+    console.log(result)
+    return result ? result : null
+  } catch (error) {
+    console.error('❌ Error updating prescription:', error)
+    return null
+  }
+}
+
+export const SavePrescriptionTemplate = async (templateData) => {
+  try {
+    if (Array.isArray(templateData)) {
+      throw new Error('Expected a single object, but received an array.')
+    }
+    const response = await axios.post(
+      `${savePrescriptionbaseUrl}/createTemplate`,
+      templateData,
+    )
+    const result = response?.data
+    console.log("✅ Template API Response:", result)
+    return result ? result : null
+  } catch (error) {
+    console.error('❌ Error saving prescription template:', error)
+    return null
+  }
+}
+
+export const getTemplateById = async (templateId) => {
+  try {
+    const response = await api.get(
+      `${savePrescriptionbaseUrl}/getTemplateById/${templateId}`
+    )
+    const result = response?.data
+    return result?.success ? result.data : result
+  } catch (error) {
+    console.error('❌ Error getting template by ID:', error)
+    return null
+  }
+}
+
+export const getTemplatesByClinic = async () => {
+  const clinicId = localStorage.getItem('hospitalId')
+  try {
+    const response = await api.get(
+      `${savePrescriptionbaseUrl}/getPrescriptionsByClinicId/${clinicId}`
+    )
+    const result = response?.data
+    return result?.success ? result.data : result
+  } catch (error) {
+    console.error('❌ Error fetching templates by clinic:', error)
     return null
   }
 }
@@ -437,7 +502,7 @@ export const averageRatings = async (doctorId) => {
 export const getDoctorFeedbackSummary = async (clinicId, doctorId) => {
   try {
     const response = await api.get(`${getDoctorFeedbackSummaryUrl}/${clinicId}/${doctorId}`)
-    
+
     if (response.data?.success && response.data?.data) {
       return {
         success: true,
@@ -591,10 +656,40 @@ export const ReportsData = async () => {
     return null
   }
 }
+export const getBookingsByPatientId = async ( input) => {
+  const clinicId = JSON.parse(localStorage.getItem('clinicDetails'))?.hospitalId;
+  try {
+    const url = `${baseUrl}/searchBookings/${clinicId}/${input}`
+    console.log('📡 Fetching bookings by patientId URL:', url)
+    const response = await api.get(url)
+    console.log('✅ Bookings by patientId response:', response.data)
+    let data = response.data?.data
+    if (!Array.isArray(data)) {
+      if (Array.isArray(response.data)) {
+        data = response.data
+      } else if (data && typeof data === 'object') {
+        const arrayProp = Object.values(data).find(v => Array.isArray(v))
+        if (arrayProp) data = arrayProp
+      }
+    }
+    return {
+      success: true,
+      data: Array.isArray(data) ? data : [],
+      message: response.data?.message || ''
+    }
+  } catch (error) {
+    console.error('❌ Error fetching bookings by patientId:', error)
+    return {
+      success: false,
+      data: [],
+      message: error.response?.data?.message || error.message || 'Failed to fetch'
+    }
+  }
+}
 
 export const Get_ReportsByBookingIdData = async (bookingId) => {
   try {
-    const response = await api.get(`${reportbaseUrl}/${Get_ReportsByBookingId}/${bookingId}`)
+    const response = await api.get(`${reportbaseUrl}/${Get_ReportsByBookingId}/${bookingId}?t=${Date.now()}`)
     console.log(response)
     return response.data.data
   } catch (error) {
@@ -752,10 +847,10 @@ export const getExerciseSessionsByExerciseId = async (clinicId, branchId, therap
   }
 }
 
-export const getExerciseSessionsWithRecords = async (clinicId, branchId, bookingId, patientId, therapistRecordId) => {
+export const getExerciseSessionsWithRecords = async (clinicId, branchId, bookingId, patientId, therapistId, therapistRecordId) => {
   try {
     const response = await api.get(
-      `${baseUrl}/payment/getExerciseSessionsWithRecords/${clinicId}/${branchId}/${bookingId}/${patientId}/${therapistRecordId}`
+      `${baseUrl}/payment/getExerciseSessionsWithRecords/${clinicId}/${branchId}/${bookingId}/${patientId}/${therapistId}/${therapistRecordId}`
     );
     console.log("✅ Exercise Sessions with Records:", response.data);
     return response.data;
