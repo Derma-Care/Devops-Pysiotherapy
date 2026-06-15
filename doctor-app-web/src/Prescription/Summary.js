@@ -17,7 +17,7 @@ import { COLORS } from '../Themes'
 import { useToast } from '../utils/Toaster'
 import FileUploader from './FileUploader'
 import { uploadPrescriptionPdf } from '../utils/S3UploadServices'
-import { createDoctorSaveDetails, getClinicDetails, getDoctorDetails, SavePatientPrescription } from '../Auth/Auth'
+import { createDoctorSaveDetails, getClinicDetails, getDoctorDetails, SavePatientPrescription, UpdatePatientPrescription, updateAppointmentBasedOnBookingId } from '../Auth/Auth'
 import { useDoctorContext } from '../Context/DoctorContext'
 import PrescriptionPDF from '../utils/PdfGenerator'
 import { pdf } from '@react-pdf/renderer'
@@ -784,7 +784,15 @@ const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formDa
 
   // Top-level IDs — same in both shapes
   const bookingId = record.bookingId ?? patientData?.bookingId ?? ''
-  const clinicId = record.clinicId ?? patientData?.clinicId ?? clinicDetails?.hospitalId ?? ''
+  let clinicId = ''
+  try {
+    clinicId = localStorage.getItem(JSON.parse(localStorage.getItem('doctorData'))?.hospitalId)
+  } catch (e) {
+    console.warn('Failed to get clinicId from localStorage doctorData:', e)
+  }
+  if (!clinicId) {
+    clinicId = record.clinicId ?? patientData?.clinicId ?? clinicDetails?.hospitalId ?? localStorage.getItem('hospitalId') ?? localStorage.getItem('clinicId') ?? ''
+  }
   const branchId = record.branchId ?? patientData?.branchId ?? ''
   const clinicName = clinicDetails?.name ?? patientData?.clinicName ?? ''
   const doctorId = doctorDetails?.doctorId ?? patientData?.doctorId ?? ''
@@ -803,37 +811,37 @@ const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formDa
   const complaintsAPI = record.complaints ?? {}   // from API response
   const symptomsInternal = record.symptoms ?? {}  // from internal formData
 
-  // Merge: API fields take priority when present; fall back to internal keys
+  // Merge: UI fields take priority when present; fall back to API keys
   const complaintDetails =
-    complaintsAPI.complaintDetails ||
     symptomsInternal.symptomDetails ||
+    complaintsAPI.complaintDetails ||
     patientData?.problem || ''
 
   const complaintDuration =
-    complaintsAPI.duration ||
     symptomsInternal.duration ||
+    complaintsAPI.duration ||
     patientData?.symptomsDuration || ''
 
   const selectedTherapy =
-    complaintsAPI.selectedTherapy ||
     symptomsInternal.selectedTherapy ||
+    complaintsAPI.selectedTherapy ||
     patientData?.subServiceName || ''
 
   const selectedTherapyID =
+    symptomsInternal.selectedTherapyID ||
     complaintsAPI.selectedTherapyId ||   // API key (no capital D)
     complaintsAPI.selectedTherapyID ||   // just in case
-    symptomsInternal.selectedTherapyID ||
     patientData?.subServiceId || ''
 
   const partImage =
-    complaintsAPI.painAssessmentImage ||
-    symptomsInternal.partImage || ''
+    symptomsInternal.partImage ||
+    complaintsAPI.painAssessmentImage || ''
 
   const reportImages = (() => {
     const apiImgs = complaintsAPI.reportImages
     const intImgs = symptomsInternal.attachmentImages
-    if (Array.isArray(apiImgs) && apiImgs.length) return apiImgs
     if (Array.isArray(intImgs) && intImgs.length) return intImgs
+    if (Array.isArray(apiImgs) && apiImgs.length) return apiImgs
     return []
   })()
 
@@ -888,44 +896,44 @@ const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formDa
 
   // ─── Background patient fields ────────────────────────────────────────────
   const previousInjuries =
-    isValid(complaintsAPI.previousInjuries) ? complaintsAPI.previousInjuries :
-      isValid(symptomsInternal.previousInjuries) ? symptomsInternal.previousInjuries :
+    isValid(symptomsInternal.previousInjuries) ? symptomsInternal.previousInjuries :
+      isValid(complaintsAPI.previousInjuries) ? complaintsAPI.previousInjuries :
         isValid(record.previousInjuries) ? record.previousInjuries :
           isValid(formData?.previousInjuries) ? formData.previousInjuries :
             isValid(patientData?.previousInjuries) ? patientData.previousInjuries : ''
 
   const currentMedications =
-    complaintsAPI.currentMedications ??
     symptomsInternal.currentMedications ??
+    complaintsAPI.currentMedications ??
     record.currentMedications ??
     formData?.currentMedications ??
     patientData?.currentMedications ?? ''
 
   const allergies =
-    complaintsAPI.allergies ??
     symptomsInternal.allergies ??
+    complaintsAPI.allergies ??
     record.allergies ??
     formData?.allergies ??
     patientData?.allergies ?? ''
 
   const occupation =
-    complaintsAPI.occupation ??
     symptomsInternal.occupation ??
+    complaintsAPI.occupation ??
     record.occupation ??
     formData?.occupation ??
     patientData?.occupation ?? ''
 
   const insuranceProvider =
-    complaintsAPI.insuranceProvider ??
     symptomsInternal.insuranceProvider ??
+    complaintsAPI.insuranceProvider ??
     record.insuranceProvider ??
     formData?.insuranceProvider ??
     patientData?.insuranceProvider ?? ''
 
   const activityLevels = (() => {
     const candidates = [
-      complaintsAPI.activityLevels,
       symptomsInternal.activityLevels,
+      complaintsAPI.activityLevels,
       record.activityLevels,
       formData?.activityLevels,
     ]
@@ -1025,11 +1033,7 @@ const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formDa
   const diagnosisObj = record.diagnosis ?? formData?.diagnosis ?? {}
 
   const diagnosisRows = (() => {
-    // 1. Internal shape: array of rows
-    if (Array.isArray(diagnosisObj.diagnosisRows) && diagnosisObj.diagnosisRows.length) {
-      return diagnosisObj.diagnosisRows
-    }
-    // 2. API shape: flat object with physioDiagnosis
+    // If the UI flat fields are set and not empty, use them
     if (isValid(diagnosisObj.physioDiagnosis)) {
       return [{
         physioDiagnosis: diagnosisObj.physioDiagnosis ?? '',
@@ -1039,6 +1043,13 @@ const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formDa
         differentialDiagnosis: diagnosisObj.differentialDiagnosis ?? '',
         notes: diagnosisObj.notes ?? '',
       }]
+    }
+    // Otherwise, check if we have a valid non-empty array of rows
+    if (Array.isArray(diagnosisObj.diagnosisRows) && diagnosisObj.diagnosisRows.length) {
+      const first = diagnosisObj.diagnosisRows[0] || {};
+      if (isValid(first.physioDiagnosis) || isValid(first.affectedArea)) {
+        return diagnosisObj.diagnosisRows;
+      }
     }
     return []
   })()
@@ -1117,19 +1128,23 @@ const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formDa
     const a = document.createElement('a'); a.href = url; a.download = filename
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
   }
+  console.log('Summary component initialized with record:', record, 'formData:', formData, 'patientData:', patientData)
 
   // ─── FIX: buildPayload — always sends the correct API-expected shape ──────
-  const buildPayload = (prescriptionPdf = '') => {
+  const buildPayload = (prescriptionPdf = '', isPrint = false) => {
     const firstDiag = diagnosisRows[0] ?? {}
     const followUpPayload = Array.isArray(followUpRaw) ? (followUpRaw[0] ?? {}) : (followUpRaw ?? {})
+    const existingRecordId = record.id || record._id || record.therapyRecordId || record.therapyrecordid || (record.therapistRecordId !== 'TR001' ? record.therapistRecordId : null)
 
     return {
       // 🏥 Top-level IDs 🏥
-      therapistRecordId: record.therapistRecordId || "TR001",
+      therapistRecordId: existingRecordId || undefined,
+      therapyRecordId: existingRecordId || undefined,
       bookingId,
       clinicId,
       branchId,
-      status: overallStatus || patientData?.status || 'Completed',
+      // status: isPrint ? 'Due for Investigation' : (overallStatus || 'Completed'),
+      // uptoInvestigation: isPrint || !!(record.uptoInvestigation || formData?.uptoInvestigation || patientData?.uptoInvestigation),
 
       // ── Patient Info ───────────────────────────────────────────────────
       patientInfo: {
@@ -1273,9 +1288,10 @@ const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formDa
         modifications: followUpPayload.modifications ?? '',
       },
 
-      prescriptionPdf,
+      prescription: record.prescription ?? formData?.prescription ?? {},
+      prescriptionPdf: prescriptionPdf || record.prescriptionPdf || formData?.prescriptionPdf || '',
     }
-  }
+  } 
 
   const doSave = async ({ downloadAfter = false } = {}) => {
     setSaving(true)
@@ -1287,9 +1303,54 @@ const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formDa
       const pdfFile = new File([blob], `${safeName}.pdf`, { type: 'application/pdf' })
       const prescriptionPdfKey = await uploadPrescriptionPdf(pdfFile)
 
-      const payload = buildPayload(prescriptionPdfKey)
+      const payload = buildPayload(prescriptionPdfKey, downloadAfter)
 
-      const resp = await SavePatientPrescription(payload)
+      const isUptoInvestigation = downloadAfter || !!(record.uptoInvestigation || formData?.uptoInvestigation || patientData?.uptoInvestigation)
+      console.log(isUptoInvestigation);
+      const existingRecordId = record.id || record._id || record.therapyRecordId || record.therapyrecordid || (record.therapistRecordId !== 'TR001' ? record.therapistRecordId : null)
+      // if (bookingId) {
+      //   try {
+      //     const currentStatus = patientData?.status || ''
+      //     const currentStatusNorm = currentStatus.toLowerCase().replace(/[\s_]/g, '')
+      //     const isDueOrDone = ['dueforinvestigation', 'duetoinvestigation', 'investigationdone', 'doneforinvestigation'].includes(currentStatusNorm)
+      //     const nextStatus = downloadAfter ? 'Due for Investigation' : (isDueOrDone ? currentStatus : 'In-progress')
+      //     console.log(`Updating appointment status to ${nextStatus}...`, bookingId)
+      //     await updateAppointmentBasedOnBookingId({ data: { bookingId, status: nextStatus } })
+      //   } catch (statusErr) {
+      //     console.error(`Failed to update appointment status to ${nextStatus}:`, statusErr)
+      //   }
+      // }
+
+      const shouldUpdate = !!existingRecordId&&isUptoInvestigation
+
+      let resp
+      if (shouldUpdate) {
+        console.log('Calling Update API on Save...', payload)
+        const createPayload = { ...payload }
+
+       resp = await UpdatePatientPrescription(createPayload)
+       console.log(resp)
+      if (resp) {
+  try {
+    await updateAppointmentBasedOnBookingId({
+      data: { bookingId, status: 'In-progress' }
+    })
+  } catch (err) {
+    console.error('Status update failed:', err)
+  }}
+
+
+
+      } else {
+        console.log('Calling Create API on Save...', payload)
+        const createPayload = { ...payload }
+
+        delete createPayload.therapyRecordId
+        delete createPayload.status
+        delete createPayload.therapistRecordId
+        resp = await SavePatientPrescription(createPayload)
+      }
+
       if (resp) {
         success('Record saved successfully!', { title: 'Success' })
         if (downloadAfter) downloadBlob(blob, `${safeName}.pdf`)
@@ -1749,10 +1810,10 @@ const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formDa
 
       {/* ── Sticky Bottom Bar ── */}
       <div style={{ position: 'fixed', bottom: 0, left: sidebarWidth ? `${sidebarWidth}px` : 0, width: sidebarWidth ? `calc(100vw - ${sidebarWidth}px)` : '100vw', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '8px 24px', zIndex: 999, boxShadow: '0 -2px 10px rgba(27,79,138,0.12)', borderTop: '2px solid #1B4F8A' }}>
-        <Button customColor="#1B4F8A" color="#FFFFFF" style={{ borderRadius: '20px', fontWeight: 700, padding: '5px 20px', fontSize: 12, boxShadow: '0 2px 8px rgba(27,79,138,0.30)', border: '1.5px solid #1B4F8A' }}
+        {/* <Button customColor="#1B4F8A" color="#FFFFFF" style={{ borderRadius: '20px', fontWeight: 700, padding: '5px 20px', fontSize: 12, boxShadow: '0 2px 8px rgba(27,79,138,0.30)', border: '1.5px solid #1B4F8A' }}
           onClick={() => { setClickedSaveTemplate(true); onSaveTemplate?.(); info('Template saved!', { title: 'Template' }) }}>
           {!updateTemplate ? '💾 Save as Template' : '🔄 Update Template'}
-        </Button>
+        </Button> */}
         {saving && <CSpinner size="sm" style={{ color: '#1B4F8A' }} />}
         <Button customColor="#1B4F8A" color="#FFFFFF" style={{ borderRadius: '20px', fontWeight: 700, padding: '5px 20px', fontSize: 12, boxShadow: '0 2px 8px rgba(27,79,138,0.30)', border: '1.5px solid #1B4F8A' }}
           onClick={() => { setPendingAction(ACTIONS.SAVE); clickedSaveTemplate ? doSave() : setShowTemplateModal(true) }} disabled={saving}>
