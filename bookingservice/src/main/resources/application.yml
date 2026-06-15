@@ -38,9 +38,10 @@ spring.lifecycle:
 # WHATSAPP
 # =========================================================
 whatsapp:
+  base-url: ${WHATSAPP_BASE_URL}
   auth-key: ${WHATSAPP_AUTH_KEY}
   phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID}
-  message-id: ${WHATSAPP_MESSAGE_ID}
+  booking-confirmation-template-id: ${WHATSAPP_BOOKING_CONFIRMATION_TEMPLATE_ID}
 
 # =========================================================
 # AWS S3
