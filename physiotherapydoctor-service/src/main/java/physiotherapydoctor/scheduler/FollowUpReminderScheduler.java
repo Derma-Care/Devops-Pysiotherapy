@@ -30,11 +30,11 @@ public class FollowUpReminderScheduler {
     // RUNS EVERY DAY AT 7:00 AM IST
     // =====================================================
 
- // RUNS EVERY DAY AT 4:40 PM IST
-    @Scheduled(cron = "0 40 16 * * *", zone = "Asia/Kolkata")
+ // RUNS EVERY DAY AT 5:10 PM IST
+    @Scheduled(cron = "0 10 17 * * *", zone = "Asia/Kolkata")
     public void sendFollowUpReminders() {
 
-        log.info("FollowUp reminder scheduler started at 4:40 PM");
+        log.info("FollowUp reminder scheduler started at 5:10 PM");
 
         try {
 
