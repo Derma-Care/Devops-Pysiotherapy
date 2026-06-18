@@ -1,18 +1,21 @@
+import axios from 'axios'
 import api from './axiosInterceptor'
 import {
   appointmentsbaseUrl,
   appointmentsCountbaseUrl,
   clinicbaseUrl,
   doctorbaseUrl,
-  updateLoginEndpoint,
+  updatePasswordEndpoint,
+  updateAvailabilityEndpoint,
+  getDoctorByIdEndpoint,
   testsbaseUrl,
   diseasesbaseUrl,
   treatmentsbaseUrl,
   ratingsbaseUrl,
+  getDoctorFeedbackSummaryUrl,
   savePrescriptionbaseUrl,
   todayappointmentsbaseUrl,
-  addDiseaseUrl, getVisitHistoryByPatientIdAndDoctorIdEndpoint,
-  // visitHistoryEndpoint,
+  addDiseaseUrl,
   getdoctorSaveDetailsEndpoint,
   Get_ReportsByBookingId,
   reportbaseUrl,
@@ -24,15 +27,30 @@ import {
   labtestsupdatedbase,
   addtreatmentUrl,
   visitHistoryBypatientIdAndBookingId,
-  todayfutureappointmentsbaseUrl
+  todayfutureappointmentsbaseUrl,
+  bookingDetailsUrl,
+  therapistUrl,
+  therapyExercisesUrl,
+  bookingsByPatientIdUrl,
+  programUrl,
+  programAllUrl,
+  therapyUrl,
+  exerciseUrl,
+  packageUrl,
+  packageUrlId,
+  programUrlId,
+  therapyUrlId,
+  exerciseUrlId,
+  getInProgressDetailsEndpoint,
+  visitHistoryByPatientIdAndBookingIdEndpoint,
+  ipUrl,
 } from './BaseUrl'
 
 export const postLogin = async (payload, endpoint) => {
   try {
     const response = await api.post(`${endpoint}`, payload, {
-      validateStatus: () => true, // ✅ handle 400/404 in try block
+      validateStatus: () => true,
     })
-
     console.log('Login Response:', response.data)
     return response.data
   } catch (error) {
@@ -44,31 +62,21 @@ export const postLogin = async (payload, endpoint) => {
   }
 }
 
-// export const postLogin = async (payload,endpoint) => {
-//   try {
-
-//     const response = await api.post(`${endpoint}`, payload);
-//     console.log('Login Success:', response.data);
-//     return response.data;
-//   } catch (error) {
-//     console.error('Login Failed:', error);
-//     throw error;
-//   }
-// };
-
 export const getDoctorDetails = async () => {
   const doctorId = localStorage.getItem('doctorId')
+  if (!doctorId || doctorId === 'undefined') return null
   try {
-    const response = await api.get(`${doctorbaseUrl}/${doctorId}`)
-
-    const doctorData = response.data.data
-
-    console.log('✅ Doctor Details:', doctorData) // <-- Console log added here
-
-    return doctorData // return only doctor data
+    const response = await api.get(`${doctorbaseUrl}/getDoctorById/${doctorId}`)
+    return response.data?.data || response.data
   } catch (error) {
-    console.error('❌ Error fetching doctor details:', error)
-    throw error
+    console.error('❌ Error fetching from physiotherapy-doctor, trying /api/doctors...', error)
+    try {
+      const altResponse = await api.get(`${ipUrl}/api/doctors/getDoctorById/${doctorId}`)
+      return altResponse.data?.data || altResponse.data
+    } catch (err2) {
+      console.error('❌ Both doctor detail APIs failed.', err2)
+      return null
+    }
   }
 }
 
@@ -85,76 +93,94 @@ export const getClinicDetails = async () => {
 }
 
 export const getTodayAppointments = async () => {
-  const doctorId = localStorage.getItem("doctorId");
-  const hospitalId = localStorage.getItem("hospitalId");
-
+  const doctorId = localStorage.getItem("doctorId")
+  const hospitalId = localStorage.getItem("hospitalId")
   try {
     const response = await api.get(
       `${todayappointmentsbaseUrl}/${hospitalId}/${doctorId}`,
-       { responseType: 'json' }
-    );
-
+      { responseType: 'json' }
+    )
     return {
       statusCode: response.data?.statusCode ?? response.status ?? 500,
       data: Array.isArray(response.data?.data) ? response.data.data : [],
       message: response.data?.message ?? "No message from server",
-    };
+    }
   } catch (error) {
     return {
       statusCode: error.response?.status ?? 500,
       data: [],
       message: error.message ?? "Network Error",
-    };
+    }
   }
-};
+}
 
 export const getTodayFutureAppointments = async () => {
-  const doctorId = localStorage.getItem("doctorId");
-  const hospitalId = localStorage.getItem("hospitalId");
-
+  const doctorId = localStorage.getItem("doctorId")
+  const hospitalId = localStorage.getItem("hospitalId")
   try {
     const response = await api.get(
       `${todayfutureappointmentsbaseUrl}/${doctorId}`,
-       { responseType: 'json' }
-    );
-
+      { responseType: 'json' }
+    )
     return {
       statusCode: response.data?.statusCode ?? response.status ?? 500,
       data: Array.isArray(response.data?.data) ? response.data.data : [],
       message: response.data?.message ?? "No message from server",
-    };
+    }
   } catch (error) {
     return {
       statusCode: error.response?.status ?? 500,
       data: [],
       message: error.message ?? "Network Error",
-    };
+    }
   }
-};
+}
 
-export const getAppointments = async (number) => {
+export const getAppointments = async (status, branchId) => {
   const doctorId = localStorage.getItem('doctorId')
   const hospitalId = localStorage.getItem('hospitalId')
-
+  const effectiveBranchId = branchId
   try {
-    const response = await api.get(`${appointmentsbaseUrl}/${hospitalId}/${doctorId}/${number}`)
+    const formattedStatus = status.toLowerCase();
+    const response = await api.get(`${appointmentsbaseUrl}/${hospitalId}/${effectiveBranchId}/${doctorId}/${formattedStatus}`)
+    console.log(`📡 getAppointments(${status}) raw:`, response.data)
 
-    // response.data might be { success: true, data: [...] }
-    const appointments = response?.data?.data
-    return Array.isArray(appointments) ? appointments : []
+    // Check various common locations for the array
+    let data = response?.data?.data
+    if (!Array.isArray(data)) {
+      if (Array.isArray(response?.data)) {
+        data = response.data
+      } else if (Array.isArray(response?.data?.data?.appointments)) {
+        data = response.data.data.appointments
+      } else if (Array.isArray(response?.data?.data?.list)) {
+        data = response.data.data.list
+      } else if (data && typeof data === 'object') {
+        // If data is an object, try to find any array property
+        const arrayProp = Object.values(data).find(v => Array.isArray(v))
+        if (arrayProp) data = arrayProp
+      }
+    }
+
+    return {
+      success: true,
+      data: Array.isArray(data) ? data : [],
+      message: response?.data?.message || ""
+    }
   } catch (error) {
-    console.error('❌ Error fetching appointment details:', error)
-    return []
+    console.error('❌ Error fetching appointments:', error)
+    return {
+      success: false,
+      data: [],
+      message: error.response?.data?.message || error.message || "Failed to fetch appointments"
+    }
   }
 }
 
 export const getAppointmentsCount = async (number) => {
   const doctorId = localStorage.getItem('doctorId')
   const hospitalId = localStorage.getItem('hospitalId')
-
   try {
     const response = await api.get(`${appointmentsCountbaseUrl}/${hospitalId}/${doctorId}`)
-
     return response?.data ?? { completedAppointmentsCount: 0 }
   } catch (error) {
     console.error('Error fetching completed appointments count:', error)
@@ -168,7 +194,6 @@ export const SavePrescription = async (prescriptionData) => {
       `${savePrescriptionbaseUrl}/createPrescription`,
       prescriptionData,
     )
-
     const result = response?.data
     return result?.success ? result.data : null
   } catch (error) {
@@ -180,7 +205,6 @@ export const SavePrescription = async (prescriptionData) => {
 export const SearchPrescription = async () => {
   try {
     const response = await api.get(`${savePrescriptionbaseUrl}/searchMedicines`)
-
     const result = response?.data
     return result?.success ? result.data : []
   } catch (error) {
@@ -189,20 +213,15 @@ export const SearchPrescription = async () => {
   }
 }
 
-//presrcption template
-
 export const SavePatientPrescription = async (prescriptionData) => {
   try {
-    // ✅ Ensure it's a plain object
     if (Array.isArray(prescriptionData)) {
       throw new Error('Expected a single object, but received an array.')
     }
-
-    const response = await api.post(
-      `${savePrescriptionbaseUrl}/createDoctorTemplate`,
+    const response = await axios.post(
+      `${savePrescriptionbaseUrl}/create`,
       prescriptionData,
     )
-
     const result = response?.data
     console.log(result)
     return result ? result : null
@@ -212,30 +231,69 @@ export const SavePatientPrescription = async (prescriptionData) => {
   }
 }
 
-//createDoctorSaveDetails
-
-export const createDoctorSaveDetails = async (prescriptionData) => {
+export const UpdatePatientPrescription = async (prescriptionData) => {
   try {
-    // ✅ Ensure it's a plain object
     if (Array.isArray(prescriptionData)) {
       throw new Error('Expected a single object, but received an array.')
     }
-
-    const response = await api.post(
-      `${savePrescriptionbaseUrl}/createDoctorSaveDetails`,
+    const id = prescriptionData.therapistRecordId || prescriptionData.therapyRecordId || prescriptionData.id || prescriptionData._id || prescriptionData.therapyrecordid
+    const response = await axios.put(
+      `${savePrescriptionbaseUrl}/updateById/${id}`,
       prescriptionData,
     )
-
     const result = response?.data
-    return result?.success ? result.data : null
+    console.log(result)
+    return result ? result : null
   } catch (error) {
-    console.error('❌ Error saving prescription:', error)
+    console.error('❌ Error updating prescription:', error)
     return null
   }
 }
 
-//gettemplate
-// {{baseUrlDoctor}}/api/doctors/searchTemplate/Atopic Dermatitis
+export const SavePrescriptionTemplate = async (templateData) => {
+  try {
+    if (Array.isArray(templateData)) {
+      throw new Error('Expected a single object, but received an array.')
+    }
+    const response = await axios.post(
+      `${savePrescriptionbaseUrl}/createTemplate`,
+      templateData,
+    )
+    const result = response?.data
+    console.log("✅ Template API Response:", result)
+    return result ? result : null
+  } catch (error) {
+    console.error('❌ Error saving prescription template:', error)
+    return null
+  }
+}
+
+export const getTemplateById = async (templateId) => {
+  try {
+    const response = await api.get(
+      `${savePrescriptionbaseUrl}/getTemplateById/${templateId}`
+    )
+    const result = response?.data
+    return result?.success ? result.data : result
+  } catch (error) {
+    console.error('❌ Error getting template by ID:', error)
+    return null
+  }
+}
+
+export const getTemplatesByClinic = async () => {
+  const clinicId = localStorage.getItem('hospitalId')
+  try {
+    const response = await api.get(
+      `${savePrescriptionbaseUrl}/getPrescriptionsByClinicId/${clinicId}`
+    )
+    const result = response?.data
+    return result?.success ? result.data : result
+  } catch (error) {
+    console.error('❌ Error fetching templates by clinic:', error)
+    return null
+  }
+}
 
 export const getDoctorSaveDetails = async (disease) => {
   console.log(disease)
@@ -255,15 +313,12 @@ export const getDoctorSaveDetails = async (disease) => {
   }
 }
 
-//get medince template
-
 export const medicineTemplate = async () => {
   const clinicId = localStorage.getItem('hospitalId')
   try {
     const response = await api.get(
       `${savePrescriptionbaseUrl}/getPrescriptionsByClinicId/${clinicId}`,
     )
-
     const result = response?.data
     return result?.success ? result.data : null
   } catch (error) {
@@ -283,91 +338,72 @@ export const getAllLabTests = async () => {
     }
   } catch (error) { }
 }
-//Based on the HospitalID get all Lab tests
+
 export const getLabTests = async () => {
-  const hospitalId = localStorage.getItem("hospitalId"); // should be "H_2"
-
+  const hospitalId = localStorage.getItem("hospitalId")
   if (!hospitalId) {
-    console.warn("⚠️ No hospitalId found in localStorage");
-    return [];
+    console.warn("⚠️ No hospitalId found in localStorage")
+    return []
   }
-
   try {
-    const response = await api.get(`${labtestsbase}/${hospitalId}`);
-
+    const response = await api.get(`${labtestsbase}/${hospitalId}`)
     if (response.data?.success) {
-      console.log("✅ Lab tests:", response.data.data);
-      return response.data.data;
+      console.log("✅ Lab tests:", response.data.data)
+      return response.data.data
     } else {
-      console.error("❌ Failed to fetch lab tests:", response.data?.message || "Unknown error");
-      return [];
+      console.error("❌ Failed to fetch lab tests:", response.data?.message || "Unknown error")
+      return []
     }
   } catch (error) {
-    console.error("🚨 Error fetching lab tests:", error);
-    return [];
+    console.error("🚨 Error fetching lab tests:", error)
+    return []
   }
-};
+}
 
 export const addLabTest = async (testName) => {
-  const hospitalId = localStorage.getItem("hospitalId");
-  if (!hospitalId || !testName) return null;
-
+  const hospitalId = localStorage.getItem("hospitalId")
+  if (!hospitalId || !testName) return null
   try {
-    const response = await api.post(`${labtestsupdatedbase}`, { hospitalId, testName });
-    return response.data?.data?.[0] || testName;
+    const response = await api.post(`${labtestsupdatedbase}`, { hospitalId, testName })
+    return response.data?.data?.[0] || testName
   } catch (error) {
-    console.error("Error adding lab test:", error);
-    return testName;
+    console.error("Error adding lab test:", error)
+    return testName
   }
-};
+}
 
-
-
-// Get all diseases
 export const getAllDiseases = async () => {
-  const hospitalId = localStorage.getItem("hospitalId"); // should be "H_2"
-
+  const hospitalId = localStorage.getItem("hospitalId")
   if (!hospitalId) {
-    console.warn("⚠️ No hospitalId found in localStorage");
-    return [];
+    console.warn("⚠️ No hospitalId found in localStorage")
+    return []
   }
-
   try {
-    // ✅ must match Postman working URL
-    const response = await api.get(`${diseasesbaseUrl}/${hospitalId}`);
-
-    console.log("✅ All Diseases Response:", response.data);
-
+    const response = await api.get(`${diseasesbaseUrl}/${hospitalId}`)
+    console.log("✅ All Diseases Response:", response.data)
     if (response?.data?.success) {
-      return Array.isArray(response.data.data) ? response.data.data : [];
+      return Array.isArray(response.data.data) ? response.data.data : []
     } else {
-      console.error("❌ Failed to fetch diseases:", response?.data?.message);
-      return [];
+      console.error("❌ Failed to fetch diseases:", response?.data?.message)
+      return []
     }
   } catch (error) {
-    console.error(
-      "❌ Error fetching diseases:",
-      error.response?.data || error.message
-    );
-    return [];
+    console.error("❌ Error fetching diseases:", error.response?.data || error.message)
+    return []
   }
-};
+}
 
-
-
-// Get all treatments
 export const getAllTreatments = async () => {
-  const hospitalId = localStorage.getItem("hospitalId"); // should be "H_2"
-
+  const hospitalId = localStorage.getItem("hospitalId")
   if (!hospitalId) {
-    console.warn("⚠️ No hospitalId found in localStorage");
-    return [];
+    console.warn("⚠️ No hospitalId found in localStorage")
+    return []
   }
   try {
     const response = await api.get(`${treatmentsbaseUrl}`)
     if (response.data.success) {
       console.log('Treatments:', response.data.data)
-      return response.data.data // returns array of treatments
+      return response.data.data
     } else {
       console.error('Failed to fetch treatments:', response.data.message)
       return []
@@ -378,59 +414,45 @@ export const getAllTreatments = async () => {
   }
 }
 
-
-//Based on the Clinic ID 
 export const getAllTreatmentsByHospital = async () => {
-  const hospitalId = localStorage.getItem("hospitalId"); // should be "H_2"
-
+  const hospitalId = localStorage.getItem("hospitalId")
   if (!hospitalId) {
-    console.warn("⚠️ No hospitalId found in localStorage");
-    return [];
+    console.warn("⚠️ No hospitalId found in localStorage")
+    return []
   }
-
   try {
-    // ✅ must match Postman working URL
-    const response = await api.get(`${treatmentUrl}/${hospitalId}`);
-
-    console.log("✅ All Treatments Response:", response.data);
-
+    const response = await api.get(`${treatmentUrl}/${hospitalId}`)
+    console.log("✅ All Treatments Response:", response.data)
     if (response?.data?.success) {
-      return Array.isArray(response.data.data) ? response.data.data : [];
+      return Array.isArray(response.data.data) ? response.data.data : []
     } else {
-      console.error("❌ Failed to fetch treatments:", response?.data?.message);
-      return [];
+      console.error("❌ Failed to fetch treatments:", response?.data?.message)
+      return []
     }
   } catch (error) {
-    console.error(
-      "❌ Error fetching treatments:",
-      error.response?.data || error.message
-    );
-    return [];
+    console.error("❌ Error fetching treatments:", error.response?.data || error.message)
+    return []
   }
-};
+}
 
-//Add new treatments
 export const addTreatmentByHospital = async (treatmentName) => {
-  const hospitalId = localStorage.getItem("hospitalId");
-  if (!hospitalId || !treatmentName) return null;
-
+  const hospitalId = localStorage.getItem("hospitalId")
+  if (!hospitalId || !treatmentName) return null
   try {
-    const response = await api.post(`${addtreatmentUrl}`, { hospitalId, treatmentName });
-    return response.data?.data?.[0] || treatmentName;
+    const response = await api.post(`${addtreatmentUrl}`, { hospitalId, treatmentName })
+    return response.data?.data?.[0] || treatmentName
   } catch (error) {
-    console.error("Error adding treatment:", error);
-    return treatmentName;
+    console.error("Error adding treatment:", error)
+    return treatmentName
   }
-};
+}
 
 export const getTreatmentStatusByVisitId = async (patientId, bookingId) => {
   try {
     const response = await fetch(`${visitHistoryBypatientIdAndBookingId}/${patientId}/${bookingId}`)
-
     if (!response.ok) {
       throw new Error(`Failed to fetch treatment status (HTTP ${response.status})`)
     }
-
     const data = await response.json()
     return data
   } catch (error) {
@@ -439,26 +461,23 @@ export const getTreatmentStatusByVisitId = async (patientId, bookingId) => {
   }
 }
 
-//Ratings
 export const averageRatings = async (doctorId) => {
   try {
-    const response = await api.get(`${ratingsbaseUrl}/${doctorId}`);
-
+    const response = await api.get(`${ratingsbaseUrl}/${doctorId}`)
     if (response.data?.success && response.data?.data) {
       const {
         overallDoctorRating = 0,
         overallHospitalRating = 0,
         comments = [],
         ratingCategoryStats = [],
-      } = response.data.data;
-
+      } = response.data.data
       return {
         doctorRating: overallDoctorRating,
         hospitalRating: overallHospitalRating,
         comments,
         ratingStats: ratingCategoryStats,
         message: response.data?.message || "No patient ratings available",
-      };
+      }
     } else {
       return {
         doctorRating: 0,
@@ -466,26 +485,50 @@ export const averageRatings = async (doctorId) => {
         comments: [],
         ratingStats: [],
         message: response.data?.message || "No patient ratings available",
-      };
+      }
     }
   } catch (error) {
-    console.error("Error fetching ratings:", error);
-
+    console.error("Error fetching ratings:", error)
     return {
       doctorRating: 0,
       hospitalRating: 0,
       comments: [],
       ratingStats: [],
       message: "No patient ratings available",
-    };
+    }
   }
-};
+}
 
+export const getDoctorFeedbackSummary = async (clinicId, doctorId) => {
+  try {
+    const response = await api.get(`${getDoctorFeedbackSummaryUrl}/${clinicId}/${doctorId}`)
 
+    if (response.data?.success && response.data?.data) {
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data?.message || "Success"
+      }
+    } else {
+      return {
+        success: false,
+        data: null,
+        message: response.data?.message || "No feedback found",
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching feedback summary:", error)
+    return {
+      success: false,
+      data: null,
+      message: "No feedback found",
+    }
+  }
+}
 
 export const updateLogin = async (payload, userName) => {
   try {
-    const response = await api.put(`/api/doctors/update-password/${userName}`, payload)
+    const response = await api.put(`${doctorbaseUrl}/${updatePasswordEndpoint}/${userName}`, payload)
     return response.data
   } catch (err) {
     console.error('Update login error:', err)
@@ -493,68 +536,114 @@ export const updateLogin = async (payload, userName) => {
   }
 }
 
-// http://localhost:8080/clinic-admin/addDisease
 
-// {
-//     "disease":"skin alergy",
-//     "hospitalId":"H_1"
+
+export const getDoctorById = async (doctorId) => {
+  try {
+    const response = await api.get(`${doctorbaseUrl}/${getDoctorByIdEndpoint}/${doctorId}`)
+    return response.data
+  } catch (err) {
+    console.error('Error fetching doctor by ID:', err)
+    throw err
+  }
+}
+
+// export const getDoctorDetails = async () => {
+//   try {
+//     const doctorId = localStorage.getItem('doctorId')
+//     if (!doctorId) throw new Error("No doctorId found in localStorage")
+//     const response = await api.get(`${doctorbaseUrl}/${getDoctorByIdEndpoint}/${doctorId}`)
+//     return response.data?.data
+//   } catch (err) {
+//     console.error('Error fetching doctor details:', err)
+//     throw err
+//   }
 // }
-// Accept an object instead of just diseaseName
-export const addDisease = async ({ diseaseName, probableSymptoms, notes }) => {
-  const clinicId = localStorage.getItem('hospitalId');
 
+export const updateAvailability = async (doctorId, payload) => {
+  try {
+
+    console.log("URL =>",
+      `${doctorbaseUrl}/${updateAvailabilityEndpoint}/${doctorId}`
+    );
+
+    console.log("PAYLOAD =>", payload);
+
+    const response = await api.put(
+      `${doctorbaseUrl}/${updateAvailabilityEndpoint}/${doctorId}`,
+      payload
+    );
+
+    console.log("FULL RESPONSE =>", response);
+
+    return response.data;
+
+  } catch (err) {
+    console.error('Update availability error:', err);
+    console.log("ERROR DATA =>", err?.response?.data);
+    throw err;
+  }
+}
+
+export const addDisease = async ({ diseaseName, probableSymptoms, notes }) => {
+  const clinicId = localStorage.getItem('hospitalId')
   const payload = {
     diseaseName,
     probableSymptoms,
     notes,
     hospitalId: clinicId,
   }
-
-
   try {
-    const response = await api.post(`${addDiseaseUrl}/addDiseases`, payload);
-    return response.data;
+    const response = await api.post(`${addDiseaseUrl}/addDiseases`, payload)
+    return response.data
   } catch (err) {
-    console.error('addDisease error:', err);
-    throw err;
+    console.error('addDisease error:', err)
+    throw err
   }
-};
+}
+
+export const updateAppointmentBasedOnBookingId = async ({ data }) => {
 
 
-
-export const getVisitHistoryByPatientIdAndDoctorId = async (patientId, doctorId) => {
-  console.log(patientId);
-  console.log(doctorId);
   try {
-    const url = `${getVisitHistoryByPatientIdAndDoctorIdEndpoint}/${patientId}/${doctorId}`;
-    console.log(url);
-    const response = await api.get(url);
-    console.log("visithistory response", response.data);
-
-    // Ensure we never return null
-    return {
-      success: response.data?.success ?? false,
-      status: response.status,
-      message: response.data?.message ?? "",
-      data: response.data?.data ?? {}, // always return object
-    };
-  } catch (error) {
-    if (error.response?.status === 404) {
-      console.error("HTTP error:", error.response.status, error.response.data);
-      throw new Error("No visit history available");
-    } else if (error.request) {
-      console.error("No response received:", error.request);
-      throw new Error("No response received from server");
-    } else {
-      console.error("Error", error.message);
-      throw error;
-    }
+    const response = await api.put(`${addDiseaseUrl}/updateAppointmentBasedOnBookingId`, data)
+    return response.data
+  } catch (err) {
+    console.error('addDisease error:', err)
+    throw err
   }
-};
+}
 
 
-//reports
 
+
+// export const getVisitHistoryByPatientIdAndDoctorId = async (patientId, doctorId) => {
+//   console.log(patientId)
+//   console.log(doctorId)
+//   try {
+//     const url = `${getVisitHistoryByPatientIdAndDoctorIdEndpoint}/${patientId}/${doctorId}`
+//     console.log(url)
+//     const response = await api.get(url)
+//     console.log("visithistory response", response.data)
+//     return {
+//       success: response.data?.success ?? false,
+//       status: response.status,
+//       message: response.data?.message ?? "",
+//       data: response.data?.data ?? {},
+//     }
+//   } catch (error) {
+//     if (error.response?.status === 404) {
+//       console.error("HTTP error:", error.response.status, error.response.data)
+//       throw new Error("No visit history available")
+//     } else if (error.request) {
+//       console.error("No response received:", error.request)
+//       throw new Error("No response received from server")
+//     } else {
+//       console.error("Error", error.message)
+//       throw error
+//     }
+//   }
+// }
 
 export const ReportsData = async () => {
   try {
@@ -567,9 +656,40 @@ export const ReportsData = async () => {
     return null
   }
 }
+export const getBookingsByPatientId = async ( input) => {
+  const clinicId = JSON.parse(localStorage.getItem('clinicDetails'))?.hospitalId;
+  try {
+    const url = `${baseUrl}/searchBookings/${clinicId}/${input}`
+    console.log('📡 Fetching bookings by patientId URL:', url)
+    const response = await api.get(url)
+    console.log('✅ Bookings by patientId response:', response.data)
+    let data = response.data?.data
+    if (!Array.isArray(data)) {
+      if (Array.isArray(response.data)) {
+        data = response.data
+      } else if (data && typeof data === 'object') {
+        const arrayProp = Object.values(data).find(v => Array.isArray(v))
+        if (arrayProp) data = arrayProp
+      }
+    }
+    return {
+      success: true,
+      data: Array.isArray(data) ? data : [],
+      message: response.data?.message || ''
+    }
+  } catch (error) {
+    console.error('❌ Error fetching bookings by patientId:', error)
+    return {
+      success: false,
+      data: [],
+      message: error.response?.data?.message || error.message || 'Failed to fetch'
+    }
+  }
+}
+
 export const Get_ReportsByBookingIdData = async (bookingId) => {
   try {
-    const response = await api.get(`${reportbaseUrl}/${Get_ReportsByBookingId}/${bookingId}`)
+    const response = await api.get(`${reportbaseUrl}/${Get_ReportsByBookingId}/${bookingId}?t=${Date.now()}`)
     console.log(response)
     return response.data.data
   } catch (error) {
@@ -578,32 +698,26 @@ export const Get_ReportsByBookingIdData = async (bookingId) => {
   }
 }
 
-
 export const getAdImages = async () => {
   try {
-    const response = await api.get(`${adminBaseUrl}/categoryAdvertisement/getAll`);
-
+    const response = await api.get(`${adminBaseUrl}/categoryAdvertisement/getAll`)
     if (Array.isArray(response?.data) && response.data.length > 0) {
       return response.data
-        .filter(item => item?.mediaUrlOrImage) // keep only valid ones
-        .map(item => item.mediaUrlOrImage);
+        .filter(item => item?.mediaUrlOrImage)
+        .map(item => item.mediaUrlOrImage)
     }
-
-    console.warn("⚠ No ad media found in API response:", response.data);
-    return [];
+    console.warn("⚠ No ad media found in API response:", response.data)
+    return []
   } catch (error) {
-    console.error("❌ Error fetching ad images:", error);
-    return [];
+    console.error("❌ Error fetching ad images:", error)
+    return []
   }
-};
+}
 
-// Auth.js
 export const getAdImagesView = async () => {
   try {
-    const response = await api.get(`${adminBaseUrl}/doctorWebAds/getAll`);
-
-    console.log("📌 API Raw Response:", response.data); // <-- log full response
-
+    const response = await api.get(`${adminBaseUrl}/doctorWebAds/getAll`)
+    console.log("📌 API Raw Response:", response.data)
     if (Array.isArray(response?.data) && response.data.length > 0) {
       return response.data
         .filter((item) => item?.mediaUrlOrImage)
@@ -611,196 +725,186 @@ export const getAdImagesView = async () => {
           id: item.id,
           url: item.mediaUrlOrImage,
           type: item.type || (item.mediaUrlOrImage.endsWith(".mp4") ? "video" : "image"),
-        }));
+        }))
     }
-
-    console.warn("⚠️ No ad media found in API response:", response.data);
-    return [];
+    console.warn("⚠️ No ad media found in API response:", response.data)
+    return []
   } catch (error) {
-    console.error("❌ Error fetching ads:", error);
-    return [];
+    console.error("❌ Error fetching ads:", error)
+    return []
   }
-};
+}
 
-
-// Save uploaded images
 export const saveImagesToServer = async (files) => {
   try {
-    console.log("📤 Sending files to server:", files.map(f => f.name));
-
-    const formData = new FormData();
+    console.log("📤 Sending files to server:", files.map(f => f.name))
+    const formData = new FormData()
     files.forEach((file) => {
-      formData.append("images", file, file.name);
-    });
-
+      formData.append("images", file, file.name)
+    })
     const response = await api.post(`${adminBaseUrl}/images/save`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
-    });
-
-    console.log("✅ Save API Response:", response.data);
-    return response.data;
+    })
+    console.log("✅ Save API Response:", response.data)
+    return response.data
   } catch (error) {
-    console.error("❌ Error saving images:", error);
-    throw error;
+    console.error("❌ Error saving images:", error)
+    throw error
   }
-};
+}
 
-// Load images
 export const loadImagesFromServer = async () => {
   try {
-    console.log("📥 Requesting saved images...");
-
-    const response = await api.get(`${adminBaseUrl}/images/getAll`);
-
-    console.log("✅ Load API Response:", response.data);
-
+    console.log("📥 Requesting saved images...")
+    const response = await api.get(`${adminBaseUrl}/images/getAll`)
+    console.log("✅ Load API Response:", response.data)
     if (Array.isArray(response?.data) && response.data.length > 0) {
       return response.data.map((item) => ({
         id: item.id,
         url: item.url,
         type: item.type || (item.url.endsWith(".mp4") ? "video" : "image"),
         savedAt: item.savedAt || null,
-      }));
+      }))
     }
-
-    console.warn("⚠️ No images found:", response.data);
-    return [];
+    console.warn("⚠️ No images found:", response.data)
+    return []
   } catch (error) {
-    console.error("❌ Error loading images:", error);
-    return [];
+    console.error("❌ Error loading images:", error)
+    return []
   }
-};
+}
 
-// Clear all images
 export const clearImagesOnServer = async () => {
   try {
-    console.log("🗑️ Requesting server to clear all images...");
-
-    const response = await api.delete(`${adminBaseUrl}/images/clearAll`);
-
-    console.log("✅ Clear API Response:", response.data);
-    return response.data;
+    console.log("🗑️ Requesting server to clear all images...")
+    const response = await api.delete(`${adminBaseUrl}/images/clearAll`)
+    console.log("✅ Clear API Response:", response.data)
+    return response.data
   } catch (error) {
-    console.error("❌ Error clearing images:", error);
-    throw error;
+    console.error("❌ Error clearing images:", error)
+    throw error
   }
-};
-//doctor slots
+}
+
 export const getAvailableSlots = async (hospitalId, doctorId) => {
   try {
-    const response = await api.get(`${getDoctorSlotsEndpoint}/${hospitalId}/${doctorId}`);
-    console.log("Slots API response:", response.data);
-
+    const response = await api.get(`${getDoctorSlotsEndpoint}/${hospitalId}/${doctorId}`)
+    console.log("Slots API response:", response.data)
     if (response.data && response.data.success) {
-      const rawData = response.data.data;
-
-      // Make sure it's an array
+      const rawData = response.data.data
       const slotsData = Array.isArray(rawData)
         ? rawData.map(item => ({
           id: item.id,
           doctorId: item.doctorId,
           hospitalId: item.hospitalId,
           date: item.date,
-          availableSlots: item.availableSlots || [], // safe default
+          availableSlots: item.availableSlots || [],
           createdAt: item.createdAt,
         }))
-        : [];
-
+        : []
       return {
         slots: slotsData,
         message: response.data.message,
         status: response.data.status,
-      };
+      }
     } else {
-      throw new Error(response.data?.message || 'Failed to fetch slots');
+      throw new Error(response.data?.message || 'Failed to fetch slots')
     }
   } catch (error) {
-    console.error('Error fetching slots:', error);
+    console.error('Error fetching slots:', error)
     return {
       slots: [],
       message: error.message || 'Something went wrong',
       status: 'error',
-    };
+    }
   }
-};
-
-
-
-// export const getNotifications = async () => {
-//   try {
-//     const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:5000";
-//     const res = await fetch(`${apiUrl}/notifications`, {
-//       method: 'GET',
-//       headers: {
-//         'Content-Type': 'application/json',
-//         Authorization: `Bearer ${localStorage.getItem('token')}`,
-//       },
-//     });
-//     return await res.json();
-//   } catch (err) {
-//     console.error("❌ Error fetching notifications:", err);
-//     return { statusCode: 500, message: "Failed to fetch notifications" };
-//   }
-// };
+}
 
 export const getInProgressDetails = async (patientId, bookingId) => {
   try {
     const response = await api.get(
-      `${baseUrl}/doctor In-progressDetails/${patientId}/${bookingId}`
-    )
-    console.log("✅ In-progress details:", response.data.data)
-    return response.data.data
+      `${getInProgressDetailsEndpoint}/${patientId}/${bookingId}`
+    );
+
+    console.log("✅ In-progress details:", response.data.data);
+    return response.data.data;
   } catch (error) {
-    console.error("❌ Error fetching in-progress details:", error)
-    throw error
+    console.error("❌ Error fetching in-progress details:", error);
+    throw error;
+  }
+};
+
+export const getExerciseSessionsByExerciseId = async (clinicId, branchId, therapistRecordId, patientId, exerciseId) => {
+  try {
+    const url = `${ipUrl}/api/customer/therapy-records/getByClinicBranchExercise/${clinicId}/${branchId}/${therapistRecordId}/${patientId}/${exerciseId}`
+    console.log('📡 getExerciseSessionsByExerciseId requesting remote URL:', url)
+    const response = await api.get(url)
+    console.log('✅ getExerciseSessionsByExerciseId response:', response.data)
+    return response.data
+  } catch (error) {
+    console.error('❌ getExerciseSessionsByExerciseId Error:', error)
+    return null
   }
 }
 
-// Fetch all medicine types
-export const getMedicineTypes = async () => {
-  const clinicId = localStorage.getItem("hospitalId");
-
+export const getExerciseSessionsWithRecords = async (clinicId, branchId, bookingId, patientId, therapistId, therapistRecordId) => {
   try {
-    const response = await api.get(`${baseUrl}/getMedicineTypes/${clinicId}`);
-    console.log("Fetched MedicineTypes:", response.data);
-
-    return response.data?.data?.medicineTypes || [];
+    const response = await api.get(
+      `${baseUrl}/payment/getExerciseSessionsWithRecords/${clinicId}/${branchId}/${bookingId}/${patientId}/${therapistId}/${therapistRecordId}`
+    );
+    console.log("✅ Exercise Sessions with Records:", response.data);
+    return response.data;
   } catch (error) {
-    console.error("Failed to fetch medicine types:");
-    if (error.response) {
-      console.error("Status:", error.response.status);
-      console.error("Data:", error.response.data);
-    } else {
-      console.error(error.message);
-    }
-    return [];
+    console.error("❌ Error fetching exercise sessions with records:", error);
+    throw error;
   }
 };
 
-// ✅ Add a new medicine type (return just the new type)
-export const addMedicineType = async (newType) => {
-  const clinicId = localStorage.getItem("hospitalId");
+export const getCompletedTherapyRecord = async (clinicId, branchId, therapistRecordId, sessionId) => {
+  try {
+    const response = await api.get(
+      `${baseUrl}/getCompletedTherapyRecord/${clinicId}/${branchId}/${therapistRecordId}/${sessionId}`
+    );
+    console.log("✅ Completed Therapy Record:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("❌ Error fetching completed therapy record:", error);
+    throw error;
+  }
+};
 
+export const getMedicineTypes = async () => {
+  const clinicId = localStorage.getItem("hospitalId")
+  try {
+    const response = await api.get(`${baseUrl}/getMedicineTypes/${clinicId}`)
+    console.log("Fetched MedicineTypes:", response.data)
+    return response.data?.data?.medicineTypes || []
+  } catch (error) {
+    console.error("Failed to fetch medicine types:")
+    if (error.response) {
+      console.error("Status:", error.response.status)
+      console.error("Data:", error.response.data)
+    } else {
+      console.error(error.message)
+    }
+    return []
+  }
+}
+
+export const addMedicineType = async (newType) => {
+  const clinicId = localStorage.getItem("hospitalId")
   try {
     const response = await api.post(`${baseUrl}/search-or-add`, {
       clinicId,
-      medicineTypes: [newType], // must be array
-    });
-
-    console.log("✅ Add MedicineType Response:", response.data);
-
-    // ✅ return only the single newly created type
-    return newType;
+      medicineTypes: [newType],
+    })
+    console.log("✅ Add MedicineType Response:", response.data)
+    return newType
   } catch (error) {
-    console.error("❌ Failed to add medicine type:", error.response?.data || error.message);
-
-    return newType; // fallback
+    console.error("❌ Failed to add medicine type:", error.response?.data || error.message)
+    return newType
   }
-};
-
-
-
-
+}
 
 export const getPatientVitals = async (bookingId, patientId) => {
   if (!bookingId || !patientId) {
@@ -809,11 +913,18 @@ export const getPatientVitals = async (bookingId, patientId) => {
   }
 
   try {
-    const response = await api.get(`${baseUrl}/getVitals/${bookingId}/${patientId}`);
+    const response = await api.get(
+      `${addDiseaseUrl}/getVitals/${bookingId}/${patientId}`
+    );
 
     if (response?.data?.success) {
-      const vitals = response.data.data || {};
-      console.log('Fetched Vitals:', vitals); // ✅ log vitals
+      const vitalsArray = response.data.data || [];
+
+      console.log('Fetched Vitals Array:', vitalsArray);
+
+      const vitals = vitalsArray[0] || {}; // ✅ FIX HERE
+
+      console.log('Vitals Object:', vitals);
 
       return {
         height: vitals.height ?? '—',
@@ -821,10 +932,12 @@ export const getPatientVitals = async (bookingId, patientId) => {
         bloodPressure: vitals.bloodPressure ?? '—',
         temperature: vitals.temperature ?? '—',
         bmi: vitals.bmi ?? '—',
-        ...vitals, // preserve any extra fields
       };
     } else {
-      console.warn('Vitals not found or API returned failure:', response?.data?.message);
+      console.warn(
+        'Vitals not found or API returned failure:',
+        response?.data?.message
+      );
       return null;
     }
   } catch (error) {
@@ -833,91 +946,312 @@ export const getPatientVitals = async (bookingId, patientId) => {
   }
 };
 
-
-// Fetch all future booked appointments for a doctor
 export const getBookedSlots = async (doctorId) => {
   try {
-    const response = await api.get(`${baseUrl}/getDoctorFutureAppointments/${doctorId}`);
-    
-    console.log("API response for booked slots:", response); // full response
-    console.log("Appointments array:", response.data?.data); // only the appointments array
-
-    // return the array of appointments
-    return response.data?.data || [];
+    const response = await api.get(`${baseUrl}/getDoctorFutureAppointments/${doctorId}`)
+    console.log("API response for booked slots:", response)
+    console.log("Appointments array:", response.data?.data)
+    return response.data?.data || []
   } catch (error) {
-    console.error("Failed to fetch appointments:", error);
-    return [];
+    console.error("Failed to fetch appointments:", error)
+    return []
   }
-};
-
-
+}
 
 export const getAllMedicines = async () => {
-  const clinicId = localStorage.getItem("hospitalId");
-
+  const clinicId = localStorage.getItem("hospitalId")
   if (!clinicId) {
-    console.warn("⚠️ No hospitalId found in localStorage");
-    return [];
+    console.warn("⚠️ No hospitalId found in localStorage")
+    return []
   }
-
   try {
-    const url = `${baseUrl}/getListOfMedicinesByClinicId/${clinicId}`;
-    console.log("📡 Fetching medicines from:", url);
-
-    const response = await api.get(url);
-    console.log("✅ Raw Medicines Response:", response.data);
-
+    const url = `${baseUrl}/getListOfMedicinesByClinicId/${clinicId}`
+    console.log("📡 Fetching medicines from:", url)
+    const response = await api.get(url)
+    console.log("✅ Raw Medicines Response:", response.data)
     if (response?.data?.success && Array.isArray(response.data.data)) {
-      const medicines = response.data.data[0]?.listOfMedicines || [];
-
-      // Convert array of strings → array of objects with id + name
+      const medicines = response.data.data[0]?.listOfMedicines || []
       const normalized = medicines.map((name, index) => ({
-        id: index, // you can replace with a UUID if needed
+        id: index,
         name,
-      }));
-
-      console.log("📋 Extracted Medicines:", normalized);
-      return normalized;
+      }))
+      console.log("📋 Extracted Medicines:", normalized)
+      return normalized
     } else {
-      console.error("❌ Failed to fetch medicines:", response?.data?.message);
-      return [];
+      console.error("❌ Failed to fetch medicines:", response?.data?.message)
+      return []
     }
   } catch (error) {
-    console.error("❌ Error fetching medicines:", error.response?.data || error.message);
-    return [];
+    console.error("❌ Error fetching medicines:", error.response?.data || error.message)
+    return []
   }
-};
+}
 
-// ✅ Add or Search Medicine
 export const addOrSearchMedicine = async (medicineName) => {
-  const clinicId = localStorage.getItem("hospitalId");
-
+  const clinicId = localStorage.getItem("hospitalId")
   if (!clinicId) {
-    console.warn("⚠️ No hospitalId found in localStorage");
-    return null;
+    console.warn("⚠️ No hospitalId found in localStorage")
+    return null
   }
-
   try {
-    const url = `${baseUrl}/addOrSearchListOfMedicine`;
+    const url = `${baseUrl}/addOrSearchListOfMedicine`
     const payload = {
       clinicId,
-      listOfMedicines: [medicineName], // 👈 always send as array
-    };
-
-    console.log("📡 Adding medicine:", payload);
-
-    const response = await api.post(url, payload);
-
+      listOfMedicines: [medicineName],
+    }
+    console.log("📡 Adding medicine:", payload)
+    const response = await api.post(url, payload)
     if (response?.data?.success) {
-      console.log("✅ Medicine added:", response.data);
-      return true;
+      console.log("✅ Medicine added:", response.data)
+      return true
     } else {
-      console.error("❌ Failed to add medicine:", response?.data?.message);
-      return false;
+      console.error("❌ Failed to add medicine:", response?.data?.message)
+      return false
     }
   } catch (error) {
-    console.error("❌ Error adding medicine:", error.response?.data || error.message);
-    return false;
+    console.error("❌ Error adding medicine:", error.response?.data || error.message)
+    return false
   }
-};
 
+
+}
+
+export const getBookingDetails = async (booking) => {
+  const bookingId = typeof booking === 'object' ? booking.bookingId : booking
+  if (!bookingId) {
+    console.warn('⚠️ getBookingDetails called without a valid bookingId')
+    return null
+  }
+  try {
+    const url = `${ipUrl}/api/customer/getBookedService/${bookingId}`
+    console.log('📡 getBookingDetails requesting:', url)
+    const response = await api.get(url)
+
+    // The API might return { data: { ... } } or { success: true, data: { ... } }
+    // We want the inner data object.
+    if (response.data?.data) {
+      return response.data.data
+    }
+    return response.data
+  } catch (error) {
+    console.error('❌ Booking API Error:', error)
+    return null
+  }
+}
+
+export const getTherapists = async (clinicId, branchId) => {
+  try {
+    const response = await api.get(`${therapistUrl}/${clinicId}/${branchId}`)
+    console.log("✅ Therapist API:", response.data)
+    const raw = response.data?.data ?? response.data ?? []
+    return Array.isArray(raw) ? raw : []
+  } catch (error) {
+    console.error("❌ Therapist API Error:", error)
+    return []
+  }
+}
+
+export const getTherapyExercises = async (clinicId, branchId) => {
+  try {
+    const response = await api.get(`${therapyExercisesUrl}/${clinicId}/${branchId}`)
+    console.log('✅ Therapy Exercises API:', response.data)
+    return response.data?.data || []
+  } catch (error) {
+    console.error('❌ Therapy Exercises API Error:', error)
+    return []
+  }
+}
+
+export const getFollowUpRecord = async (clinicId, branchId, patientId, bookingId) => {
+  try {
+    const response = await api.get(`${ipUrl}/api/physiotherapy-doctor/get-record/${clinicId}/${branchId}/${patientId}/${bookingId}`)
+    console.log('✅ FollowUp Record API:', response.data)
+    return response.data?.data || response.data
+  } catch (error) {
+    console.error('❌ FollowUp Record API Error:', error)
+    return null
+  }
+}
+
+
+export const createDoctorSaveDetails = async (prescriptionData) => {
+  try {
+    if (!prescriptionData || typeof prescriptionData !== 'object' || Array.isArray(prescriptionData)) {
+      throw new Error('Expected a single object, but received invalid data.')
+    }
+    console.log("📦 Sending Payload:", prescriptionData)
+    const response = await api.post(
+      `${savePrescriptionbaseUrl}/create`,
+      prescriptionData
+    )
+    console.log("✅ API Response:", response.data)
+    const result = response?.data
+    return result?.success ? result.data : result
+  } catch (error) {
+    console.error('❌ Error saving prescription:', error?.response || error.message)
+    return null
+  }
+}
+
+// =============================
+// ✅ Get packages by clinicId & branchId (list)
+export const getPackagesByBranch = async (clinicId, branchId) => {
+  try {
+    const response = await api.get(`${packageUrl}/${clinicId}/${branchId}`)
+    console.log('✅ Packages by Branch API:', response.data)
+    const raw = response.data?.data ?? response.data ?? []
+    return Array.isArray(raw) ? raw : []
+  } catch (error) {
+    console.error('❌ Packages by Branch API Error:', error)
+    return []
+  }
+}
+
+// ✅ FIX: Get single package detail by ID — returns the full object, NOT forced into array
+export const getPackagesByBranchAndId = async (clinicId, branchId, packagesId) => {
+  try {
+    const response = await api.get(`${packageUrlId}/${clinicId}/${branchId}/${packagesId}`)
+    console.log('✅ Package Detail API (full response):', response.data)
+    // The API returns { success, data: { packageId, programs: [...], ... }, message, status }
+    // We must return the data object directly — NOT coerce it to an array
+    const raw = response.data?.data ?? response.data ?? null
+    // If raw is an array (unexpected), take the first element; otherwise return as-is
+    return Array.isArray(raw) ? (raw[0] ?? null) : raw
+  } catch (error) {
+    console.error('❌ Package Detail API Error:', error)
+    return null
+  }
+}
+
+// ===============================
+// ✅ Get programs by clinicId & branchId
+export const getProgramsByBranch = async (clinicId, branchId) => {
+  try {
+    const response = await api.get(`${programUrl}/${clinicId}/${branchId}`)
+    console.log('✅ Programs by Branch API:', response.data)
+    const raw = response.data?.data ?? response.data ?? []
+    return Array.isArray(raw) ? raw : []
+  } catch (error) {
+    console.error('❌ Programs by Branch API Error:', error)
+    return []
+  }
+}
+
+export const getProgramsByBranchAndId = async (clinicId, branchId, programId) => {
+  try {
+    const response = await api.post(`${programUrlId}/${clinicId}/${branchId}/${programId}`)
+    console.log('✅ Programs by Branch+ID API:', response.data)
+    const raw = response.data?.data ?? response.data ?? null
+    return Array.isArray(raw) ? (raw[0] ?? null) : raw
+  } catch (error) {
+    console.error('❌ Programs by Branch+ID API Error:', error)
+    return null
+  }
+}
+
+// ==============================
+// ✅ Get therapies by clinicId & branchId
+export const getTherapiesByBranch = async (clinicId, branchId) => {
+  try {
+    const response = await api.get(`${therapyUrl}/${clinicId}/${branchId}`)
+    console.log('✅ Therapies by Branch API:', response.data)
+    const raw = response.data?.data ?? response.data ?? []
+    return Array.isArray(raw) ? raw : []
+  } catch (error) {
+    console.error('❌ Therapies by Branch API Error:', error)
+    return []
+  }
+}
+
+export const getTherapiesByBranchAndId = async (clinicId, branchId, therapyId) => {
+  try {
+    const response = await api.get(`${therapyUrlId}/${therapyId}/${clinicId}/${branchId}`)
+    console.log('✅ Therapy Detail API:', response.data)
+    const raw = response.data?.data ?? response.data ?? null
+    return Array.isArray(raw) ? (raw[0] ?? null) : raw
+  } catch (error) {
+    console.error('❌ Therapy Detail API Error:', error)
+    return null
+  }
+}
+
+// =============================
+// ✅ Get exercises by clinicId & branchId
+export const getExercisesByBranch = async (clinicId, branchId) => {
+  try {
+    const response = await api.get(`${exerciseUrl}/${clinicId}/${branchId}`)
+    console.log('✅ Exercises by Branch API:', response.data)
+    const raw = response.data?.data ?? response.data ?? []
+    return Array.isArray(raw) ? raw : []
+  } catch (error) {
+    console.error('❌ Exercises by Branch API Error:', error)
+    return []
+  }
+}
+
+export const getExercisesByBranchAndIdAndId = async (clinicId, branchId, exerciseId) => {
+  try {
+    const response = await api.get(`${exerciseUrlId}/${clinicId}/${branchId}/${exerciseId}`)
+    console.log('✅ Exercise Detail API:', response.data)
+    const raw = response.data?.data ?? response.data ?? null
+    return Array.isArray(raw) ? (raw[0] ?? null) : raw
+  } catch (error) {
+    console.error('❌ Exercise Detail API Error:', error)
+    return null
+  }
+}
+
+// =============================
+// ✅ Get all programs (fallback)
+export const getPrograms = async () => {
+  try {
+    const response = await api.get(`${programAllUrl}`)
+    console.log('✅ All Programs API:', response.data)
+    const raw = response.data?.data ?? response.data ?? []
+    return Array.isArray(raw) ? raw : []
+  } catch (error) {
+    console.error('❌ All Programs API Error:', error)
+    return []
+  }
+}
+
+
+export const getVisitHistoryByPatientIdAndBookingId = async (patientId, bookingId) => {
+  console.log('Fetching visit history for patientId:', patientId, 'bookingId:', bookingId)
+  try {
+    const url = `${visitHistoryByPatientIdAndBookingIdEndpoint}/${patientId}/${bookingId}`
+    console.log('Visit history URL:', url)
+    const response = await api.get(url)
+    console.log('visithistory (by booking) response', response.data)
+    return {
+      success: response.data?.success ?? false,
+      status: response.status,
+      message: response.data?.message ?? '',
+      data: response.data?.data ?? {},
+    }
+  } catch (error) {
+    // ✅ Always return object, never throw
+    if (error.response?.status === 404) {
+      return {
+        success: false,
+        status: 404,
+        message: 'No visit history found',
+        data: null,
+      }
+    } else if (error.request) {
+      return {
+        success: false,
+        status: 500,
+        message: 'No response received from server',
+        data: null,
+      }
+    } else {
+      return {
+        success: false,
+        status: 500,
+        message: error.message ?? 'Something went wrong',
+        data: null,
+      }
+    }
+  }
+}

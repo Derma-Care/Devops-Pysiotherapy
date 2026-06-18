@@ -86,7 +86,7 @@ export const AppointmentData = async () => {
   const hospitalId = localStorage.getItem('HospitalId')
   const branchId = localStorage.getItem('branchId')
   try {
-    const response = await axios.get(`${Booking_service_Url}/${getAllBookedServices}`) //TODO:chnage when apigetway call axios to http
+    const response = await axios.get(`${BASE_URL}/getAllbookingsDetailsByClinicAndBranchId/${hospitalId}/${branchId}`) //TODO:chnage when apigetway call axios to http
     return response.data
   } catch (error) {
     console.error('Error fetching service data:', error.message)
@@ -131,6 +131,23 @@ export const GetBookingByClinicIdData = async (id) => {
     throw error
   }
 }
+export const GetTodayBooking = async (id) => {
+  const hID = localStorage.getItem('HospitalId')
+  const branchId = localStorage.getItem('branchId')
+  console.log(id)
+  try {
+    const response = await axios.get(
+      `${BASE_URL}/getTodayBookingsByClinicIdAndBranchId/${hID}/${branchId}`,
+    ) //TODO:chnage when apigetway call axios to http
+    console.log(response.data)
+    return response.data
+  } catch (error) {
+    console.error('Error fetching booking by clinicId:', error.message)
+    throw error
+  }
+}
+
+
 
 // Assume `bookingDetails` is a JS object with the same structure as your Dart model
 

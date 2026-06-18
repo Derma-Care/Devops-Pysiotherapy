@@ -1,13 +1,10 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState } from 'react'
 import DoctorCard from './Doctorcard'
-import CIcon from '@coreui/icons-react'
-import { cilUser } from '@coreui/icons'
 import axios from 'axios'
 import { useHospital } from '../Usecontext/HospitalContext'
-import { ToastContainer, toast } from 'react-toastify'
+import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import sendDermaCareOnboardingEmail from '../../Utils/Emailjs'
-
 import {
   CModal,
   CModalHeader,
@@ -23,572 +20,418 @@ import {
   CFormCheck,
 } from '@coreui/react'
 import Select from 'react-select'
-import {
-  BASE_URL,
-  // subService_URL,
-  MainAdmin_URL,
-  getSubServicesbyserviceId,
-  getadminSubServicesbyserviceId,
-  getservice,
-} from '../../baseUrl'
+import { getservice } from '../../baseUrl'
 import {
   serviceDataH,
-  CategoryData,
+  // CategoryData,
   subServiceData,
   getSubServiceById,
 } from '../ProcedureManagement/ProcedureManagementAPI'
 import LoadingIndicator from '../../Utils/loader'
-import { useGlobalSearch } from '../Usecontext/GlobalSearchContext'
+import { Search, X } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faUserDoctor } from '@fortawesome/free-solid-svg-icons'
+import { faUserDoctor, faPlus } from '@fortawesome/free-solid-svg-icons'
 import { http } from '../../Utils/Interceptors'
 import { GetClinicBranches } from './DoctorAPI'
 import { showCustomToast } from '../../Utils/Toaster'
 import Pagination from '../../Utils/Pagination'
 import { emailPattern } from '../../Constant/Constants'
+import { use } from 'react'
+import { uploadFile } from '../widgets/S3UploadServiceDoctor'
+
+/* ─── Brand token ─────────────────────────────── */
+const B = {
+  600: '#185fa5',
+  800: '#0c447c',
+  50: '#e6f1fb',
+  100: '#b5d4f4',
+  400: '#378add',
+}
+
+const initialForm = {
+  doctorPicture: null,
+  doctorLicence: '',
+  doctorMobileNumber: '',
+  doctorEmail: '',
+  doctorName: '',
+  service: [],
+  subServices: [],
+  specialization: '',
+  gender: '',
+  experience: '',
+  qualification: '',
+  associationsOrMemberships: '',
+  branch: [],
+  availableDays: '',
+  availableTimes: '',
+  profileDescription: '',
+  doctorSignature: null,
+  doctorSignatureFileName: null,
+  doctorSignatureFile: null,
+  doctorPictureFile: null,
+  doctorFees: { inClinicFee: '' },
+  focusAreas: [],
+  languages: [],
+  highlights: [],
+  availableConsultations: [],
+  consultation: { inClinic: 0, videoOrOnline: 0, serviceAndTreatments: 0 },
+  dateofJoining: '',
+  emergencyContact: '',
+  aadharID: '',
+  dateofBirth: '',
+  bankAccountDetails: {
+    accountHolderName: '',
+    accountNumber: '',
+    bankName: '',
+    branchName: '',
+    ifscCode: '',
+    panCardNumber: ''
+  }
+}
+
+const SectionHeading = ({ text }) => (
+  <div className="dm-section-header">
+    <span className="dm-section-line" />
+    <span className="dm-section-text">{text}</span>
+    <span className="dm-section-line" />
+  </div>
+)
+
 const DoctorManagement = () => {
   const {
     doctorData,
     errorMessage,
     setDoctorData,
-    setSelectedHospital,
-    fetchHospitalDetails,
-    fetchDoctorDetails,
+    fetchDoctors
   } = useHospital()
 
-  // const [doctors, setDoctors] = useState([]);
+  const { user } = useHospital()
+  const can = (feature, action) => user?.permissions?.[feature]?.includes(action)
 
   const [modalVisible, setModalVisible] = useState(false)
-  const [monthlyLeaves, setMonthlyLeaves] = useState('');
-  const [newService, setNewService] = useState({
-    serviceName: '',
-    serviceId: '',
-  })
-  const [selectedServices, setSelectedServices] = useState([])
-  const clearFieldError = (field) => {
-    setFormErrors((prev) => {
-      const updated = { ...prev }
-      delete updated[field]
-      return updated
-    })
-  }
+  const [monthlyLeaves, setMonthlyLeaves] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [enabledTypes, setEnabledTypes] = useState({
-    inClinic: false,
-    online: false,
-    serviceTreatment: false,
-  })
+  const [loading, setLoading] = useState(false)
+  const [saveloading, setSaveLoading] = useState(false)
+  const [showErrorMessage, setShowErrorMessage] = useState('')
+  const [isFetchingBankDetails, setIsFetchingBankDetails] = useState(false)
 
-  const toggleType = (type) => {
-    setEnabledTypes((prev) => {
-      const updated = { ...prev, [type]: !prev[type] }
-
-      // Build availableConsultations array based on updated enabledTypes
-      const consultations = []
-      if (updated.serviceTreatment) consultations.push('Services & Treatments')
-      if (updated.inClinic) consultations.push('In-Clinic')
-      if (updated.online) consultations.push('Video/Online')
-
-      setForm((prevForm) => ({
-        ...prevForm,
-        availableConsultations: consultations,
-      }))
-
-      console.log('Available Consultations:', consultations)
-
-      return updated
-    })
-  }
-
-  const initialForm = {
-    doctorPicture: null, // file input or image URL
-    doctorLicence: '',
-    doctorMobileNumber: '',
-    doctorEmail: '',
-    doctorName: '',
-    service: [],
-    subServices: [], // Note: 'subSerives' in Java, but 'subServices' is more consistent in JS
-    specialization: '',
-    
-    gender: '',
-    experience: '',
-    qualification: '',
-    associationsOrMemberships: '',
-    branch: [],
-    availableDays: '', // array of selected days
-    availableTimes: '', // array of selected time slots
-    profileDescription: '',
-    doctorSignature: null,
-    doctorFees: {
-      
-      inClinicFee: '',
-      vedioConsultationFee: '',
-    },
-    focusAreas: [], // array of objects like [{label: '', value: ''}]
-    languages: [],
-    highlights: [],
-    availableConsultations: [],
-    consultation: {
-      inClinic: 0,
-      videoOrOnline: 0, 
-      serviceAndTreatments: 0,
-    },
-  }
-  const [form, setForm] = useState(initialForm)
-  // console.log(doctorData.data)
+  const [newService, setNewService] = useState({ serviceName: '', serviceId: '' })
+  const [selectedServices, setSelectedServices] = useState([])
+  const [selectedSubService, setSelectedSubService] = useState([])
+  const [subServiceOptions, setSubServiceOptions] = useState([])
+  const [serviceOptions, setServiceOptions] = useState([])
+  const [serviceOptionsFormatted, setServiceOptionsFormatted] = useState([])
+  const [category, setCategory] = useState([])
+  const [branchOptions, setBranchOptions] = useState([])
+  const [branchLoading, setBranchLoading] = useState(false)
+  const [isSubServiceComplete, setIsSubServiceComplete] = useState(true)
+  const [formErrors, setFormErrors] = useState({})
+  const [errors, setErrors] = useState({})
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(5)
 
   const [startDay, setStartDay] = useState('')
   const [endDay, setEndDay] = useState('')
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
-  const [category, setCategory] = useState([])
-  const [service, setService] = useState([])
-  const [selectedCategoryId, setSelectedCategoryId] = useState('')
-  const [filteredServices, setFilteredServices] = useState([])
-  const [serviceOptions, setServiceOptions] = useState([])
-  const [subServiceOptions, setSubServiceOptions] = useState([]) // ✅ ARRAY
 
-  const [selectedSubServices, setSelectedSubServices] = useState([])
-  const [selectedSubService, setSelectedSubService] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('')
-  const [formErrors, setFormErrors] = useState({})
-  const [loading, setLoading] = useState(false)
-  const [saveloading, setSaveLoading] = useState(false)
-  const [showErrorMessage, setShowErrorMessage] = useState('')
+  const [enabledTypes, setEnabledTypes] = useState({
+    inClinic: false, online: false, serviceTreatment: false,
+  })
 
-  const [serviceOptionsFormatted, setServiceOptionsFormatted] = useState([]) // ✅ Add this
-  const [isSubServiceComplete, setIsSubServiceComplete] = useState(true)
-  const [errors, setErrors] = useState({})
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(5)
+  const [form, setForm] = useState(initialForm)
+
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const times = [
+    '07:00 AM', '08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
+    '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM', '06:00 PM',
+    '07:00 PM', '08:00 PM', '09:00 PM', '10:00 PM',
+  ]
+
+  const fetchBankDetails = async (ifsc) => {
+    if (ifsc.length !== 11) return
+    setIsFetchingBankDetails(true)
+    try {
+      const response = await axios.get(`https://ifsc.razorpay.com/${ifsc}`)
+      if (response.data) {
+        setForm((p) => ({
+          ...p,
+          bankAccountDetails: {
+            ...p.bankAccountDetails,
+            bankName: response.data.BANK || '',
+            branchName: response.data.BRANCH || ''
+          }
+        }))
+        clearFieldError('bankName')
+        clearFieldError('branchName')
+        showCustomToast('Bank details fetched successfully', 'success')
+      }
+    } catch (error) {
+      showCustomToast('Could not fetch bank details. Please enter manually.', 'warning')
+    } finally {
+      setIsFetchingBankDetails(false)
+    }
+  }
+
+
+  /* ─── helpers ──────────────────────────────────── */
+  const clearFieldError = (field) =>
+    setFormErrors((prev) => { const u = { ...prev }; delete u[field]; return u })
+
+  const toggleType = (type) => {
+    setEnabledTypes((prev) => {
+      const updated = { ...prev, [type]: !prev[type] }
+      const consultations = []
+      if (updated.serviceTreatment) consultations.push('Services & Treatments')
+      if (updated.inClinic) consultations.push('In-Clinic')
+      if (updated.online) consultations.push('Video/Online')
+      setForm((f) => ({ ...f, availableConsultations: consultations }))
+      return updated
+    })
+  }
 
   const availableDays = (value, type) => {
     if (type === 'start') {
       setStartDay(value)
-      const updated = `${value} - ${endDay || ''}`.trim()
-      setForm((prev) => ({ ...prev, availableDays: updated }))
-    } else if (type === 'end') {
+      setForm((f) => ({ ...f, availableDays: `${value} - ${endDay || ''}`.trim() }))
+    } else {
       setEndDay(value)
-      const updated = `${startDay || ''} - ${value}`.trim()
-      setForm((prev) => ({ ...prev, availableDays: updated }))
+      setForm((f) => ({ ...f, availableDays: `${startDay || ''} - ${value}`.trim() }))
     }
   }
-
-  // const serviceOptionsFormatted = serviceOptions.map((s) => ({
-  //   value: s.serviceId,
-  //   label: s.serviceName,
-  // }))
 
   const handleTimeChange = (value, type) => {
     if (type === 'start') {
       setStartTime(value)
-      const updated = `${value} - ${endTime || ''}`.trim()
-      setForm((prev) => ({ ...prev, availableTimes: updated }))
-    } else if (type === 'end') {
+      setForm((f) => ({ ...f, availableTimes: `${value} - ${endTime || ''}`.trim() }))
+    } else {
       setEndTime(value)
-      const updated = `${startTime || ''} - ${value}`.trim()
-      setForm((prev) => ({ ...prev, availableTimes: updated }))
+      setForm((f) => ({ ...f, availableTimes: `${startTime || ''} - ${value}`.trim() }))
     }
   }
 
-  const fetchSubServices = async (serviceIds) => {
-    if (!Array.isArray(serviceIds) || serviceIds.length === 0) return
+  useEffect(() => {
+    let mounted = true
 
-    try {
-      const allResponses = await Promise.all(
-        serviceIds.map(async (id) => {
-          const res = await subServiceData(id)
-          console.log(res.data)
-          return res.data || [] // Extract the "data" array directly
-        }),
-      )
-
-      // Flatten all subServices from each category block
-      const allSubServices = allResponses
-        .flat() // flatten the top-level array
-        .flatMap((block) => block.subServices || []) // extract subServices from each category
-
-      setSubServiceOptions(allSubServices)
-    } catch (error) {
-      console.error('Failed to fetch subservices:', error)
-      setSubServiceOptions([])
+    const loadDoctors = async () => {
+      if (mounted) {
+        await fetchDoctors()
+      }
     }
-  }
+
+    loadDoctors()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  // const fetchSubServices = async (serviceIds) => {
+  //   if (!Array.isArray(serviceIds) || serviceIds.length === 0) return
+  //   try {
+  //     const all = await Promise.all(serviceIds.map((id) => subServiceData(id)))
+  //     const flat = all.flatMap((r) => (r.data || []).flatMap((b) => b.subServices || []))
+  //     setSubServiceOptions(flat)
+  //   } catch { setSubServiceOptions([]) }
+  // }
 
   const handleChanges = async (e) => {
     const { name, value } = e.target
-
     if (name === 'categoryId') {
-      setNewService((prev) => ({
-        ...prev,
-        categoryId: value,
-        serviceId: [],
-        serviceName: [],
-      }))
-
+      setNewService((p) => ({ ...p, categoryId: value, serviceId: [], serviceName: [] }))
       try {
-        const allServices = await Promise.all(
-          value.map(async (catId) => {
-            const res = await http.get(`/${getservice}/${catId}`)
-            return res.data?.data || []
-          }),
-        )
-
-        const merged = allServices.flat()
-
-        // Save the raw service list
+        const all = await Promise.all(value.map((id) => http.get(`/${getservice}/${id}`)))
+        const merged = all.flatMap((r) => r.data?.data || [])
         setServiceOptions(merged)
-
-        // Save formatted list for dropdowns or selects
-        const formatted = merged.map((s) => ({
-          label: s.serviceName,
-          value: s.serviceId,
-        }))
-
-        setServiceOptionsFormatted(formatted)
-      } catch (err) {
-        console.error('❌ Failed to fetch services:', err)
+        setServiceOptionsFormatted(merged.map((s) => ({ label: s.serviceName, value: s.serviceId })))
+      } catch {
         setServiceOptions([])
         setServiceOptionsFormatted([])
       }
     }
   }
 
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  const times = [
-    '07:00 AM',
-    '08:00 AM',
-    '09:00 AM',
-    '10:00 AM',
-    '11:00 AM',
-    '12:00 PM',
-    '01:00 PM',
-    '02:00 PM',
-    '03:00 PM',
-    '04:00 PM',
-    '05:00 PM',
-    '06:00 PM',
-    '07:00 PM',
-    '08:00 PM',
-    '09:00 PM',
-    '10:00 PM',
-  ]
-
-  const fetchData = async () => {
-    try {
-      const categoryResponse = await CategoryData()
-      if (categoryResponse.data && Array.isArray(categoryResponse.data)) {
-        setCategory(categoryResponse.data)
-      } else {
-        throw new Error('Invalid category data format')
-      }
-
-      const serviceResponse = await serviceDataH()
-      console.log(serviceResponse.data)
-      setService(serviceResponse.data)
-    } catch (error) {
-      console.error('Error fetching data:', error)
-      setErrors('Failed to fetch data. Please try again later.')
-    } finally {
-    }
-  }
-
-  //branchOptions
-  // const branchOptions = [
-  //   { value: 'Banjara Hills', label: 'Banjara Hills' },
-  //   { value: 'Jubilee Hills', label: 'Jubilee Hills' },
-  //   { value: 'Madhapur', label: 'Madhapur' },
-  //   { value: 'Gachibowli', label: 'Gachibowli' },
-  //   { value: 'Hitech City', label: 'Hitech City' },
-  //   { value: 'Secunderabad', label: 'Secunderabad' },
-  //   { value: 'Kukatpally', label: 'Kukatpally' },
-  // ]
-  const [branchOptions, setBranchOptions] = useState([])
-  const [branchLoading, setBranchLoading] = useState(false)
+  // const fetchData = async () => {
+  //   try {
+  //     const catRes = await CategoryData()
+  //     if (Array.isArray(catRes.data)) setCategory(catRes.data)
+  //   } catch { /* ignore */ }
+  // }
 
   useEffect(() => {
-    const fetchAllData = async () => {
+    const fetchAll = async () => {
       const clinicId = localStorage.getItem('HospitalId')
       try {
         setLoading(true)
-
-        await fetchData()
-        await serviceDataH()
-
-        // fetch hospital details
-        const data = await http.get(`/doctors/hospitalById/${clinicId}`)
-        if (data) {
-          setShowErrorMessage('')
-        } else {
-          setShowErrorMessage('Hospital data not found')
-        }
-
-        // ✅ fetch branches
+        // await fetchData()
         setBranchLoading(true)
-        const response = await GetClinicBranches(clinicId)
-        const branches = response.data || [] // ✅ get the array safely
-        console.log('Branch API response:', response)
-
-        // 🟢 assume API returns array of { branchId, branchName }
-        const formatted = branches.map((b) => ({
-          value: b.branchId || b.id || b.name, // adjust based on actual API
-          label: b.branchName || b.name,
-        }))
-
-        setBranchOptions(formatted)
-      } catch (err) {
-        console.error(err)
-        setShowErrorMessage('Failed to fetch hospital details')
-      } finally {
-        setLoading(false)
-        setBranchLoading(false)
-      }
+        const res = await GetClinicBranches(clinicId)
+        const branches = res.data || []
+        setBranchOptions(branches.map((b) => ({ value: b.branchId || b.id || b.name, label: b.branchName || b.name })))
+      } catch { setShowErrorMessage('Failed to fetch data') }
+      finally { setLoading(false); setBranchLoading(false) }
     }
-
-    fetchAllData()
+    fetchAll()
   }, [])
 
-  // useEffect(() => {
-  //   const clnicId = localStorage.getItem('HospitalId')
-  //   // fetchHospitalDetails(clnicId)
+  const categoryOptions = category.map((c) => ({ value: c.categoryId, label: c.categoryName }))
 
-  //   http.get(`/doctors/hospitalById/${clnicId}`)
-  // }, [])
-
-  const validateDoctorForm = () => {
-    const errors = {}
-    let isValid = true
-    const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-
-    if (!newService.categoryId || newService.categoryId.length === 0) {
-      errors.categoryId = 'Please select at least one category.'
-      isValid = false
+  const checkSubServiceDetails = async (ids) => {
+    const hospitalId = localStorage.getItem('HospitalId')
+    for (const id of ids) {
+      const data = await getSubServiceById(hospitalId, id)
+      if (!data || !data.price || !data.finalCost) { setIsSubServiceComplete(false); return }
     }
-
-    if (!selectedServices || selectedServices.length === 0) {
-      errors.serviceId = 'Please select at least one service.'
-      isValid = false
-    }
-
-    if (!selectedSubService || selectedSubService.length === 0) {
-      errors.subServiceName = 'Please select at least one sub service.'
-      isValid = false
-    }
-
-    if (!form.doctorName.trim()) {
-      errors.doctorName = 'Doctor name is required'
-      isValid = false
-    }
-
-    if (!form.doctorLicence.trim()) {
-      errors.doctorLicence = 'License number is required'
-      isValid = false
-    }
-
-    if (!form.doctorMobileNumber || !/^[6789]\d{9}$/.test(form.doctorMobileNumber)) {
-      errors.doctorMobileNumber = 'Enter a valid 10-digit mobile number starting with 6,7, 8, or 9'
-      isValid = false
-    }
-    if (
-      !form.doctorEmail ||
-      !/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/.test(form.doctorEmail)
-    ) {
-      errors.doctorEmail = 'Please enter a valid Email'
-      isValid = false
-    }
-
-    if (!form.experience || isNaN(form.experience) || form.experience < 0) {
-      errors.experience = 'Enter valid experience'
-      isValid = false
-    }
-
-    if (!form.qualification.trim()) {
-      errors.qualification = 'Qualification is required'
-      isValid = false
-    }
-
-    if (!form.specialization.trim()) {
-      errors.specialization = 'Specialization is required'
-      isValid = false
-    }
-
-    if (!form.profileDescription.trim()) {
-      errors.profileDescription = 'Profile description is required'
-      isValid = false
-    }
-
-    // In-Clinic Fee validation
-    if (enabledTypes.inClinic) {
-      if (
-        !form.doctorFees.inClinicFee ||
-        isNaN(form.doctorFees.inClinicFee) ||
-        Number(form.doctorFees.inClinicFee) <= 0
-      ) {
-        errors.inClinicFee = 'Enter valid in-clinic fee'
-        isValid = false
-      }
-    }
-
-    // Video/Online Fee validation
-    if (enabledTypes.online) {
-      if (
-        !form.doctorFees.vedioConsultationFee ||
-        isNaN(form.doctorFees.vedioConsultationFee) ||
-        Number(form.doctorFees.vedioConsultationFee) <= 0
-      ) {
-        errors.vedioConsultationFee = 'Enter valid video consultation fee'
-        isValid = false
-      }
-    }
-
-    if (!form.doctorPicture) {
-      errors.doctorPicture = 'Profile picture is required'
-      isValid = false
-    }
-    if (!form.doctorSignature) {
-      errors.doctorSignature = 'Doctor Signature is required'
-      isValid = false
-    }
-
-    if (!startDay) {
-      errors.startDay = 'Start day is required'
-      isValid = false
-    }
-
-    if (!endDay) {
-      errors.endDay = 'End day is required'
-      isValid = false
-    }
-
-    if (startDay && endDay && dayOrder.indexOf(startDay) > dayOrder.indexOf(endDay)) {
-      errors.endDay = 'End day cannot be before start day'
-      isValid = false
-    }
-
-    const convertTo24Hrs = (time) => {
-      const [rawTime, modifier] = time.split(' ')
-      let [hours, minutes] = rawTime.split(':').map(Number)
-      if (modifier === 'PM' && hours !== 12) hours += 12
-      if (modifier === 'AM' && hours === 12) hours = 0
-      return hours * 60 + minutes
-    }
-
-    if (!startTime || !endTime) {
-      errors.availableTimes = 'Start and end times are required'
-      isValid = false
-    } else if (convertTo24Hrs(startTime) >= convertTo24Hrs(endTime)) {
-      errors.availableTimes = 'Start time must be before end time'
-      isValid = false
-    }
-    // ✅ Gender validation
-    if (!form.gender) {
-      errors.gender = 'Please select gender'
-      isValid = false
-    }
-
-    // ✅ Branch validation
-    if (!form.branch || form.branch.length === 0) {
-      errors.branch = 'Please select at least one branch'
-      isValid = false
-    }
-    if (!startTime) {
-      errors.startTime = 'Start time is required'
-      isValid = false
-    }
-
-    if (!endTime) {
-      errors.endTime = 'End time is required'
-      isValid = false
-    }
-
-    if (startTime && endTime && times.indexOf(startTime) > times.indexOf(endTime)) {
-      errors.endTime = 'End time cannot be before start time'
-      isValid = false
-    }
-    setFormErrors(errors)
-    return isValid
+    setIsSubServiceComplete(true)
   }
 
-  const categoryOptions = category.map((cat) => ({
-    value: cat.categoryId,
-    label: cat.categoryName,
-  }))
+  /* ─── Validation ────────────────────────────────── */
+  const validateDoctorForm = () => {
+    const errs = {}
+    const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const cvt = (t) => {
+      const [raw, mod] = t.split(' ')
+      let [h, m] = raw.split(':').map(Number)
+      if (mod === 'PM' && h !== 12) h += 12
+      if (mod === 'AM' && h === 12) h = 0
+      return h * 60 + m
+    }
 
-  //select
+    // if (!newService.categoryId?.length) errs.categoryId = 'Select at least one category'
+    // if (!selectedServices.length) errs.serviceId = 'Select at least one service'
+    // if (!selectedSubService.length) errs.subServiceName = 'Select at least one procedure'
+    if (!form.doctorName.trim()) errs.doctorName = 'Doctor name is required'
+    if (!form.languages || form.languages.length === 0) {
+      errs.languages = 'Language is required';
+    } else if (!form.languages.every(lang => /^[A-Za-z\s]+$/.test(lang))) {
+      errs.languages = 'Only alphabets are allowed';
+    }
+    if (!form.doctorLicence.trim()) errs.doctorLicence = 'License number is required'
+    if (!/^[6789]\d{9}$/.test(form.doctorMobileNumber)) errs.doctorMobileNumber = 'Enter valid 10-digit number starting with 6-9'
+    if (!/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/.test(form.doctorEmail)) errs.doctorEmail = 'Enter a valid email'
+    if (!form.experience || isNaN(form.experience) || form.experience < 0) errs.experience = 'Enter valid experience'
+    if (!form.qualification.trim()) errs.qualification = 'Qualification is required'
+    if (!form.specialization.trim()) errs.specialization = 'Specialization is required'
+    if (!form.profileDescription.trim()) errs.profileDescription = 'Profile description is required'
+    if (!form.doctorFees.inClinicFee || Number(form.doctorFees.inClinicFee) <= 0) errs.inClinicFee = 'Enter valid in-clinic fee'
+    if (!form.doctorPicture) errs.doctorPicture = 'Profile picture is required'
+    if (!form.doctorSignature) errs.doctorSignature = 'Doctor signature is required'
+    if (!startDay) errs.startDay = 'Start day required'
+    if (!endDay) errs.endDay = 'End day required'
+    if (startDay && endDay && dayOrder.indexOf(startDay) > dayOrder.indexOf(endDay)) errs.endDay = 'End day cannot be before start day'
+    if (!startTime || !endTime) errs.availableTimes = 'Start and end times required'
+    else if (cvt(startTime) >= cvt(endTime)) errs.availableTimes = 'Start time must be before end time'
+    if (!form.gender) errs.gender = 'Please select gender'
+    if (!form.branch?.length) errs.branch = 'Select at least one branch'
 
+    // Date of Joining validation
+    if (!form.dateofJoining) {
+      errs.dateofJoining = 'Date of joining is required'
+    } else {
+      const doj = new Date(form.dateofJoining)
+      const now = new Date()
+      const fifteenYearsAgo = new Date()
+      fifteenYearsAgo.setFullYear(now.getFullYear() - 15)
+      if (doj > now) errs.dateofJoining = 'Date of joining cannot be in the future'
+      else if (doj < fifteenYearsAgo) errs.dateofJoining = 'Date of joining cannot be more than 15 years ago'
+    }
+
+    // Date of Birth validation (21 to 100 years)
+    if (!form.dateofBirth) {
+      errs.dateofBirth = 'Date of birth is required'
+    } else {
+      const dob = new Date(form.dateofBirth)
+      const now = new Date()
+      let age = now.getFullYear() - dob.getFullYear()
+      const m = now.getMonth() - dob.getMonth()
+      if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--
+
+      if (age < 21) errs.dateofBirth = 'Doctor must be at least 21 years old'
+      else if (age > 100) errs.dateofBirth = 'Age cannot exceed 100 years'
+    }
+
+    // Aadhar ID validation
+    if (!form.aadharID) {
+      errs.aadharID = 'Aadhar ID is required'
+    } else if (!/^\d{12}$/.test(form.aadharID)) {
+      errs.aadharID = 'Aadhar ID must be 12 digits'
+    } else if (/^(.)\1+$/.test(form.aadharID)) {
+      errs.aadharID = 'Aadhar ID cannot have all identical digits'
+    }
+    if (!form.emergencyContact) {
+      errs.emergencyContact = 'Emergency contact is required'
+    } else if (!/^[6789]\d{9}$/.test(form.emergencyContact)) {
+      errs.emergencyContact = 'Enter valid 10-digit emergency contact'
+    }
+
+    if (!form.bankAccountDetails.accountHolderName.trim()) errs.accountHolderName = 'Account holder name is required'
+    if (!form.bankAccountDetails.accountNumber.trim() || !/^\d{9,18}$/.test(form.bankAccountDetails.accountNumber)) errs.accountNumber = 'Valid account number is required'
+    if (!form.bankAccountDetails.bankName.trim()) errs.bankName = 'Bank name is required'
+    if (!form.bankAccountDetails.branchName.trim()) errs.branchName = 'Branch name is required'
+    if (!form.bankAccountDetails.ifscCode.trim() || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.bankAccountDetails.ifscCode.toUpperCase())) errs.ifscCode = 'Valid IFSC code is required'
+    if (!form.bankAccountDetails.panCardNumber.trim() || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(form.bankAccountDetails.panCardNumber.toUpperCase())) errs.panCardNumber = 'Valid PAN card number is required'
+
+    setFormErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
+  /* ─── Submit ─────────────────────────────────────── */
   const handleSubmit = async () => {
-    const isDuplicate = doctorData?.data?.some(
-      (doctor) => doctor.doctorLicence === form.doctorLicence.trim(),
-    )
-
-    if (isDuplicate) {
-      setFormErrors((prev) => ({
-        ...prev,
-        doctorLicence: 'This License Number already exists',
-      }))
-      return // ❌ Stop submission
-    }
-    if (isSaving) return // ❌ Prevent multiple submissions
+    const isDuplicate = doctorData?.data?.some((d) => d.doctorLicence === form.doctorLicence.trim())
+    if (isDuplicate) { setFormErrors((p) => ({ ...p, doctorLicence: 'License number already exists' })); return }
+    if (isSaving) return
     setIsSaving(true)
+    if (!validateDoctorForm()) { setIsSaving(false); return }
 
-    const isValid = validateDoctorForm()
-    if (!isValid) {
-      setIsSaving(false)
-      return
-    }
     try {
       const hospitalId = localStorage.getItem('HospitalId')
       const hospitalName = localStorage.getItem('HospitalName')
-      const allValidSubServiceIds = (subServiceOptions || []).map((ss) => ss.subServiceId)
+      const validIds = subServiceOptions.map((s) => s.subServiceId)
+      // const selectedSubServiceObjects = subServiceOptions
+      //   .filter((s) => selectedSubService.includes(s.subServiceId) && validIds.includes(s.subServiceId))
+      //   .map((s) => ({ subServiceId: s.subServiceId, subServiceName: s.subServiceName }))
 
-      const selectedSubServiceObjects = (subServiceOptions || [])
-        .filter(
-          (sub) =>
-            selectedSubService.includes(sub.subServiceId) &&
-            allValidSubServiceIds.includes(sub.subServiceId),
-        )
-        .map((sub) => ({
-          subServiceId: sub.subServiceId,
-          subServiceName: sub.subServiceName,
-        }))
+      const mobileExists = doctorData?.data?.some((d) => d.doctorMobileNumber === form.doctorMobileNumber)
+      const emailExists = doctorData?.data?.some((d) => d.doctorEmail === form.doctorEmail)
+      if (mobileExists) { showCustomToast('Mobile number already exists', 'error'); setIsSaving(false); return }
+      if (emailExists) { showCustomToast('Email already exists', 'error'); setIsSaving(false); return }
 
-      // 🔍 2. Check if any doctor already has the same mobile or email
-      const mobileExists = doctorData.data?.some(
-        (doc) => doc.doctorMobileNumber === form.doctorMobileNumber,
-      )
-      const emailExists = doctorData.data?.some((doc) => doc.doctorEmail === form.doctorEmail)
-
-      if (mobileExists) {
-        showCustomToast('A doctor with this mobile number already exists', 'error')
-        return
-      }
-
-      if (emailExists) {
-        showCustomToast('A doctor with this email already exists', 'error')
-        return
-      }
       setSaveLoading(true)
+      let uploadedDoctorPicture = form.doctorPicture
+      let uploadedDoctorSignature = form.doctorSignature
+
+      if (form.doctorPictureFile) {
+        try {
+          uploadedDoctorPicture = await uploadFile('doctorPicture', form.doctorPictureFile)
+        } catch (err) {
+          showCustomToast('Failed to upload doctor picture', 'error')
+          setIsSaving(false); setSaveLoading(false); return
+        }
+      }
+
+      if (form.doctorSignatureFile) {
+        try {
+          uploadedDoctorSignature = await uploadFile('doctorSignature', form.doctorSignatureFile)
+        } catch (err) {
+          showCustomToast('Failed to upload doctor signature', 'error')
+          setIsSaving(false); setSaveLoading(false); return
+        }
+      }
+
       const payload = {
         branchId: localStorage.getItem('branchId'),
         createdBy: localStorage.getItem('staffId') || 'admin',
         hospitalId,
-        doctorPicture: form.doctorPicture,
-        doctorSignature: form.doctorSignature,
+        doctorPicture: uploadedDoctorPicture,
+        doctorSignature: uploadedDoctorSignature,
         doctorName: form.doctorName,
         doctorMobileNumber: form.doctorMobileNumber,
         doctorEmail: form.doctorEmail,
         doctorLicence: form.doctorLicence,
-        category: categoryOptions
-          .filter((cat) => newService.categoryId.includes(cat.value))
-          .map((cat) => ({
-            categoryId: cat.value,
-            categoryName: cat.label,
-          })),
-        service: selectedServices.map((s) => ({
-          serviceId: s.serviceId,
-          serviceName: s.serviceName,
-        })),
-        subServices: selectedSubServiceObjects,
+        // category: categoryOptions.filter((c) => newService.categoryId.includes(c.value)).map((c) => ({ categoryId: c.value, categoryName: c.label })),
+        // service: selectedServices.map((s) => ({ serviceId: s.serviceId, serviceName: s.serviceName })),
+        // subServices: selectedSubServiceObjects,
         gender: form.gender,
         experience: form.experience,
         qualification: form.qualification,
@@ -601,284 +444,176 @@ const DoctorManagement = () => {
         focusAreas: form.focusAreas,
         languages: form.languages,
         highlights: form.highlights,
-        // ServiceAvailability:form.ServiceAvailability,
-        doctorFees: {
-          inClinicFee: form.doctorFees.inClinicFee,
-          vedioConsultationFee: form.doctorFees.vedioConsultationFee,
-        },
-        consultation: {
-          serviceAndTreatments: form.availableConsultations.includes('Services & Treatments') ? 3 : 0,
-  inClinic: form.availableConsultations.includes('In-Clinic') ? 1 : 0,
-  videoOrOnline: form.availableConsultations.includes('Video/Online') ? 2 : 0,
-        },
+        doctorFees: { inClinicFee: form.doctorFees.inClinicFee },
+        dateofJoining: form.dateofJoining,
+        emergencyContact: form.emergencyContact,
+        aadharID: form.aadharID,
+        dateofBirth: form.dateofBirth,
+        role: "doctor",
+        bankAccountDetails: form.bankAccountDetails
+        // consultation: {
+        //   serviceAndTreatments: form.availableConsultations.includes('Services & Treatments') ? 3 : 0,
+        //   inClinic: form.availableConsultations.includes('In-Clinic') ? 1 : 0,
+        //   videoOrOnline: form.availableConsultations.includes('Video/Online') ? 2 : 0,
+        // },
       }
-      console.log(payload)
-      const response = await http.post(`/addDoctor`, payload, {
-        headers: { 'Content-Type': 'application/json' },
-      })
 
-      if (response.data?.status === 201) {
-        // const newDoctor = response.data.doctor ?? payload
+      const response = await http.post(`/addDoctor`, payload, { headers: { 'Content-Type': 'application/json' } })
+
+      if (response.status === 201 || response.status === 200 || response.data?.status === 201 || response.data?.success) {
         const newDoctor = response.data.data?.doctor ?? payload
-
-        // Update doctorData immediately so UI reflects new doctor
-        setDoctorData((prev) => ({
-          ...prev,
-          data: [...(prev?.data || []), newDoctor],
-        }))
-
-        // ✅ Send onboarding email
-        await sendDermaCareOnboardingEmail({
-          name: form.doctorName,
-          email: form.doctorEmail,
-          password: response.data.data?.temporaryPassword,
-          userID: response.data.data?.username,
-          clinicName: hospitalName,
-        })
-
-        showCustomToast(response.data.message || 'Doctor added successfully', 'success', {
-          position: 'top-right',
-        })
-        //  ✅ Reset form
-        // Reset doctor form
-        setForm({
-          doctorPicture: null,
-          doctorSignature: null,
-          doctorLicence: '',
-          doctorMobileNumber: '',
-          doctorEmail: '',
-          doctorName: '',
-          gender: '',
-          experience: '',
-          qualification: '',
-          associationsOrMemberships: '',
-          branch: '',
-          specialization: '',
-          availableDays: '',
-          availableTimes: '',
-          profileDescription: '',
-          focusAreas: [],
-          languages: [],
-          highlights: [],
-          doctorFees: { inClinicFee: '', vedioConsultationFee: '' },
-        })
-
-        // Reset services & subservices
-        setNewService({ serviceId: '', serviceName: '', categoryId: '', categoryName: '' })
-        setSelectedServices([]) // ✅ clear main services
-        setSelectedSubServices([]) // ✅ clear subservices
-        setServiceOptions([])
-        setSubServiceOptions([])
-
-        // Reset availability inputs
-        setStartDay('')
-        setEndDay('')
-        setStartTime('')
-        setEndTime('')
-
-        // Close modal
+        setDoctorData((prev) => ({ ...prev, data: [...(prev?.data || []), newDoctor] }))
+        // sendDermaCareOnboardingEmail({
+        //   name: form.doctorName, email: form.doctorEmail,
+        //   password: response.data.data?.temporaryPassword,
+        //   userID: response.data.data?.username, clinicName: hospitalName,
+        // })
+        showCustomToast(response.data.message || 'Doctor added successfully', 'success')
+        resetForm()
         setModalVisible(false)
-      } else {
-        throw new Error(response.data?.message || 'Failed to add doctor')
-      }
+        fetchDoctors()
+      } else throw new Error(response.data?.message || 'Failed to add doctor')
     } catch (error) {
-      const status = error?.response?.status
-      const errorMessage = error?.response?.data?.message || 'Something went wrong'
-
-      if (status === 400 && errorMessage.includes('mobile number')) {
-        showCustomToast(
-          errorMessage,
-          {
-            position: 'top-right',
-          },
-          'error',
-        )
-        setErrors((prev) => ({
-          ...prev,
-          doctorMobileNumber: errorMessage,
-        }))
-        setModalVisible(true) // ❌ Keep modal open so user can fix input
-      } else if (status === 400 && errorMessage.includes('email')) {
-        showCustomToast(
-          errorMessage,
-          {
-            position: 'top-right',
-          },
-          'error',
-        )
-        setErrors((prev) => ({
-          ...prev,
-          doctorEmail: errorMessage,
-        }))
-        setModalVisible(true)
-      } else {
-        showCustomToast(
-          errorMessage,
-          {
-            position: 'top-right',
-          },
-          'error',
-        )
-        setModalVisible(false) // ✅ Optional: Close modal on other errors
-      }
-    } finally {
-      setIsSaving(false)
-      setSaveLoading(false)
-    }
+      showCustomToast(error?.response?.data?.message || error.message || 'Something went wrong', 'error')
+    } finally { setIsSaving(false); setSaveLoading(false) }
   }
 
-  const ChipSection = ({ label, items, onAdd }) => {
+  const resetForm = () => {
+    setForm(initialForm)
+    setSelectedServices([])
+    setSelectedSubService([])
+    setSubServiceOptions([])
+    setServiceOptionsFormatted([])
+    setFormErrors({})
+    setNewService({ categoryId: [], serviceId: [], serviceName: [], subServiceId: [] })
+    setStartDay(''); setEndDay(''); setStartTime(''); setEndTime('')
+    setEnabledTypes({ inClinic: false, online: false, serviceTreatment: false })
+    setIsSubServiceComplete(true)
+    setMonthlyLeaves('')
+  }
+
+  /* ─── Chip input ────────────────────────────────── */
+  const ChipSection = ({ label, items, onAdd, onlyAlpha = false, required = false }) => {
     const [input, setInput] = useState('')
-
     const handleAdd = () => {
-      const trimmed = input.trim()
-      if (trimmed && !items.includes(trimmed)) {
-        onAdd([...items, trimmed])
-        setInput('')
+      const t = input.trim()
+      if (!t) return
+      if (onlyAlpha && !/^[A-Za-z\s]+$/.test(t)) {
+        showCustomToast(`Only alphabets allowed in ${label}`, 'error'); return
       }
+      if (!items.includes(t)) onAdd([...items, t])
+      setInput('')
     }
-
-    const handleRemove = (indexToRemove) => {
-      const updated = items.filter((_, index) => index !== indexToRemove)
-      onAdd(updated)
-    }
-
-    const normalize = (str) => str?.toString().toLowerCase() || ''
-
-    // Filter doctors using global search
-
     return (
-      <div className="mb-3">
-        <label className="form-label fw-semibold">{label}</label>
-        <div className="d-flex mb-2">
-          <input
-            type="text"
-            className="form-control me-2"
-            placeholder={`Add ${label}`}
+      <div className="chip-section">
+        <label className="dm-label">{label} {required && <span className="req">*</span>}</label>
+        <div className="chip-input-row">
+          <CFormInput
+            className="dm-chip-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+            placeholder={`Add ${label}`}
           />
-          <button className="btn"  style={{backgroundColor:'var(--color-black)', color: 'white' }}onClick={handleAdd}>
-            Add
-          </button>
+          <button className="dm-add-chip-btn" type="button" onClick={handleAdd}>Add</button>
         </div>
-        <div className="d-flex flex-wrap gap-2">
-          {items.map((item, index) => (
-            <div
-              key={index}
-              className="badge d-flex align-items-center"
-              style={{ padding: '8px 12px', borderRadius: '20px' }}
-            >
-              <span className="me-2">{item}</span>
-              <span
-                style={{ cursor: 'pointer', fontSize: '10px' }}
-                onClick={() => handleRemove(index)}
-              >
-                ❌
-              </span>
+        <div className="chip-list">
+          {items.map((item, i) => (
+            <div key={i} className="chip">
+              {item}
+              <span className="chip-remove" onClick={() => onAdd(items.filter((_, idx) => idx !== i))}>×</span>
             </div>
           ))}
         </div>
       </div>
     )
   }
-  // console.log(selectedHospital)
-  const checkSubServiceDetails = async (ids) => {
-    let incomplete = false
-    const hospitalId = localStorage.getItem('HospitalId')
-    for (const id of ids) {
-      const data = await getSubServiceById(hospitalId, id) // Use actual hospitalId
-      if (!data || !data.price || !data.finalCost) {
-        incomplete = true
-        break
-      }
-    }
 
-    setIsSubServiceComplete(!incomplete)
-  }
-  const { searchQuery } = useGlobalSearch()
-
-  const normalize = (str) => str?.toString().toLowerCase() || ''
-
-  const [enableFees, setEnableFees] = useState({
-    inClinic: true,
-    videoConsultation: true,
+  /* ─── Global search filter ─────────────────────── */
+  const [searchQuery, setSearchQuery] = useState('')
+  const normalize = (s) => s?.toString().toLowerCase() || ''
+  const filteredDoctors = (Array.isArray(doctorData?.data) ? doctorData.data : []).filter((d) => {
+    if (!searchQuery.trim()) return true
+    return (
+      normalize(d.doctorName).includes(normalize(searchQuery)) ||
+      normalize(d.qualification).includes(normalize(searchQuery)) ||
+      normalize(d.doctorId).includes(normalize(searchQuery)) ||
+      normalize(d.specialization).includes(normalize(searchQuery)) ||
+      normalize(d.doctorMobileNumber).includes(normalize(searchQuery))
+    )
   })
-
-  const filteredDoctors = (Array.isArray(doctorData?.data) ? doctorData.data : []).filter(
-    (doctor) => {
-      if (!searchQuery.trim()) return true
-      return (
-        normalize(doctor.doctorName).includes(normalize(searchQuery)) ||
-        normalize(doctor.qualification).includes(normalize(searchQuery)) ||
-        normalize(doctor.doctorId).includes(normalize(searchQuery)) ||
-        normalize(doctor.specialization).includes(normalize(searchQuery)) ||
-        normalize(doctor.doctorMobileNumber).includes(normalize(searchQuery))
-      )
-    },
-  )
-
   const totalDoctors = filteredDoctors.length
   const totalPages = Math.ceil(totalDoctors / pageSize)
-  const startIndex = (currentPage - 1) * pageSize
-  const endIndex = startIndex + pageSize
-  const paginatedDoctors = filteredDoctors.slice(startIndex, endIndex)
+  const paginatedDoctors = filteredDoctors.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  /* ─── Section header component ─────────────────── */
+  const SectionHeading = ({ text }) => (
+    <div className="dm-section-heading">
+      <span className="dm-section-bar" />
+      <h5 className="dm-section-title">{text}</h5>
+    </div>
+  )
+
+  /* ─── Error helper ──────────────────────────────── */
+  const Err = ({ field }) =>
+    formErrors[field] ? <div className="dm-error">{formErrors[field]}</div> : null
 
   return (
-    <div>
-      <ToastContainer />
-      <div className="d-flex justify-content-end mb-3">
-        <button
-          className="btn btn-info text-white d-flex align-items-center gap-2 shadow-sm px-4 py-2"
-          onClick={() => {
-            setFormErrors({})
-            setModalVisible(true)
-          }}
-          style={{
-            background: 'linear-gradient(to right, var(--color-black),var(--color-black)',
-            border: 'none',
-            fontWeight: '600',
-            fontSize: '16px',
-          }}
-        >
-          <FontAwesomeIcon icon={faUserDoctor} />
-          <span style={{ color: 'white' }}>Add Doctor</span>
-        </button>
+    <div className="dm-wrapper">
+      {/* <ToastContainer /> */}
+
+      {/* Add Doctor button & Search bar */}
+      <div className="dm-top-bar">
+        <div className="dm-search-wrapper">
+          <Search size={14} className="dm-search-icon-left" />
+          <input
+            type="text"
+            className="dm-search-input"
+            placeholder="Search doctors by name, ID, or specialization..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button className="dm-search-clear" onClick={() => setSearchQuery('')}>
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {can('Doctors', 'create') && (
+          <button className="dm-add-btn" onClick={() => { setFormErrors({}); setModalVisible(true) }}>
+            <FontAwesomeIcon icon={faUserDoctor} />
+            <span>Add Doctor</span>
+          </button>
+        )}
       </div>
 
+      {/* List */}
       {loading ? (
-        <div className="centered-message">
-          <LoadingIndicator message="Loading doctors..." />
-        </div>
+        <div className="dm-center"><LoadingIndicator message="Loading doctors..." /></div>
       ) : errorMessage ? (
-        <div className="centered-message">
-          <p>{errorMessage}</p>
-        </div>
-      ) : !doctorData || !doctorData.data ? null : doctorData.data.length === 0 ? ( // ✅ DON’T show "Page not found" here — just return null or loading
-        <div className="centered-message">
-          <span>No doctors found for this hospital.</span>{' '}
-          <span
-            onClick={() => {
-              setFormErrors({})
-              setModalVisible(true)
-            }}
-            style={{ fontWeight: 'bold', color: 'blue', cursor: 'pointer' }}
-          >
-            + Add Doctor
-          </span>
-        </div>
-      ) : (
-        <div className="row">
-          {filteredDoctors.length > 0 ? (
-            paginatedDoctors.map((doctor, index) => <DoctorCard key={index} doctor={doctor} />)
-          ) : (
-            <div className="text-center w-100 py-5">
-              <p>No doctors match your search.</p>
+        <div className="dm-center"><p>{errorMessage}</p></div>
+      ) : !doctorData?.data ? null
+        : doctorData.data.length === 0 ? (
+          <div className="dm-center">
+            <div className="dm-empty-state">
+              <FontAwesomeIcon icon={faUserDoctor} className="dm-empty-icon" />
+              <p>No doctors found.</p>
+              {can('Doctors', 'create') && (
+                <button className="dm-add-btn" onClick={() => { setFormErrors({}); setModalVisible(true) }}>
+                  <FontAwesomeIcon icon={faPlus} /> Add First Doctor
+                </button>
+              )}
             </div>
-          )}
-          {totalDoctors > 0 && (
-            <div className="mb-3 mx-3">
+          </div>
+        ) : (
+          <div>
+            {filteredDoctors.length > 0 ? (
+              paginatedDoctors.map((doctor, i) => <DoctorCard key={i} doctor={doctor} />)
+            ) : (
+              <div className="dm-center"><p>No doctors match your search.</p></div>
+            )}
+            {totalDoctors > 0 && (
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
@@ -886,1120 +621,990 @@ const DoctorManagement = () => {
                 onPageChange={setCurrentPage}
                 onPageSizeChange={setPageSize}
               />
+            )}
+          </div>
+        )}
+
+      {/* ─── Modal ──────────────────────────────── */}
+      <CModal visible={modalVisible} onClose={() => setModalVisible(false)} size="lg" backdrop="static" className='custom-modal'>
+        <CModalHeader className="dm-modal-header">
+          <div closeButton className="dm-modal-title-row" >
+            <div className="dm-modal-icon">
+              <FontAwesomeIcon icon={faUserDoctor} />
             </div>
-          )}
-        </div>
-      )}
-
-      <CModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        size="lg"
-        backdrop="static"
-        className="custom-modal"
-      >
-        <CModalHeader>
-          <FontAwesomeIcon
-            icon={faUserDoctor}
-            style={{ color: 'var(--color-black)', paddingRight: '10px' }}
-          />
-          <strong style={{ color: 'var(--color-black)' }}> Add Doctor</strong>
+            <strong>Add New Doctor</strong>
+          </div>
         </CModalHeader>
-        <CModalBody>
-          <CRow className="g-4 mb-4">
+
+        <CModalBody className="dm-modal-body">
+
+          {/* Section 1: Category / Service */}
+          {/* <SectionHeading text="Category & Service" /> */}
+          {/* <CRow className="g-3 mb-2">
             <CCol md={6}>
-              <h6>
-                Category Name <span className="text-danger">*</span>
-              </h6>
+              <label className="dm-label">Category Name <span className="req">*</span></label>
               <Select
                 isMulti
-                name="categoryId"
-                value={categoryOptions.filter((opt) => newService.categoryId?.includes(opt.value))}
-                onChange={(selected) => {
-                  handleChanges({
-                    target: {
-                      name: 'categoryId',
-                      value: selected.map((opt) => opt.value),
-                    },
-                  })
-
-                  if (selected.length > 0) {
-                    setFormErrors((prev) => ({ ...prev, categoryId: '' }))
-                  }
-                }}
                 options={categoryOptions}
-                placeholder="Select Category"
+                value={categoryOptions.filter((o) => newService.categoryId?.includes(o.value))}
+                onChange={(sel) => {
+                  handleChanges({ target: { name: 'categoryId', value: sel.map((o) => o.value) } })
+                  if (sel.length) clearFieldError('categoryId')
+                }}
+                placeholder="Select category"
+                classNamePrefix="dm-select"
               />
-              {formErrors.categoryId && (
-                <div className="text-danger mt-1">{formErrors.categoryId}</div>
-              )}
+              <Err field="categoryId" />
             </CCol>
-
             <CCol md={6}>
-              <h6>
-                Service Name <span className="text-danger">*</span>
-              </h6>
+              <label className="dm-label">Service Name <span className="req">*</span></label>
               <Select
                 isMulti
-                name="serviceId"
-                value={serviceOptionsFormatted.filter((opt) =>
-                  selectedServices.some((s) => s.serviceId === opt.value),
-                )}
-                onChange={(selected) => {
-                  const selectedServiceObjects = serviceOptions.filter((s) =>
-                    selected.some((sel) => sel.value === s.serviceId),
-                  )
-                  setSelectedServices(selectedServiceObjects)
-                  fetchSubServices(selectedServiceObjects.map((s) => s.serviceId))
-
-                  // Clear error
-                  if (selectedServiceObjects.length > 0) {
-                    setFormErrors((prev) => ({ ...prev, serviceId: '' }))
-                  }
-                }}
                 options={serviceOptionsFormatted}
-                placeholder="Select Services"
+                value={serviceOptionsFormatted.filter((o) => selectedServices.some((s) => s.serviceId === o.value))}
+                onChange={(sel) => {
+                  const objs = serviceOptions.filter((s) => sel.some((x) => x.value === s.serviceId))
+                  setSelectedServices(objs)
+                  fetchSubServices(objs.map((s) => s.serviceId))
+                  if (objs.length) clearFieldError('serviceId')
+                }}
+                placeholder="Select service"
+                classNamePrefix="dm-select"
               />
-              {formErrors.serviceId && (
-                <div className="text-danger mt-1">{formErrors.serviceId}</div>
-              )}
+              <Err field="serviceId" />
             </CCol>
-
             <CCol md={12}>
-              <h6>
-                Procedure Name <span className="text-danger">*</span>
-              </h6>
-
+              <label className="dm-label">Procedure Name <span className="req">*</span></label>
               <Select
                 isMulti
-                name="subServiceName"
-                placeholder="Select Sub Services"
-                options={(subServiceOptions || []).map((sub) => ({
-                  label: sub.subServiceName,
-                  value: sub.subServiceId,
-                }))}
-                value={(subServiceOptions || [])
-                  .filter((opt) => selectedSubService.includes(opt.subServiceId))
-                  .map((opt) => ({
-                    label: opt.subServiceName,
-                    value: opt.subServiceId,
-                  }))}
-                onChange={(selected) => {
-                  setSelectedSubService(selected.map((opt) => opt.value))
-                  const ids = selected.map((opt) => opt.value)
+                options={subServiceOptions.map((s) => ({ label: s.subServiceName, value: s.subServiceId }))}
+                value={subServiceOptions.filter((o) => selectedSubService.includes(o.subServiceId)).map((o) => ({ label: o.subServiceName, value: o.subServiceId }))}
+                onChange={(sel) => {
+                  const ids = sel.map((o) => o.value)
                   setSelectedSubService(ids)
-
-                  if (selected.length > 0) {
-                    setFormErrors((prev) => ({ ...prev, subServiceName: '' }))
-                  }
-
-                  // ✅ Check if selected sub-services have complete data
                   checkSubServiceDetails(ids)
-
-                  // Clear validation error on selection
-                  // if (selected.length > 0) {
-                  //   setFormErrors((prev) => ({ ...prev, subServiceName: '' }))
-                  // }
+                  if (ids.length) clearFieldError('subServiceName')
                 }}
+                placeholder="Select procedures"
+                classNamePrefix="dm-select"
               />
-              {!isSubServiceComplete && (
-                <div className="text-danger mt-2">
-                  Some selected Procedures are missing details like price or final cost.
-                  <br />
-                  <a href="/procedure-Management" className="text-primary">
-                    Please add Procedure details
-                  </a>
-                </div>
-              )}
-
-              {formErrors.subServiceName && (
-                <div className="text-danger mt-1">{formErrors.subServiceName}</div>
-              )}
+              <Err field="subServiceName" />
             </CCol>
-          </CRow>
+          </CRow> */}
 
-          <hr />
+          <div className="dm-divider" />
 
-          <h5 className="mb-3">Doctor Details</h5>
-          <CRow className="g-4 mb-4">
+          {/* Section 2: Professional Information */}
+          <SectionHeading text="Professional Information" />
+          <CRow className="g-3 mb-2">
             <CCol md={6}>
-              <CFormLabel>
-                Doctor Name
-                <span className="text-danger">*</span>
-              </CFormLabel>
-              <div className="input-group">
-                <CFormInput
-                  value={form.doctorName}
-                  onChange={(e) => {
-                    let name = e.target.value
-                    // Remove digits
-                    name = name.replace(/[0-9]/g, '')
-                    const withPrefix = name.startsWith('Dr.') ? name : `Dr. ${name}`
-                    setForm((prev) => ({ ...prev, doctorName: withPrefix }))
-                    //Clear error if valid
-                    if (withPrefix.length > 3) {
-                      setFormErrors((prev) => ({ ...prev, doctorName: '' }))
-                    }
-                  }}
-                  invalid={!!formErrors.doctorName}
-                />
-              </div>
-              {formErrors.doctorName && (
-                <div className="text-danger mt-1">{formErrors.doctorName}</div>
-              )}
-            </CCol>{' '}
-            <CCol md={6}>
-              <CFormLabel>
-                License Number
-                <span className="text-danger">*</span>
-              </CFormLabel>
+              <label className="dm-label">Doctor Name <span className="req">*</span></label>
               <CFormInput
-                value={form.doctorLicence}
+                className="dm-input"
+                value={form.doctorName}
                 onChange={(e) => {
-                  let value = e.target.value
-
-                  // ✅ Optionally remove unwanted characters as user types
-                  // Allow letters, numbers, spaces, / . -
-                  value = value.replace(/[^A-Za-z0-9\s/.-]/g, '')
-
-                  setForm((prev) => ({ ...prev, doctorLicence: value }))
-
-                  // Validation
-                  let error = ''
-                  const trimmedValue = value.trim()
-                  if (!trimmedValue) {
-                    error = 'License Number is required.'
-                  } else if (trimmedValue.length < 3 || trimmedValue.length > 20) {
-                    error = 'License Number must be between 3 and 20 characters.'
-                  } else if (!/[A-Za-z0-9]/.test(trimmedValue)) {
-                    error = 'License Number cannot contain only special characters.'
-                  } else {
-                    // Check duplicate
-                    const isDuplicate = doctorData?.data?.some(
-                      (doctor) => doctor.doctorLicence === trimmedValue,
-                    )
-                    if (isDuplicate) {
-                      error = 'This License Number already exists.'
-                    }
-                  }
-
-                  setFormErrors((prev) => ({ ...prev, doctorLicence: error }))
+                  let v = e.target.value.replace(/[^A-Za-z\s.]/g, '')
+                  const w = v.startsWith('Dr.') ? v : `Dr. ${v}`
+                  setForm((p) => ({ ...p, doctorName: w }))
+                  if (w.length > 3) clearFieldError('doctorName')
                 }}
-                invalid={!!formErrors?.doctorLicence}
+                invalid={!!formErrors.doctorName}
+                placeholder="Dr. Full Name"
               />
-
-              {formErrors?.doctorLicence && (
-                <small className="text-danger">{formErrors.doctorLicence}</small>
-              )}
+              <Err field="doctorName" />
             </CCol>
             <CCol md={6}>
-              <CFormLabel>
-                Gender
-                <span className="text-danger">*</span>
-              </CFormLabel>
+              <label className="dm-label">Gender <span className="req">*</span></label>
               <CFormSelect
+                className={`dm-select-native ${formErrors.gender ? 'is-invalid' : ''}`}
                 value={form.gender}
                 onChange={(e) => {
-                  const value = e.target.value
-                  setForm((p) => ({ ...p, gender: value }))
-
-                  // ✅ Validation
-                  let error = ''
-                  if (!value || value.trim() === '') {
-                    error = 'Gender is required.'
-                  }
-                  setFormErrors((prev) => ({ ...prev, gender: error }))
+                  setForm((p) => ({ ...p, gender: e.target.value }))
+                  clearFieldError('gender')
                 }}
-                className={formErrors.gender ? 'is-invalid' : ''}
               >
-                <option value="">Select Gender</option>
+                <option value="">Select gender</option>
                 <option value="Female">Female</option>
                 <option value="Male">Male</option>
                 <option value="Other">Other</option>
               </CFormSelect>
-              {formErrors.gender && <div className="text-danger">{formErrors.gender}</div>}
+              <Err field="gender" />
             </CCol>
             <CCol md={6}>
-              <CFormLabel>
-                Experience (years)
-                <span className="text-danger">*</span>
-              </CFormLabel>
+              <label className="dm-label">License Number <span className="req">*</span></label>
               <CFormInput
+                className="dm-input"
+                value={form.doctorLicence}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^A-Za-z0-9\s/.-]/g, '')
+                  setForm((p) => ({ ...p, doctorLicence: v }))
+                  const isDup = doctorData?.data?.some((d) => d.doctorLicence === v.trim())
+                  setFormErrors((p) => ({ ...p, doctorLicence: isDup ? 'License already exists' : '' }))
+                }}
+                invalid={!!formErrors.doctorLicence}
+                placeholder="License number"
+              />
+              <Err field="doctorLicence" />
+            </CCol>
+            <CCol md={6}>
+              <label className="dm-label">Qualification <span className="req">*</span></label>
+              <CFormInput
+                className="dm-input"
+                value={form.qualification}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setForm((p) => ({ ...p, qualification: v }))
+                  if (v.trim().length >= 2) clearFieldError('qualification')
+                }}
+                invalid={!!formErrors.qualification}
+                placeholder="e.g. MBBS, MD"
+              />
+              <Err field="qualification" />
+            </CCol>
+            <CCol md={6}>
+              <label className="dm-label">Specialization <span className="req">*</span></label>
+              <CFormInput
+                className="dm-input"
+                value={form.specialization}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^A-Za-z\s]/g, '')
+                  setForm((p) => ({ ...p, specialization: v }))
+                  if (v.trim().length >= 2) clearFieldError('specialization')
+                }}
+                invalid={!!formErrors.specialization}
+                placeholder="e.g. Cardiology"
+              />
+              <Err field="specialization" />
+            </CCol>
+            <CCol md={6}>
+              <label className="dm-label">Experience (years) <span className="req">*</span></label>
+              <CFormInput
+                className="dm-input"
                 type="number"
                 value={form.experience}
                 onChange={(e) => {
-                  let value = e.target.value
-
-                  // ✅ Allow only numbers and max 2 digits
-                  if (/^\d{0,2}$/.test(value)) {
-                    setForm((p) => ({ ...p, experience: value }))
-
-                    // Validation
-                    let error = ''
-                    if (!value) {
-                      error = 'Experience is required.'
-                    } else if (Number(value) < 0) {
-                      error = 'Experience must be a non-negative number.'
-                    }
-
-                    setFormErrors((prev) => ({ ...prev, experience: error }))
+                  if (/^\d{0,2}$/.test(e.target.value)) {
+                    setForm((p) => ({ ...p, experience: e.target.value }))
+                    clearFieldError('experience')
                   }
                 }}
                 invalid={!!formErrors.experience}
+                placeholder="Years"
               />
-              {formErrors.experience && (
-                <div className="text-danger mt-1">{formErrors.experience}</div>
-              )}
+              <Err field="experience" />
             </CCol>
+          </CRow>
+
+          <div className="dm-divider" />
+
+          {/* Section 3: Employment & Identification */}
+          <SectionHeading text="Employment & Identification" />
+          <CRow className="g-3 mb-2">
             <CCol md={6}>
-              <CFormLabel>
-                Qualification
-                <span className="text-danger">*</span>
-              </CFormLabel>
+              <label className="dm-label">Date of Birth <span className="req">*</span></label>
               <CFormInput
-                value={form.qualification}
+                type="date"
+                className="dm-input"
+                value={form.dateofBirth}
                 onChange={(e) => {
-                  let value = e.target.value
-
-                  // ✅ Remove digits
-                  value = value.replace(/[0-9]/g, '')
-
-                  // ✅ Update form
-                  setForm((prev) => ({ ...prev, qualification: value }))
-
-                  // ✅ Validation
-                  let error = ''
-                  const trimmedValue = value.trim()
-                  if (!trimmedValue) {
-                    error = 'Qualification is required.'
-                  } else if (!/^[A-Za-z\s]+$/.test(trimmedValue)) {
-                    error = 'Qualification can contain only letters and spaces.'
-                  } else if (trimmedValue.length < 2 || trimmedValue.length > 50) {
-                    error = 'Qualification must be between 2 and 50 characters.'
-                  }
-
-                  setFormErrors((prev) => ({ ...prev, qualification: error }))
+                  setForm((p) => ({ ...p, dateofBirth: e.target.value }))
+                  clearFieldError('dateofBirth')
                 }}
-                invalid={!!formErrors.qualification}
+                invalid={!!formErrors.dateofBirth}
+                max={new Date(new Date().setFullYear(new Date().getFullYear() - 21)).toISOString().split('T')[0]}
+                min={new Date(new Date().setFullYear(new Date().getFullYear() - 100)).toISOString().split('T')[0]}
               />
-              {formErrors.qualification && (
-                <div className="text-danger mt-1">{formErrors.qualification}</div>
-              )}
+              <Err field="dateofBirth" />
             </CCol>
             <CCol md={6}>
-              <CFormLabel>
-                Specialization
-                <span className="text-danger">*</span>
-              </CFormLabel>
+              <label className="dm-label">Date of Joining <span className="req">*</span></label>
               <CFormInput
-                value={form.specialization}
+                type="date"
+                className="dm-input"
+                value={form.dateofJoining}
                 onChange={(e) => {
-                  let value = e.target.value
-
-                  // ✅ Remove digits
-                  value = value.replace(/[0-9]/g, '')
-
-                  // ✅ Update form state
-                  setForm((prev) => ({ ...prev, specialization: value }))
-
-                  // ✅ Validation
-                  let error = ''
-                  const trimmedValue = value.trim()
-                  if (!trimmedValue) {
-                    error = 'Specialization is required.'
-                  } else if (!/^[A-Za-z\s]+$/.test(trimmedValue)) {
-                    error = 'Specialization can contain only letters and spaces.'
-                  } else if (trimmedValue.length < 2 || trimmedValue.length > 50) {
-                    error = 'Specialization must be between 2 and 50 characters.'
-                  }
-
-                  setFormErrors((prev) => ({ ...prev, specialization: error }))
+                  setForm((p) => ({ ...p, dateofJoining: e.target.value }))
+                  clearFieldError('dateofJoining')
                 }}
-                invalid={!!formErrors.specialization}
+                invalid={!!formErrors.dateofJoining}
+                max={new Date().toISOString().split('T')[0]}
+                min={new Date(new Date().setFullYear(new Date().getFullYear() - 15)).toISOString().split('T')[0]}
               />
-              {formErrors.specialization && (
-                <div className="text-danger mt-1">{formErrors.specialization}</div>
-              )}
+              <Err field="dateofJoining" />
             </CCol>
             <CCol md={6}>
-              <CFormLabel>
-                Profile Description
-                <span className="text-danger">*</span>
-              </CFormLabel>
+              <label className="dm-label">Aadhar ID <span className="req">*</span></label>
+              <CFormInput
+                className="dm-input"
+                value={form.aadharID}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '').slice(0, 12)
+                  setForm((p) => ({ ...p, aadharID: v }))
+                  if (v.length === 12) clearFieldError('aadharID')
+                }}
+                invalid={!!formErrors.aadharID}
+                placeholder="1234 5678 9012"
+              />
+              <Err field="aadharID" />
+            </CCol>
+            <CCol md={6}>
+              <label className="dm-label">Emergency Contact <span className="req">*</span></label>
+              <CFormInput
+                className="dm-input"
+                value={form.emergencyContact}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '').slice(0, 10)
+                  setForm((p) => ({ ...p, emergencyContact: v }))
+                  if (v.length === 10 || v.length === 0) clearFieldError('emergencyContact')
+                }}
+                invalid={!!formErrors.emergencyContact}
+                placeholder="Emergency number"
+              />
+              <Err field="emergencyContact" />
+            </CCol>
+            <CCol md={6}>
+              <label className="dm-label">Monthly Paid Leaves</label>
+              <CFormInput
+                className="dm-input"
+                type="number"
+                value={monthlyLeaves}
+                onChange={(e) => setMonthlyLeaves(e.target.value)}
+                min={0}
+                placeholder="0"
+              />
+            </CCol>
+          </CRow>
+
+          <div className="dm-divider" />
+
+          {/* Section 4: Additional Information */}
+          <SectionHeading text="Additional Information" />
+          <CRow className="g-3 mb-2">
+            <CCol md={6}>
+              <label className="dm-label">Profile Picture <span className="req">*</span></label>
+              <div className="dm-upload-box">
+                <CFormInput
+                  type="file"
+                  accept="image/jpeg, image/png"
+                  className="dm-file-input"
+                  onChange={(e) => {
+                    const file = e.target.files[0]
+                    if (!file) return
+                    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+                      setFormErrors((p) => ({ ...p, doctorPicture: 'Only JPG/PNG allowed' }))
+                      return
+                    }
+                    if (file.size > 250 * 1024) {
+                      setFormErrors((p) => ({ ...p, doctorPicture: 'Max 250 KB' }))
+                      return
+                    }
+                    const r = new FileReader()
+                    r.onloadend = () => {
+                      setForm((p) => ({ ...p, doctorPicture: r.result, doctorPictureFile: file }))
+                      clearFieldError('doctorPicture')
+                    }
+                    r.readAsDataURL(file)
+                  }}
+                />
+                {form.doctorPicture && (
+                  <div className="dm-image-preview">
+                    <img src={form.doctorPicture} alt="Preview" />
+                  </div>
+                )}
+              </div>
+              <Err field="doctorPicture" />
+            </CCol>
+            <CCol md={12}>
+              <label className="dm-label">Profile Description <span className="req">*</span></label>
               <CFormTextarea
+                className="dm-textarea"
+                rows={3}
                 value={form.profileDescription}
                 onChange={(e) => {
-                  let value = e.target.value
-
-                  // ✅ Remove digits (optional, if you don't want numbers)
-                  value = value.replace(/[0-9]/g, '')
-
-                  // ✅ Update form state
-                  setForm((prev) => ({ ...prev, profileDescription: value }))
-
-                  // ✅ Validation
-                  let error = ''
-                  const trimmedValue = value.trim()
-                  if (!trimmedValue) {
-                    error = 'Profile description is required.'
-                  }
-                  // } else if (!/^[A-Za-z\s.,'-]+$/.test(trimmedValue)) {
-                  //   // Allow letters, spaces, periods, commas, apostrophes, hyphens
-                  //   error = 'Profile description can contain only letters and common punctuation.'
-                  // }
-                  else if (trimmedValue.length < 10 || trimmedValue.length > 5000) {
-                    // Minimum 10, maximum 500 characters
-                    error = 'Profile description must be between 10 and 5000 characters.'
-                  }
-
-                  setFormErrors((prev) => ({ ...prev, profileDescription: error }))
+                  const v = e.target.value.replace(/[0-9]/g, '')
+                  setForm((p) => ({ ...p, profileDescription: v }))
+                  if (v.trim().length >= 10) clearFieldError('profileDescription')
                 }}
                 invalid={!!formErrors.profileDescription}
-                rows={4}
+                placeholder="Brief professional summary..."
               />
-
-              {formErrors.profileDescription && (
-                <div className="text-danger mt-1">{formErrors.profileDescription}</div>
-              )}
-            </CCol>
-            <CCol md={6}>
-              <CFormLabel>
-                Profile Picture
-                <span className="text-danger">*</span>
-              </CFormLabel>
-              <CFormInput
-                type="file"
-                accept="image/jpeg, image/png"
-                onChange={(e) => {
-                  const file = e.target.files[0]
-                  if (!file) {
-                    setFormErrors((prev) => ({
-                      ...prev,
-                      doctorPicture: 'Profile picture is required',
-                    }))
-                    setForm((prev) => ({ ...prev, doctorPicture: '' }))
-                    return
-                  }
-
-                  const validTypes = ['image/jpeg', 'image/png']
-                  if (!validTypes.includes(file.type)) {
-                    setFormErrors((prev) => ({
-                      ...prev,
-                      doctorPicture: 'Only JPG and PNG images are allowed',
-                    }))
-                    setForm((prev) => ({ ...prev, doctorPicture: '' }))
-                    return
-                  }
-
-                  const MAX_SIZE = 2 * 1024 * 1024 // 2 MB
-                  if (file.size > MAX_SIZE) {
-                    setFormErrors((prev) => ({
-                      ...prev,
-                      doctorPicture: 'File size must be less than 2 MB',
-                    }))
-                    setForm((prev) => ({ ...prev, doctorPicture: '' }))
-                    return
-                  }
-
-                  // If everything is okay
-                  const reader = new FileReader()
-                  reader.onloadend = () => {
-                    setForm((prev) => ({ ...prev, doctorPicture: reader.result }))
-                    setFormErrors((prev) => ({ ...prev, doctorPicture: '' }))
-                  }
-                  reader.readAsDataURL(file)
-                }}
-              />
-              {formErrors.doctorPicture && (
-                <div className="text-danger">{formErrors.doctorPicture}</div>
-              )}
-            </CCol>
-            <CCol xs={12} md={6}>
-  <CFormLabel>
-    Monthly Paid Leaves
-  </CFormLabel>
-
-  <CFormInput
-    type="number"
-    value={monthlyLeaves}
-    onChange={(e) => setMonthlyLeaves(e.target.value)}
-    min={0}
-  />
-</CCol>
-
-          </CRow>
-
-          <hr />
-
-          <h5 className="mb-3">Working Schedule</h5>
-          <CRow className="g-4 mb-4">
-            <CCol md={6}>
-              <CFormLabel>
-                Start Day <span className="text-danger">*</span>
-              </CFormLabel>
-              <CFormSelect
-                value={startDay}
-                onChange={(e) => {
-                  setStartDay(e.target.value)
-                  availableDays(e.target.value, 'start')
-                  setFormErrors((prev) => ({ ...prev, startDay: '' })) // clear startDay error
-                }}
-              >
-                <option value="">Select</option>
-                {days.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </CFormSelect>
-              {formErrors.startDay && <div className="text-danger">{formErrors.startDay}</div>}
-            </CCol>
-
-            <CCol md={6}>
-              <CFormLabel>
-                End Day <span className="text-danger">*</span>
-              </CFormLabel>
-              <CFormSelect
-                value={endDay}
-                onChange={(e) => {
-                  setEndDay(e.target.value)
-                  availableDays(e.target.value, 'end')
-                  setFormErrors((prev) => ({ ...prev, endDay: '' })) // clear endDay error
-                }}
-              >
-                <option value="">Select</option>
-                {days.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </CFormSelect>
-              {formErrors.endDay && <div className="text-danger">{formErrors.endDay}</div>}
-            </CCol>
-            <CCol md={6}>
-              <CFormLabel>
-                Start Time <span className="text-danger">*</span>
-              </CFormLabel>
-              <CFormSelect
-                value={startTime}
-                onChange={(e) => {
-                  setStartTime(e.target.value)
-                  handleTimeChange(e.target.value, 'start')
-                  setFormErrors((prev) => ({ ...prev, startTime: '' })) // clear startTime error
-                }}
-              >
-                <option value="">Select</option>
-                {times.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </CFormSelect>
-              {formErrors.startTime && <div className="text-danger">{formErrors.startTime}</div>}
-            </CCol>
-
-            <CCol md={6}>
-              <CFormLabel>
-                End Time <span className="text-danger">*</span>
-              </CFormLabel>
-              <CFormSelect
-                value={endTime}
-                onChange={(e) => {
-                  setEndTime(e.target.value)
-                  handleTimeChange(e.target.value, 'end')
-                  setFormErrors((prev) => ({ ...prev, endTime: '' })) // clear endTime error
-                }}
-              >
-                <option value="">Select</option>
-                {times.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </CFormSelect>
-              {formErrors.endTime && <div className="text-danger">{formErrors.endTime}</div>}
+              <Err field="profileDescription" />
             </CCol>
           </CRow>
 
-          <hr />
+          <div className="dm-divider" />
 
-          <CRow className="g-4 mb-4">
-            <CCol xs={12}>
-              <h5 className="mb-3">Consultations & Contact</h5>
-            </CCol>
+          {/* Section 3: Working Schedule */}
+          <SectionHeading text="Working Schedule" />
+          <CRow className="g-3 mb-2">
+            {[['startDay', 'Start Day', 'start'], ['endDay', 'End Day', 'end']].map(([field, lbl, type]) => (
+              <CCol md={6} key={field}>
+                <label className="dm-label">{lbl} <span className="req">*</span></label>
+                <CFormSelect
+                  className={`dm-select-native ${formErrors[field] ? 'is-invalid' : ''}`}
+                  value={field === 'startDay' ? startDay : endDay}
+                  onChange={(e) => {
+                    availableDays(e.target.value, type)
+                    clearFieldError(field)
+                  }}
+                >
+                  <option value="">Select day</option>
+                  {days.map((d) => <option key={d} value={d}>{d}</option>)}
+                </CFormSelect>
+                <Err field={field} />
+              </CCol>
+            ))}
+            {[['startTime', 'Start Time', 'start'], ['endTime', 'End Time', 'end']].map(([field, lbl, type]) => (
+              <CCol md={6} key={field}>
+                <label className="dm-label">{lbl} <span className="req">*</span></label>
+                <CFormSelect
+                  className={`dm-select-native ${formErrors.availableTimes ? 'is-invalid' : ''}`}
+                  value={field === 'startTime' ? startTime : endTime}
+                  onChange={(e) => {
+                    handleTimeChange(e.target.value, type)
+                    clearFieldError('availableTimes')
+                  }}
+                >
+                  <option value="">Select time</option>
+                  {times.map((t) => <option key={t} value={t}>{t}</option>)}
+                </CFormSelect>
+              </CCol>
+            ))}
+            {formErrors.availableTimes && (
+              <CCol md={12}><div className="dm-error">{formErrors.availableTimes}</div></CCol>
+            )}
+          </CRow>
 
-            {/* Row: Consultation Type (Checkboxes) */}
-            <CCol xs={12}>
-              <div className="d-flex align-items-center flex-wrap gap-4">
-                <strong>Consultation Type:</strong>
+          <div className="dm-divider" />
 
-                <CFormCheck
-                  type="checkbox"
-                  label="Services & Treatments"
-                  checked={enabledTypes.serviceTreatment}
-                  onChange={() => toggleType('serviceTreatment')}
-                />
-                <CFormCheck
-                  type="checkbox"
-                  label="In-Clinic Consultation"
-                  checked={enabledTypes.inClinic}
-                  onChange={() => toggleType('inClinic')}
-                />
-                <CFormCheck
-                  type="checkbox"
-                  label="Online Consultation"
-                  checked={enabledTypes.online}
-                  onChange={() => toggleType('online')}
-                />
-              </div>
-            </CCol>
+          {/* Section 4: Consultation & Contact */}
+          <SectionHeading text="Consultations & Contact" />
+          <CRow className="g-3 mb-2">
 
-            {/* Row: Input fields side-by-side, label below */}
-            <CCol xs={12}>
-              <div className="d-flex gap-4 flex-wrap">
-                {/* In-Clinic Fee Input */}
-                {enabledTypes.inClinic && (
-  <div style={{ flex: 1 }}>
-    <CFormLabel>
-      In-Clinic Consultation Fee
-      <span className="text-danger">*</span>
-    </CFormLabel>
-
-    <CFormInput
-      type="number"
-      placeholder="In-Clinic Consultation Fee"
-      value={form.doctorFees.inClinicFee}
-      onChange={(e) => {
-        const value = e.target.value
-        setForm((prev) => ({
-          ...prev,
-          doctorFees: {
-            ...prev.doctorFees,
-            inClinicFee: value,
-          },
-        }))
-
-        if (value && Number(value) > 0) {
-          setFormErrors((prev) => ({ ...prev, inClinicFee: '' }))
-        }
-      }}
-    />
-
-    {formErrors.inClinicFee && (
-      <div className="text-danger">{formErrors.inClinicFee}</div>
-    )}
-  </div>
-)}
-
-
-                {/* Video/Online Fee Input */}
-             {enabledTypes.online && (
-  <div style={{ flex: 1 }}>
-    <CFormLabel>
-      Online Consultation Fee
-      <span className="text-danger">*</span>
-    </CFormLabel>
-
-    <CFormInput
-      type="number"
-      placeholder="Online Consultation Fee"
-      value={form.doctorFees.vedioConsultationFee}
-      onChange={(e) => {
-        const value = e.target.value
-        setForm((prev) => ({
-          ...prev,
-          doctorFees: {
-            ...prev.doctorFees,
-            vedioConsultationFee: value,
-          },
-        }))
-
-        if (value && Number(value) > 0) {
-          setFormErrors((prev) => ({
-            ...prev,
-            vedioConsultationFee: '',
-          }))
-        }
-      }}
-    />
-
-    {formErrors.vedioConsultationFee && (
-      <div className="text-danger">{formErrors.vedioConsultationFee}</div>
-    )}
-  </div>
-)}
-
-              </div>
-            </CCol>
-
-            {/* Mobile Number */}
             <CCol md={6}>
-              <CFormLabel>
-                Contact Number
-                <span className="text-danger">*</span>
-              </CFormLabel>
+              <label className="dm-label">Consultation Fee (₹) <span className="req">*</span></label>
               <CFormInput
+                className="dm-input"
+                type="number"
+                value={form.doctorFees.inClinicFee}
+                invalid={!!formErrors.inClinicFee}
+                onChange={(e) => {
+                  setForm((p) => ({ ...p, doctorFees: { ...p.doctorFees, inClinicFee: e.target.value } }))
+                  if (Number(e.target.value) > 0) clearFieldError('inClinicFee')
+                }}
+                placeholder="Amount in ₹"
+              />
+              <Err field="inClinicFee" />
+            </CCol>
+
+            {/* {enabledTypes.online && (
+              <CCol md={6}>
+                <label className="dm-label">Online Fee (₹) <span className="req">*</span></label>
+                <CFormInput
+                  className="dm-input"
+                  type="number"
+                  value={form.doctorFees.vedioConsultationFee}
+                  onChange={(e) => {
+                    setForm((p) => ({ ...p, doctorFees: { ...p.doctorFees, vedioConsultationFee: e.target.value } }))
+                    if (Number(e.target.value) > 0) clearFieldError('vedioConsultationFee')
+                  }}
+                  placeholder="Amount in ₹"
+                />
+                <Err field="vedioConsultationFee" />
+              </CCol>
+            )} */}
+            <CCol md={6}>
+              <label className="dm-label">Contact Number <span className="req">*</span></label>
+              <CFormInput
+                className="dm-input"
                 type="tel"
                 maxLength={10}
                 value={form.doctorMobileNumber}
                 onChange={(e) => {
-                  const value = e.target.value
-
-                  // ✅ Allow only digits and max 10
-                  if (/^\d{0,10}$/.test(value)) {
-                    setForm((prev) => ({ ...prev, doctorMobileNumber: value }))
-
-                    // ✅ Run validator and update error
-                    let error = ''
-                    if (!value) {
-                      error = 'Mobile number is required.'
-                    } else if (!/^\d{10}$/.test(value)) {
-                      error = 'Mobile number must be exactly 10 digits.'
-                    }
-
-                    setFormErrors((prev) => ({ ...prev, doctorMobileNumber: error }))
+                  if (/^\d{0,10}$/.test(e.target.value)) {
+                    setForm((p) => ({ ...p, doctorMobileNumber: e.target.value }))
+                    if (e.target.value.length === 10) clearFieldError('doctorMobileNumber')
                   }
                 }}
-                placeholder="Enter 10-digit number"
                 invalid={!!formErrors.doctorMobileNumber}
+                placeholder="10-digit mobile"
               />
-
-              {formErrors.doctorMobileNumber && (
-                <div className="text-danger">{formErrors.doctorMobileNumber}</div>
-              )}
+              <Err field="doctorMobileNumber" />
             </CCol>
             <CCol md={6}>
-              <CFormLabel>
-                Email Address
-                <span className="text-danger">*</span>
-              </CFormLabel>
+              <label className="dm-label">Email Address <span className="req">*</span></label>
               <CFormInput
+                className="dm-input"
                 type="email"
                 value={form.doctorEmail}
                 onChange={(e) => {
-                  const value = e.target.value
-                  setForm((prev) => ({ ...prev, doctorEmail: value }))
-
-                  let error = ''
-                  if (!value.trim()) {
-                    error = 'Email is required.'
-                  } else {
-                    if (!emailPattern.test(value.trim())) {
-                      error = 'Enter a valid email address.'
-                    }
-                  }
-
-                  setFormErrors((prev) => ({ ...prev, doctorEmail: error }))
+                  setForm((p) => ({ ...p, doctorEmail: e.target.value }))
+                  if (emailPattern.test(e.target.value.trim())) clearFieldError('doctorEmail')
                 }}
-                placeholder="Enter doctor email"
                 invalid={!!formErrors.doctorEmail}
+                placeholder="doctor@email.com"
               />
-
-              {formErrors.doctorEmail && (
-                <div className="text-danger">{formErrors.doctorEmail}</div>
-              )}
+              <Err field="doctorEmail" />
             </CCol>
           </CRow>
 
-          <hr />
+          <div className="dm-divider" />
 
-          <h5 className="mb-3">Additional Details</h5>
-          <CRow>
+          {/* Section 5: Additional Details */}
+          <SectionHeading text="Additional Details" />
+          <CRow className="g-3 mb-2">
             <CCol md={6}>
-              <CFormLabel>Association/Membership</CFormLabel>
+              <label className="dm-label">Association / Membership</label>
               <CFormInput
+                className="dm-input"
                 value={form.associationsOrMemberships}
-                onChange={(e) => {
-                  let value = e.target.value
-                  // Remove numbers
-                  value = value.replace(/[0-9]/g, '')
-                  setForm((p) => ({ ...p, associationsOrMemberships: value }))
-
-                  // Validation
-                  let error = ''
-                  if (!value.trim()) {
-                    error = 'Associations or Memberships is required.'
-                  } else if (value.trim().length < 2 || value.trim().length > 100) {
-                    error = 'Must be between 2 and 100 characters.'
-                  }
-
-                  setFormErrors((prev) => ({ ...prev, associationsOrMemberships: error }))
-                }}
-                invalid={!!formErrors.associationsOrMemberships}
+                onChange={(e) => setForm((p) => ({ ...p, associationsOrMemberships: e.target.value.replace(/[0-9]/g, '') }))}
+                placeholder="e.g. IMA Member"
               />
-
-              {formErrors.associationsOrMemberships && (
-                <div className="text-danger mt-1">{formErrors.associationsOrMemberships}</div>
-              )}
             </CCol>
             <CCol md={6}>
-              <CFormLabel>
-                Branch
-                <span className="text-danger">*</span>
-              </CFormLabel>
+              <label className="dm-label">Branch <span className="req">*</span></label>
               <Select
                 isMulti
                 options={branchOptions}
-                value={branchOptions.filter(
-                  (opt) =>
-                    Array.isArray(form.branch) && form.branch.some((b) => b.branchId === opt.value),
-                )}
-                onChange={(selected) => {
-                  setForm((prev) => ({
-                    ...prev,
-                    branch: selected.map((opt) => ({
-                      branchId: opt.value,
-                      branchName: opt.label,
-                    })),
-                  }))
-
-                  // Validation: At least one branch must be selected
-                  setFormErrors((prev) => ({
-                    ...prev,
-                    branch: selected.length > 0 ? '' : 'Please select at least one branch',
-                  }))
+                value={branchOptions.filter((o) => Array.isArray(form.branch) && form.branch.some((b) => b.branchId === o.value))}
+                onChange={(sel) => {
+                  setForm((p) => ({ ...p, branch: sel.map((o) => ({ branchId: o.value, branchName: o.label })) }))
+                  if (sel.length) clearFieldError('branch')
                 }}
-                placeholder="Select branches..."
-                className={formErrors.branch ? 'is-invalid' : ''}
+                placeholder="Select branches"
+                classNamePrefix="dm-select"
               />
-              {formErrors.branch && <div className="text-danger">{formErrors.branch}</div>}
+              <Err field="branch" />
             </CCol>
           </CRow>
-          <ChipSection
-            label="Area of Expertise"
-            items={form.focusAreas}
-            onAdd={(items) => {
-              // ✅ Filter out items that are all numbers
-              const validItems = items.filter((item) => !/^\d+$/.test(item.trim()))
 
-              // ✅ Show toast if some items were rejected
-              if (validItems.length < items.length) {
-                showCustomToast('Numbers are not allowed in Area of Expertise', 'error')
-              }
-
-              // ✅ Update form state with only valid items
-              setForm((prev) => ({ ...prev, focusAreas: validItems }))
-
-              // ✅ Validation: must have at least one valid item
-              setFormErrors((prev) => ({
-                ...prev,
-                focusAreas:
-                  validItems.length > 0
-                    ? ''
-                    : 'Please add at least one valid focus area (no numbers)',
-              }))
-            }}
-          />
-
-          {/* show error */}
-          {formErrors.focusAreas && <div className="text-danger mt-1">{formErrors.focusAreas}</div>}
-
-          <div className="mb-3">
-            {/* <label label="Language">Languages Known</label> */}
-            <ChipSection
-              label="Languages Known"
-              items={form.languages}
+          <div style={{ marginTop: 12 }}>
+            <ChipSection label="Area of Expertise" items={form.focusAreas}
+              onAdd={(items) => { const v = items.filter((i) => !/^\d+$/.test(i.trim())); setForm((p) => ({ ...p, focusAreas: v })) }} />
+            <ChipSection label="Languages Known" items={form.languages} onlyAlpha required
               onAdd={(items) => {
-                // ✅ Filter out items that contain numbers
-                const validItems = items.filter((item) => /^[A-Za-z\s]+$/.test(item.trim()))
-
-                // ✅ Show toast if invalid items were removed
-                if (validItems.length < items.length) {
-                  showCustomToast('Only alphabets are allowed in Languages Known', 'error')
-                }
-
-                // ✅ Update form state
-                setForm((prev) => ({ ...prev, languages: validItems }))
-
-                // ✅ Validation: At least one valid language
-                setFormErrors((prev) => ({
-                  ...prev,
-                  languages:
-                    validItems.length > 0
-                      ? ''
-                      : 'Please add at least one valid language (alphabets only)',
-                }))
-              }}
-              inputProps={{
-                placeholder: 'Add language',
-              }}
-            />
-            {formErrors.languages && <div className="text-danger mt-1">{formErrors.languages}</div>}
-
-            {/* {formErrors.languages && <div className="text-danger mt-1">{formErrors.languages}</div>} */}
+                const v = items.filter((i) => /^[A-Za-z\s]+$/.test(i.trim()));
+                setForm((p) => ({ ...p, languages: v }));
+                if (v.length > 0) clearFieldError('languages');
+              }} />
+            <Err field="languages" />
+            <ChipSection label="Achievements / Awards" items={form.highlights}
+              onAdd={(items) => { const v = items.filter((i) => !/^\d+$/.test(i.trim())); setForm((p) => ({ ...p, highlights: v })) }} />
           </div>
 
-          <ChipSection
-            label="Achievements / Awards"
-            items={form.highlights}
-            onAdd={(items) => {
-              // ✅ Filter out items that are all numbers
-              const validItems = items.filter((item) => !/^\d+$/.test(item.trim()))
-
-              // ✅ Show toast if some invalid items were removed
-              if (validItems.length < items.length) {
-                showCustomToast('Numbers are not allowed in Achievements / Awards', 'error')
-              }
-
-              // ✅ Update form state with only valid items
-              setForm((prev) => ({ ...prev, highlights: validItems }))
-
-              // ✅ Optional validation: at least one valid achievement
-              setFormErrors((prev) => ({
-                ...prev,
-                highlights:
-                  validItems.length > 0
-                    ? ''
-                    : 'Please add at least one valid achievement (no numbers)',
-              }))
-            }}
-          />
-          {formErrors.highlights && <div className="text-danger mt-1">{formErrors.highlights}</div>}
-          <CCol md={6} className="d-flex align-items-center" style={{ gap: '20px' }}>
-            <div style={{ flex: 1 }}>
-              <CFormLabel htmlFor="doctorSignature">
-                Doctor Signature (to add in the E-Prescription)
-                <span className="text-danger">*</span>
-              </CFormLabel>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  padding: '4px',
-                  backgroundColor: '#f8f9fa',
+          {/* Section 6: Bank Account Details */}
+          <SectionHeading text="Bank Account Details" />
+          <CRow className="g-3 mb-2">
+            <CCol md={6}>
+              <label className="dm-label">Account Holder Name <span className="req">*</span></label>
+              <CFormInput
+                className="dm-input"
+                value={form.bankAccountDetails.accountHolderName}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^A-Za-z\s]/g, '')
+                  setForm((p) => ({ ...p, bankAccountDetails: { ...p.bankAccountDetails, accountHolderName: v } }))
+                  if (v.trim().length > 2) clearFieldError('accountHolderName')
                 }}
-              >
-                <CButton
-                  color="secondary"
-                  onClick={() => document.getElementById('file-input-doctor-signature').click()}
-                >
+                invalid={!!formErrors.accountHolderName}
+                placeholder="Account Holder Name"
+              />
+              <Err field="accountHolderName" />
+            </CCol>
+            <CCol md={6}>
+              <label className="dm-label">Account Number <span className="req">*</span></label>
+              <CFormInput
+                className="dm-input"
+                value={form.bankAccountDetails.accountNumber}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '')
+                  setForm((p) => ({ ...p, bankAccountDetails: { ...p.bankAccountDetails, accountNumber: v } }))
+                  if (v.length >= 9) clearFieldError('accountNumber')
+                }}
+                invalid={!!formErrors.accountNumber}
+                placeholder="Account Number"
+              />
+              <Err field="accountNumber" />
+            </CCol>
+            <CCol md={6}>
+              <label className="dm-label">IFSC Code <span className="req">*</span></label>
+              <CFormInput
+                className="dm-input"
+                value={form.bankAccountDetails.ifscCode}
+                onChange={(e) => {
+                  const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11)
+                  setForm((p) => ({ ...p, bankAccountDetails: { ...p.bankAccountDetails, ifscCode: v } }))
+                  if (/^[A-Z]{4}0[A-Z0-9]{6}$/.test(v)) {
+                    clearFieldError('ifscCode')
+                  }
+                  if (v.length === 11) {
+                    fetchBankDetails(v)
+                  }
+                }}
+                invalid={!!formErrors.ifscCode}
+                placeholder="IFSC Code"
+              />
+              <Err field="ifscCode" />
+              {isFetchingBankDetails && <small style={{ color: '#185fa5', fontSize: '11px', marginTop: '4px', display: 'block' }}>Fetching bank details...</small>}
+            </CCol>
+            <CCol md={6}>
+              <label className="dm-label">Bank Name <span className="req">*</span></label>
+              <CFormInput
+                className="dm-input"
+                value={form.bankAccountDetails.bankName}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^A-Za-z\s]/g, '')
+                  setForm((p) => ({ ...p, bankAccountDetails: { ...p.bankAccountDetails, bankName: v } }))
+                  if (v.trim().length > 2) clearFieldError('bankName')
+                }}
+                invalid={!!formErrors.bankName}
+                placeholder="Bank Name"
+              />
+              <Err field="bankName" />
+            </CCol>
+            <CCol md={6}>
+              <label className="dm-label">Branch Name <span className="req">*</span></label>
+              <CFormInput
+                className="dm-input"
+                value={form.bankAccountDetails.branchName}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^A-Za-z\s]/g, '')
+                  setForm((p) => ({ ...p, bankAccountDetails: { ...p.bankAccountDetails, branchName: v } }))
+                  if (v.trim().length > 2) clearFieldError('branchName')
+                }}
+                invalid={!!formErrors.branchName}
+                placeholder="Branch Name"
+              />
+              <Err field="branchName" />
+            </CCol>
+
+            <CCol md={6}>
+              <label className="dm-label">PAN Card Number <span className="req">*</span></label>
+              <CFormInput
+                className="dm-input"
+                value={form.bankAccountDetails.panCardNumber}
+                onChange={(e) => {
+                  const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10)
+                  setForm((p) => ({ ...p, bankAccountDetails: { ...p.bankAccountDetails, panCardNumber: v } }))
+                  if (/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(v)) clearFieldError('panCardNumber')
+                }}
+                invalid={!!formErrors.panCardNumber}
+                placeholder="PAN Card Number"
+              />
+              <Err field="panCardNumber" />
+            </CCol>
+          </CRow>
+
+          <div className="dm-divider" />
+
+          {/* Signature */}
+          <div className="dm-signature-row">
+            <div style={{ flex: 1 }}>
+              <label className="dm-label">
+                Doctor Signature (for E-Prescription) <span className="req">*</span>
+              </label>
+              <div className="dm-file-input-row">
+                <CButton color="secondary" size="sm"
+                  onClick={() => document.getElementById('sig-file-input').click()}>
                   Choose File
                 </CButton>
-                <span
-                  style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                >
-                  {form.doctorSignatureFileName || 'No file selected'}
-                </span>
+                <span className="dm-filename">{form.doctorSignatureFileName || 'No file selected'}</span>
               </div>
-
-              <CFormInput
-                id="file-input-doctor-signature"
+              <input
+                id="sig-file-input"
                 type="file"
                 accept="image/jpeg, image/png"
                 style={{ display: 'none' }}
                 onChange={(e) => {
                   const file = e.target.files[0]
-                  if (!file) {
-                    setForm((p) => ({ ...p, doctorSignature: null, doctorSignatureFileName: null }))
-                    setFormErrors((prev) => ({
-                      ...prev,
-                      doctorSignature: 'Profile picture is required',
-                    }))
-                    return
+                  if (!file) return
+                  if (!['image/jpeg', 'image/png'].includes(file.type)) { setFormErrors((p) => ({ ...p, doctorSignature: 'Only JPG/PNG allowed' })); return }
+                  if (file.size > 250 * 1024) { setFormErrors((p) => ({ ...p, doctorSignature: 'Max 250 KB' })); return }
+                  const r = new FileReader()
+                  r.onloadend = () => {
+                    setForm((p) => ({ ...p, doctorSignature: r.result, doctorSignatureFileName: file.name, doctorSignatureFile: file }))
+                    clearFieldError('doctorSignature')
                   }
-
-                  const validTypes = ['image/jpeg', 'image/png']
-                  if (!validTypes.includes(file.type)) {
-                    setFormErrors((prev) => ({
-                      ...prev,
-                      doctorSignature: 'Only JPG and PNG images are allowed',
-                    }))
-                    setForm((p) => ({ ...p, doctorSignature: null, doctorSignatureFileName: null }))
-                    return
-                  }
-
-                  const MAX_SIZE = 250 * 1024 // 250 KB
-                  if (file.size > MAX_SIZE) {
-                    setFormErrors((prev) => ({
-                      ...prev,
-                      doctorSignature: 'File size must be less than 250 KB',
-                    }))
-                    setForm((p) => ({ ...p, doctorSignature: null, doctorSignatureFileName: null }))
-                    return
-                  }
-
-                  const reader = new FileReader()
-                  reader.onloadend = () => {
-                    setForm((p) => ({
-                      ...p,
-                      doctorSignature: reader.result,
-                      doctorSignatureFileName: file.name,
-                    }))
-                    setFormErrors((prev) => ({ ...prev, doctorSignature: '' }))
-                  }
-                  reader.readAsDataURL(file)
+                  r.readAsDataURL(file)
                 }}
-                invalid={!!formErrors.doctorSignature}
               />
-              {formErrors.doctorSignature && (
-                <div className="text-danger p-2">{formErrors.doctorSignature}</div>
-              )}
+              <Err field="doctorSignature" />
             </div>
+            <div className="dm-sig-preview">
+              {form.doctorSignature
+                ? <img src={form.doctorSignature} alt="Signature" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                : <span className="dm-sig-placeholder">No signature</span>}
+            </div>
+          </div>
 
-            <div style={{ minWidth: '150px' }}>
-              {form.doctorSignature ? (
-                <img
-                  src={form.doctorSignature}
-                  alt="Doctor Signature Preview"
-                  style={{
-                    width: '150px',
-                    height: 'auto',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    objectFit: 'contain',
-                  }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: '150px',
-                    height: '80px',
-                    border: '1px dashed #ccc',
-                    borderRadius: '4px',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    color: '#999',
-                    fontSize: '14px',
-                  }}
-                >
-                  No Image
-                </div>
-              )}
-            </div>
-          </CCol>
         </CModalBody>
 
-        <CModalFooter>
-          <CButton
-            color="secondary"
-            onClick={() => {
-              // Reset form to initial state
-              setForm(initialForm)
-              setSelectedServices([])
-              setSelectedSubService([])
-              setSubServiceOptions([])
-              setServiceOptionsFormatted([])
-              setFormErrors({})
-              setNewService({
-                categoryId: [],
-                serviceId: [],
-                serviceName: [],
-                subServiceId: [],
-              })
-              setIsSubServiceComplete(true)
-            }}
-          >
-            Reset
-          </CButton>
-
-          <CButton
-            color="secondary"
-            onClick={() => {
-              // Reset and close modal
-              setForm(initialForm)
-              setSelectedServices([])
-              setSelectedSubService([])
-              setSubServiceOptions([])
-              setServiceOptionsFormatted([])
-              setFormErrors({})
-              setNewService({
-                categoryId: [],
-                serviceId: [],
-                serviceName: [],
-                subServiceId: [],
-              })
-              setModalVisible(false)
-              setIsSubServiceComplete(true)
-            }}
-          >
-            Cancel
-          </CButton>
-
-          <CButton
-            style={{
-              backgroundColor: 'var(--color-black)',
-              color: 'white',
-            }}
-            onClick={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <span className="spinner-border spinner-border-sm me-2 text-white" role="status" />
-                Saving...
-              </>
-            ) : (
-              'Save'
-            )}
-          </CButton>
+        <CModalFooter className="dm-modal-footer">
+          <button className="dm-btn-secondary" onClick={resetForm}>Reset</button>
+          <button className="dm-btn-secondary" onClick={() => { resetForm(); setModalVisible(false) }}>Cancel</button>
+          <button className="dm-btn-primary" onClick={handleSubmit} disabled={isSaving || saveloading}>
+            {(isSaving || saveloading)
+              ? <><span className="spinner-border spinner-border-sm me-2" />Saving...</>
+              : 'Save Doctor'}
+          </button>
         </CModalFooter>
       </CModal>
 
+      {/* ─── Styles ─────────────────────────────── */}
       <style>{`
-        .add-doctor-wrapper {
-          position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 1000;
+        .dm-wrapper { padding: 4px 0; }
+
+        /* Top bar */
+        .dm-top-bar { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+        .dm-add-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: #185fa5;
+          color: #ffffff;
+          border: none;
+          border-radius: 8px;
+          padding: 9px 20px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.15s, transform 0.1s;
+          box-shadow: 0 2px 8px rgba(24,95,165,0.20);
+        }
+        .dm-add-btn span,
+        .dm-add-btn svg { color: #ffffff; }
+        .dm-add-btn:hover { background: #0c447c; }
+        .dm-add-btn:active { transform: scale(0.98); }
+
+        /* Empty state */
+        .dm-center { display: flex; justify-content: center; align-items: center; min-height: 40vh; }
+        .dm-empty-state { display: flex; flex-direction: column; align-items: center; gap: 16px; color: #5f6e80; }
+        .dm-empty-icon { font-size: 48px; color: #b5d4f4; }
+
+        /* Modal */
+        .dm-modal-header {
+          background: #185fa5;
+          border-bottom: none;
+          padding: 14px 20px;
+        }
+        .dm-modal-title-row {
+          display: flex; align-items: center; gap: 10px; color: #fff;
+        }
+        .dm-modal-icon {
+          width: 34px; height: 34px; border-radius: 8px;
+          background: rgba(255,255,255,0.18);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 16px; color: #fff;
+        }
+        .dm-modal-header strong { font-size: 16px; color: #fff; }
+        .dm-modal-body { padding: 20px 24px; background: #f7fafd; }
+        .dm-modal-footer {
+          background: #fff; border-top: 0.5px solid #d0dce9;
+          padding: 12px 20px; display: flex; gap: 8px; justify-content: flex-end;
         }
 
-        .add-doctor-btn {
+        /* Section heading */
+        .dm-section-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; margin-top: 4px; }
+        .dm-section-bar { width: 3px; height: 20px; background: #185fa5; border-radius: 2px; flex-shrink: 0; }
+        .dm-section-title { font-size: 14px; font-weight: 600; color: #0c447c; margin: 0; }
+        /* Section headers */
+        .dm-section-header {
+          display: flex; align-items: center; gap: 12px;
+          margin: 24px 0 12px;
+        }
+        .dm-section-line { height: 1px; background: #e5e7eb; flex: 1; }
+        .dm-section-text {
+          font-size: 13px; font-weight: 700; color: #185fa5;
+          text-transform: uppercase; letter-spacing: 0.05em;
+        }
+
+        .dm-divider { border-top: 1px solid #e5e7eb; margin: 24px 0; }
+        
+        /* Labels */
+        .dm-label { font-size: 13px; font-weight: 500; color: #374151; display: block; margin-bottom: 4px; }
+        .req { color: #e24b4a; margin-left: 2px; }
+        .dm-error { font-size: 12px; color: #a32d2d; margin-top: 3px; }
+
+        /* ── ALL text inputs: unified 13px ───────────── */
+        .dm-input,
+        .dm-modal-body input[type="text"],
+        .dm-modal-body input[type="number"],
+        .dm-modal-body input[type="email"],
+        .dm-modal-body input[type="tel"],
+        .dm-modal-body input[type="file"] {
+          font-size: 13px !important;
+          color: #374151 !important;
+        }
+        .dm-input::placeholder,
+        .dm-modal-body input::placeholder {
+          font-size: 12px !important;
+          color: #9ca3af !important;
+        }
+          .dm-modal-header .btn-close {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+
+        /* Native selects (CFormSelect) */
+        .dm-select-native,
+        .dm-modal-body select {
+          font-size: 13px !important;
+          color: #374151 !important;
+          border: 1px solid #ced4da;
+          border-radius: 6px;
+          min-height: 36px;
+          padding: 4px 10px;
+        }
+        .dm-select-native option {
+          color: #374151 !important;
+          font-size: 13px !important;
+        }
+
+        /* Textarea */
+        .dm-textarea {
+          font-size: 13px !important;
+          color: #374151 !important;
+        }
+        .dm-textarea::placeholder {
+          font-size: 12px !important;
+          color: #9ca3af !important;
+        }
+
+        /* Buttons */
+        .dm-btn-primary {
+          background: #185fa5; color: #fff; border: none;
+          padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 600;
+          cursor: pointer; transition: background 0.15s, transform 0.1s;
+          display: inline-flex; align-items: center;
+        }
+        .dm-btn-primary:hover:not(:disabled)  { background: #0c447c; }
+        .dm-btn-primary:active:not(:disabled)  { transform: scale(0.98); }
+        .dm-btn-primary:disabled               { opacity: 0.6; cursor: not-allowed; }
+        .dm-btn-secondary {
+          background: #fff; color: #374151;
+          border: 0.5px solid #d0dce9; border-radius: 8px;
+          padding: 8px 16px; font-size: 13px; font-weight: 500;
+          cursor: pointer; transition: background 0.15s;
+        }
+        .dm-btn-secondary:hover { background: #f0f5fb; }
+
+        /* Consultation checkboxes */
+        .dm-consult-types { margin-bottom: 14px; }
+        .dm-check-row { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 8px; }
+        .dm-check-label {
+          display: flex; align-items: center; gap: 6px;
+          font-size: 13px; color: #374151; cursor: pointer;
+        }
+        .dm-check-label input[type="checkbox"] { accent-color: #185fa5; width: 15px; height: 15px; }
+
+        /* Chip section */
+        .chip-section { margin-bottom: 14px; }
+        .chip-input-row { display: flex; gap: 8px; margin-top: 4px; margin-bottom: 8px; }
+        .dm-add-chip-btn {
+          background: #185fa5; color: #fff; border: none;
+          padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+          cursor: pointer; white-space: nowrap; flex-shrink: 0;
+        }
+        .dm-add-chip-btn:hover { background: #0c447c; }
+        .chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+        .chip {
+          display: inline-flex; align-items: center; gap: 6px;
+          background: #e6f1fb; color: #0c447c;
+          border: 0.5px solid #b5d4f4; border-radius: 20px;
+          padding: 3px 10px; font-size: 12px; font-weight: 500;
+        }
+        .chip-remove {
+          cursor: pointer; font-size: 14px; line-height: 1;
+          color: #185fa5; font-weight: 700;
+        }
+        .chip-remove:hover { color: #a32d2d; }
+
+        /* Chip input */
+        .dm-chip-input { font-size: 13px !important; color: #374151 !important; }
+        .dm-chip-input::placeholder { font-size: 12px !important; color: #9ca3af !important; }
+
+        /* Signature */
+        .dm-signature-row { display: flex; gap: 16px; align-items: flex-start; margin-top: 14px; }
+        .dm-file-input-row {
+          display: flex; align-items: center; gap: 10px;
+          border: 0.5px solid #d0dce9; border-radius: 6px;
+          padding: 5px 10px; background: #fff; margin-top: 4px;
+        }
+        .dm-filename { font-size: 12px; color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .dm-sig-preview {
+          width: 140px; height: 80px; flex-shrink: 0;
+          border: 0.5px dashed #b5d4f4; border-radius: 6px;
+          background: #f7fafd; display: flex; align-items: center; justify-content: center;
+          overflow: hidden;
+        }
+        .dm-sig-placeholder { font-size: 11px; color: #b5d4f4; }
+
+        /* File upload box */
+        .dm-upload-box { display: flex; flex-direction: column; gap: 10px; }
+        .dm-file-input { padding: 6px; font-size: 13px !important; }
+        .dm-image-preview img {
+          width: 80px; height: 80px; object-fit: cover;
+          border-radius: 50%; border: 2px solid #e5e7eb;
+        }
+
+        /* ══════════════════════════════════════════════
+           REACT-SELECT OVERRIDES — ALL FIXED
+        ══════════════════════════════════════════════ */
+
+        /* Control box */
+        .dm-select__control {
+          border: 1px solid #ced4da !important;
+          border-radius: 6px !important;
+          min-height: 36px !important;
+          font-size: 13px !important;
+          background: #fff !important;
+        }
+        .dm-select__control--is-focused {
+          border-color: #185fa5 !important;
+          box-shadow: 0 0 0 2px rgba(24,95,165,0.15) !important;
+        }
+
+        /* Placeholder */
+        .dm-select__placeholder {
+          font-size: 12px !important;
+          color: #9ca3af !important;
+        }
+
+        /* Typed input text */
+        .dm-select__input-container,
+        .dm-select__input {
+          font-size: 13px !important;
+          color: #374151 !important;
+        }
+
+        /* Single value */
+        .dm-select__single-value {
+          font-size: 13px !important;
+          color: #374151 !important;
+        }
+
+        /* Multi-value tags */
+        .dm-select__multi-value {
+          background: #e6f1fb !important;
+          border-radius: 4px !important;
+        }
+        .dm-select__multi-value__label {
+          color: #0c447c !important;
+          font-size: 12px !important;
+        }
+        .dm-select__multi-value__remove:hover {
+          background: #b5d4f4 !important;
+          color: #0c447c !important;
+        }
+
+        /* Dropdown menu */
+        .dm-select__menu {
+          border: 1px solid #d0dce9 !important;
+          border-radius: 6px !important;
+          box-shadow: 0 4px 16px rgba(24,95,165,0.12) !important;
+          z-index: 9999 !important;
+        }
+        .dm-select__menu-list {
+          padding: 4px !important;
+        }
+
+        /* Dropdown options — THE KEY FIX */
+        .dm-select__option {
+          font-size: 13px !important;
+          color: #374151 !important;          /* dark readable text — was invisible */
+          background: transparent !important;
+          border-radius: 4px !important;
+          padding: 7px 10px !important;
+          cursor: pointer !important;
+        }
+        .dm-select__option--is-focused {
+          background: #e6f1fb !important;     /* light blue hover */
+          color: #0c447c !important;           /* dark blue on hover */
+        }
+        .dm-select__option--is-selected {
+          background: #185fa5 !important;     /* brand blue when selected */
+          color: #ffffff !important;           /* white text when selected */
+        }
+        .dm-select__option--is-selected.dm-select__option--is-focused {
+          background: #0c447c !important;     /* darker on selected+hover */
+          color: #ffffff !important;
+        }
+
+        /* No-options message */
+        .dm-select__no-options-message,
+        .dm-select__no-options {
+          font-size: 13px !important;
+          color: #9ca3af !important;
+        }
+
+        /* Indicator icons */
+        .dm-select__indicator-separator { background: #d0dce9 !important; }
+        .dm-select__dropdown-indicator { color: #6b7280 !important; }
+        .dm-select__dropdown-indicator:hover { color: #185fa5 !important; }
+        .dm-select__clear-indicator { color: #6b7280 !important; }
+        .dm-select__clear-indicator:hover { color: #a32d2d !important; }
+
+        /* Search Bar Styles */
+        .dm-top-bar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+          gap: 15px;
+          flex-wrap: wrap;
+        }
+
+        .dm-search-wrapper {
+          position: relative;
           display: flex;
           align-items: center;
-          background-color: #fff;
-          border: 1px solid #00aaff;
+          background: #fff;
+          border: 1px solid #d0dce9;
           border-radius: 8px;
-          padding: 8px 16px;
-          color: #00aaff;
-          font-weight: 600;
-          font-size: 16px;
-          cursor: pointer;
-          transition: background-color 0.3s ease;
+          padding: 0 12px;
+          height: 38px;
+          width: 320px;
+          transition: all 0.2s;
         }
 
-        .add-doctor-btn:hover {
-          background-color: #e0f7ff;
+        .dm-search-wrapper:focus-within {
+          border-color: #185fa5;
+          box-shadow: 0 0 0 3px rgba(24, 95, 165, 0.1);
         }
 
-        .add-icon-circle {
-          width: 40px;
-          height: 40px;
-          min-width: 40px;
-          min-height: 40px;
-          background-color: #e6f7ff;
-          border-radius: 50%;
+        .dm-search-icon-left {
+          color: #6b7280;
+          margin-right: 8px;
+        }
+
+        .dm-search-input {
+          border: none;
+          outline: none;
+          width: 100%;
+          font-size: 13px;
+          color: #374151;
+          background: transparent;
+        }
+
+        .dm-search-input::placeholder {
+          color: #9ca3af;
+        }
+
+        .dm-search-clear {
+          background: none;
+          border: none;
+          padding: 4px;
           display: flex;
           align-items: center;
           justify-content: center;
-          margin-right: 10px;
-          border: 1px solid #00aaff;
+          color: #9ca3af;
+          cursor: pointer;
+          transition: color 0.15s;
         }
 
-        .add-doctor-text {
-          color: #00aaff;
+        .dm-search-clear:hover {
+          color: #ef4444;
         }
-          .badge {
-  background-color: #e2e3e5;
-  color: #000;
-}
-  .centered-message {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 60vh; // Adjust based on your layout
-  text-align: center;
-  font-size: 1.2rem;
-  color:"blue"
-}
-.label-required::after {
-    content:"*";
-    color: red;
-   
-  }
 
       `}</style>
     </div>

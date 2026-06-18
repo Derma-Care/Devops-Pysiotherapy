@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { http } from '../../Utils/Interceptors'
-import { GetSubServices_ByClinicId } from '../ProcedureManagement/ProcedureManagementAPI'
+// import { GetSubServices_ByClinicId } from '../ProcedureManagement/ProcedureManagementAPI'
 import { getDoctorByClinicId } from '../../baseUrl'
 
 const HospitalContext = createContext()
@@ -16,6 +16,7 @@ export const HospitalProvider = ({ children }) => {
   const [subServices, setSubServices] = useState([])
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [doctorLoading, setDoctorLoading] = useState(false)
   const [notificationCount, setNotificationCount] = useState('')
   const [role, setRole] = useState(localStorage.getItem('role'))
   const [user, setUser] = useState(() => {
@@ -24,6 +25,12 @@ export const HospitalProvider = ({ children }) => {
   })
   const [hospitalId, setHospitalId] = useState(localStorage.getItem('HospitalId'))
   const [hydrated, setHydrated] = useState(false) // Track data readiness
+  const [notifications, setNotifications] = useState([])
+
+  const addNotification = useCallback((notif) => {
+    setNotifications(prev => [{ ...notif, id: Date.now(), read: false }, ...prev])
+    setNotificationCount(prev => (parseInt(prev) || 0) + 1)
+  }, [])
 
   // Persist user & hospital to localStorage
   useEffect(() => {
@@ -87,38 +94,56 @@ export const HospitalProvider = ({ children }) => {
   }, [])
 
   // Fetch doctors by hospital and branch
+  // const fetchDoctors = useCallback(async () => {
+  //   if (!hospitalId) return
+  //   setLoading(true)
+  //   try {
+  //     const branchId = localStorage.getItem('branchId')
+  //     const hospitalId = localStorage.getItem('HospitalId')
+  //     const res = await http.get(`${getDoctorByClinicId}/${hospitalId}/${branchId}`)
+  //     if (res.status === 200 && res.data) setDoctorData(res.data)
+  //   } catch (err) {
+  //     console.error(err)
+  //     setErrorMessage('Error fetching doctors.')
+  //   } finally {
+  //     setLoading(false)
+  //   }
+  // }, [])
   const fetchDoctors = useCallback(async () => {
-    if (!hospitalId) return
-    setLoading(true)
     try {
+      setDoctorLoading(true)
+
       const branchId = localStorage.getItem('branchId')
       const hospitalId = localStorage.getItem('HospitalId')
-      const res = await http.get(`${getDoctorByClinicId}/${hospitalId}/${branchId}`)
-      if (res.status === 200 && res.data) setDoctorData(res.data)
+
+      const res = await http.get(
+        `${getDoctorByClinicId}/${hospitalId}/${branchId}`
+      )
+
+      setDoctorData(res.data)
     } catch (err) {
-      console.error(err)
-      setErrorMessage('Error fetching doctors.')
+      console.log(err)
     } finally {
-      setLoading(false)
+      setDoctorLoading(false)
     }
   }, [])
 
   // Fetch subservices by hospital
-  const fetchSubServices = useCallback(async () => {
-    const hospitalId = localStorage.getItem('HospitalId')
-    if (!hospitalId) return
-    setLoading(true)
-    try {
-      const res = await GetSubServices_ByClinicId(hospitalId)
-      const list = Array.isArray(res?.data) ? res.data : []
-      setSubServices(list.filter((s) => s.hospitalId === hospitalId))
-    } catch (err) {
-      console.error(err)
-      setErrorMessage('Error fetching subservices.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  // const fetchSubServices = useCallback(async () => {
+  //   const hospitalId = localStorage.getItem('HospitalId')
+  //   if (!hospitalId) return
+  //   setLoading(true)
+  //   try {
+  //     const res = await GetSubServices_ByClinicId(hospitalId)
+  //     const list = Array.isArray(res?.data) ? res.data : []
+  //     setSubServices(list.filter((s) => s.hospitalId === hospitalId))
+  //   } catch (err) {
+  //     console.error(err)
+  //     setErrorMessage('Error fetching subservices.')
+  //   } finally {
+  //     setLoading(false)
+  //   }
+  // }, [])
 
   const fetchAllData = useCallback(
     async (id = hospitalId) => {
@@ -126,10 +151,10 @@ export const HospitalProvider = ({ children }) => {
       setHydrated(false)
       await fetchHospital(id)
       await fetchDoctors()
-      await fetchSubServices()
+      // await fetchSubServices()
       setHydrated(true)
     },
-    [hospitalId, fetchHospital, fetchDoctors, fetchSubServices],
+    [hospitalId, fetchHospital, fetchDoctors],
   )
 
   // Auto-fetch on hospitalId change
@@ -161,7 +186,10 @@ export const HospitalProvider = ({ children }) => {
         fetchAllData,
         fetchDoctors,
         fetchHospital,
-        fetchSubServices, // expose for manual calls (like after login)
+        // fetchSubServices, // expose for manual calls (like after login)
+        notifications,
+        setNotifications,
+        addNotification,
       }}
     >
       {children}

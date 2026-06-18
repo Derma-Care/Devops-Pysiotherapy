@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import {
   CAvatar,
-  CBadge,
   CDropdown,
   CDropdownDivider,
   CDropdownHeader,
@@ -9,32 +8,36 @@ import {
   CDropdownMenu,
   CDropdownToggle,
 } from '@coreui/react'
-import {
-  cilBell,
-  cilCreditCard,
-  cilCommentSquare,
-  cilEnvelopeOpen,
-  cilFile,
-  cilLockLocked,
-  cilSettings,
-  cilTask,
-  cilUser,
-} from '@coreui/icons'
+import { cilLockLocked, cilUser } from '@coreui/icons'
 import CIcon from '@coreui/icons-react'
 import '../header/AppHear.css'
 import avatar8 from './../../assets/images/ic_launcher.png'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { getClinicDetails } from '../../Auth/Auth'
 
 const AppHeaderDropdown = () => {
   const navigate = useNavigate()
   const [clinic, setClinic] = useState(null)
 
-  // Logout / lock account
+  // Logout
   const handleLock = () => {
+    // Preserve local attendance data so it doesn't disappear if they log back in
+    const todayStr = new Date().toISOString().split('T')[0]
+    const userId = localStorage.getItem('doctorId') || '0001'
+    const attendanceKey = `doctor_duty_log_${userId}_${todayStr}`
+    const monthlyKey = `doctor_monthly_attendance_${userId}`
+    
+    const attendanceData = localStorage.getItem(attendanceKey)
+    const monthlyData = localStorage.getItem(monthlyKey)
+
     localStorage.removeItem('token')
     sessionStorage.clear()
     localStorage.clear()
+
+    // Restore the attendance data securely under the doctor's specific ID
+    if (attendanceData) localStorage.setItem(attendanceKey, attendanceData)
+    if (monthlyData) localStorage.setItem(monthlyKey, monthlyData)
+
     navigate('/login', { replace: true })
   }
 
@@ -43,10 +46,9 @@ const AppHeaderDropdown = () => {
     const fetchClinic = async () => {
       try {
         const res = await getClinicDetails()
-        console.log('✅ Clinic loaded:', res)
         setClinic(res)
       } catch (err) {
-        console.error('❌ Error fetching clinic:', err)
+        console.error('Error fetching clinic:', err)
       }
     }
     fetchClinic()
@@ -54,76 +56,62 @@ const AppHeaderDropdown = () => {
 
   return (
     <CDropdown variant="nav-item">
-      <CDropdownToggle placement="bottom-end" className="py-0 pe-0" caret={false}>
+      <CDropdownToggle
+        placement="bottom-end"
+        className="py-0 pe-0"
+        caret={false}
+      >
         <CAvatar
-          src={clinic?.hospitalLogo ? `data:image/png;base64,${clinic.hospitalLogo}` : avatar8}
-          // size="md"
+          src={
+            (() => {
+              let logo = clinic?.hospitalLogo;
+              if (logo && typeof logo === 'string' && logo !== 'null' && logo !== 'undefined' && logo.trim() !== '') {
+                if (logo.includes('amazonaws.com/data%3Aimage')) {
+                  try {
+                    const decoded = decodeURIComponent(logo);
+                    const dataIdx = decoded.indexOf('data:image');
+                    if (dataIdx !== -1) {
+                      logo = decoded.substring(dataIdx).split('?')[0];
+                    }
+                  } catch (e) {
+                    console.error('Error decoding image URL', e);
+                  }
+                }
+                return logo.startsWith('http://') || logo.startsWith('https://') || logo.startsWith('data:image')
+                  ? logo
+                  : `data:image/png;base64,${logo}`;
+              }
+              return avatar8;
+            })()
+          }
           className="profile-image"
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = avatar8;
+          }}
         />
       </CDropdownToggle>
 
-      <CDropdownMenu className="pt-0" placement="bottom-end">
-        {/* Account Section */}
-        <CDropdownHeader className="bg-body-secondary fw-semibold mb-2">Account</CDropdownHeader>
-        <CDropdownItem onClick={() => navigate('/updates')}>
-          <CIcon icon={cilBell} className="me-2" />
-          Updates
-          <CBadge color="info" className="ms-2">
-            42
-          </CBadge>
-        </CDropdownItem>
-        <CDropdownItem onClick={() => navigate('/messages')}>
-          <CIcon icon={cilEnvelopeOpen} className="me-2" />
-          Messages
-          <CBadge color="success" className="ms-2">
-            42
-          </CBadge>
-        </CDropdownItem>
-        <CDropdownItem onClick={() => navigate('/tasks')}>
-          <CIcon icon={cilTask} className="me-2" />
-          Tasks
-          <CBadge color="danger" className="ms-2">
-            42
-          </CBadge>
-        </CDropdownItem>
-        <CDropdownItem onClick={() => navigate('/comments')}>
-          <CIcon icon={cilCommentSquare} className="me-2" />
-          Comments
-          <CBadge color="warning" className="ms-2">
-            42
-          </CBadge>
-        </CDropdownItem>
-
-        {/* Settings Section */}
-        <CDropdownHeader className="bg-body-secondary fw-semibold my-2">Settings</CDropdownHeader>
-        <CDropdownItem onClick={() => navigate('/doctorprofile')}>
-          <CIcon icon={cilUser} className="me-2" />
-          Profile
-        </CDropdownItem>
-        <CDropdownItem onClick={() => navigate('/settings')}>
-          <CIcon icon={cilSettings} className="me-2" />
+      <CDropdownMenu className="pt-0 dropdown-custom" placement="bottom-end">
+        <CDropdownHeader className="dropdown-header-custom">
           Settings
-        </CDropdownItem>
-        <CDropdownItem onClick={() => navigate('/payments')}>
-          <CIcon icon={cilCreditCard} className="me-2" />
-          Payments
-          <CBadge color="secondary" className="ms-2">
-            42
-          </CBadge>
-        </CDropdownItem>
-        <CDropdownItem onClick={() => navigate('/projects')}>
-          <CIcon icon={cilFile} className="me-2" />
-          Projects
-          <CBadge color="primary" className="ms-2">
-            42
-          </CBadge>
+        </CDropdownHeader>
+
+        <CDropdownItem
+          className="dropdown-item-custom"
+          onClick={() => navigate('/doctorprofile')}
+        >
+          <CIcon icon={cilUser} className="icon-style me-2" />
+          Profile
         </CDropdownItem>
 
         <CDropdownDivider />
 
-        {/* Lock Account */}
-        <CDropdownItem onClick={handleLock}>
-          <CIcon icon={cilLockLocked} className="me-2" />
+        <CDropdownItem
+          className="dropdown-item-custom"
+          onClick={handleLock}
+        >
+          <CIcon icon={cilLockLocked} className="icon-style me-2" />
           Logout
         </CDropdownItem>
       </CDropdownMenu>

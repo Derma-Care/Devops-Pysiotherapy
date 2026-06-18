@@ -1,22 +1,57 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import routes from '../routes'
 import { CBreadcrumb, CBreadcrumbItem, CButton } from '@coreui/react'
 import { ArrowLeft } from 'lucide-react'
 import { COLORS } from '../Constant/Themes'
 
-const AppBreadcrumb = () => {
-  const currentLocation = useLocation().pathname
-  const navigate = useNavigate()
 
+const AppBreadcrumb = () => {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [dateTime, setDateTime] = useState('')
+
+  // ✅ Date & Time
+  useEffect(() => {
+    const updateDateTime = () => {
+      const now = new Date()
+      const day = now.getDate()
+      const suffix =
+        day % 10 === 1 && day !== 11
+          ? 'st'
+          : day % 10 === 2 && day !== 12
+          ? 'nd'
+          : day % 10 === 3 && day !== 13
+          ? 'rd'
+          : 'th'
+
+      const month = now.toLocaleString('en-US', { month: 'short' })
+      const year = now.getFullYear().toString().slice(-2)
+      const weekday = now.toLocaleString('en-US', { weekday: 'short' })
+      const time = now.toLocaleString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      })
+
+      setDateTime(`${day}${suffix} ${month}, ${year} (${weekday}), ${time}`)
+    }
+
+    updateDateTime()
+    const timer = setInterval(updateDateTime, 60000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // ✅ Route Name
   const getRouteName = (pathname, routes) => {
     const currentRoute = routes.find((route) => route.path === pathname)
     return currentRoute ? currentRoute.name : false
   }
 
-  const getBreadcrumbs = (location) => {
+  // ✅ Breadcrumbs
+  const getBreadcrumbs = (pathname) => {
     const breadcrumbs = []
-    location.split('/').reduce((prev, curr, index, array) => {
+    pathname.split('/').reduce((prev, curr, index, array) => {
       const currentPathname = `${prev}/${curr}`
       const routeName = getRouteName(currentPathname, routes)
       if (routeName) {
@@ -31,59 +66,124 @@ const AppBreadcrumb = () => {
     return breadcrumbs
   }
 
-  const breadcrumbs = getBreadcrumbs(currentLocation)
+  const breadcrumbs = getBreadcrumbs(location.pathname)
 
-  // ✅ Show Back button for all /employee-management subroutes,
-  // but NOT on the main /employee-management page
+  // ✅ Back Button Condition
   const showBackButton =
-    currentLocation.startsWith('/employee-management') &&
-    currentLocation !== '/employee-management'
+    location.pathname.startsWith('/employee-management') &&
+    location.pathname !== '/employee-management'
 
   const handleBack = () => {
     if (window.history.length > 2) {
-      navigate(-1) // Go to previous page if history exists
+      navigate(-1)
     } else {
-      navigate('/branch-details') // Fallback route
+      navigate('/branch-details')
     }
   }
 
   return (
     <div
-      className="d-flex justify-content-between align-items-center"
-      style={{ width: '100%' }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+        padding: '6px 12px',
+        flexWrap: 'nowrap',
+      }}
     >
-      {/* Breadcrumb Section */}
-      <CBreadcrumb className="my-0 custom-breadcrumb">
-        <CBreadcrumbItem href="/">Home</CBreadcrumbItem>
-        {breadcrumbs.map((breadcrumb, index) => (
-          <CBreadcrumbItem
-            style={{ color: 'var(--color-black)' }}
-            {...(breadcrumb.active ? { active: true } : { href: breadcrumb.pathname })}
-            key={index}
-          >
-            {breadcrumb.name}
-          </CBreadcrumbItem>
-        ))}
-      </CBreadcrumb>
-
-      {/* ✅ Back Button (only on subpages) */}
-      {showBackButton && (
-        <CButton
-          size="sm"
+      {/* 🔹 LEFT - Breadcrumb */}
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          overflow: 'hidden',
+        }}
+      >
+        <CBreadcrumb
+          className="my-0"
           style={{
-            background: '#fff',
-            color: '#00838F',
-            border: 'none',
-            fontWeight: '600',
-            borderRadius: '8px',
-            padding: '6px 14px',
+            marginBottom: 0,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            '--cui-breadcrumb-divider-color': COLORS.white,
           }}
-          onClick={handleBack}
         >
+          <CBreadcrumbItem
+            style={{
+              cursor: 'pointer',
+              color: COLORS.white,
+              fontWeight: 'bold',
+            }}
+            onClick={() => navigate('/dashboard')}
+          >
+            Home
+          </CBreadcrumbItem>
 
-          Back
-        </CButton>
-      )}
+          {breadcrumbs.map((b, idx) => (
+            <CBreadcrumbItem
+              key={idx}
+              style={{
+                color: COLORS.white,
+                cursor: b.active ? 'default' : 'pointer',
+                fontWeight: b.active ? 600 : 500,
+              }}
+              {...(b.active
+                ? { active: true }
+                : { onClick: () => navigate(b.pathname) })}
+            >
+              {b.name}
+            </CBreadcrumbItem>
+          ))}
+        </CBreadcrumb>
+      </div>
+
+      {/* 🔹 RIGHT - Date + Back */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          flexShrink: 0,
+        }}
+      >
+        {/* Date */}
+        <small
+          style={{
+            fontWeight: 600,
+            color: COLORS.white,
+            fontSize: '0.85rem',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {dateTime}
+        </small>
+
+        {/* Back Button */}
+        {showBackButton && (
+          <CButton
+            size="sm"
+            onClick={handleBack}
+            style={{
+              backgroundColor: '#f9c571',
+              color: '#1a3a6b',
+              border: 'none',
+              fontWeight: '600',
+              borderRadius: '20px',
+              padding: '5px 12px',
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <ArrowLeft size={14} />
+            Back
+          </CButton>
+        )}
+      </div>
     </div>
   )
 }

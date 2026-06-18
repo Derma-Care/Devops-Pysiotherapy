@@ -1,10 +1,7 @@
 import React from 'react'
 import { useLocation } from 'react-router-dom'
-
 import routes from '../routes'
-
 import { CBreadcrumb, CBreadcrumbItem } from '@coreui/react'
-import { COLORS } from '../Constant/Themes'
 import BackButton from '../views/widgets/BackButton'
 
 const AppBreadcrumb = () => {
@@ -33,24 +30,92 @@ const AppBreadcrumb = () => {
 
   const breadcrumbs = getBreadcrumbs(currentLocation)
 
-  return (
-    <div className="d-flex justify-content-between align-items-center align-content-center  w-100">
-      <CBreadcrumb className="my-0 custom-breadcrumb mb-0">
-        <CBreadcrumbItem href="/">Home</CBreadcrumbItem>
-        {breadcrumbs.map((breadcrumb, index) => (
-          <CBreadcrumbItem
-            key={index}
-            {...(breadcrumb.active ? { active: true } : { href: breadcrumb.pathname })}
-            style={{ color: 'var(--color-black)' }}
-          >
-            {breadcrumb.name}
-          </CBreadcrumbItem>
-        ))}
-      </CBreadcrumb>
+  const linkStyle = (color) => ({
+    color: color,
+    textDecoration: 'none',
+    fontSize: '0.775rem',
+    fontWeight: 400,
+  })
 
-      {/* 🟢 Back Button aligned at the right end */}
-      <div className="ms-auto ">
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        padding: '6px 10px',
+        background: 'transparent',
+      }}
+    >
+      {/* Left Side */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          flexWrap: 'wrap',
+        }}
+      >
+        {/* Back Button First */}
         <BackButton />
+
+        {/* Breadcrumb */}
+        <CBreadcrumb
+          className="my-0"
+          style={{
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          {/* Home */}
+          <CBreadcrumbItem>
+            <a
+              href="/dashboard"
+              style={{
+                color: '#ffffff',
+                textDecoration: 'none',
+                fontSize: '13px',
+                fontWeight: 600,
+                transition: '0.2s',
+              }}
+            >
+              Home
+            </a>
+          </CBreadcrumbItem>
+
+          {/* Dynamic Breadcrumbs */}
+          {breadcrumbs.map((breadcrumb, index) =>
+            breadcrumb.active ? (
+              <CBreadcrumbItem key={index} active>
+                <span
+                  style={{
+                    color: '#dbeafe',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                  }}
+                >
+                  {breadcrumb.name}
+                </span>
+              </CBreadcrumbItem>
+            ) : (
+              <CBreadcrumbItem key={index}>
+                <a
+                  href={breadcrumb.pathname}
+                  style={{
+                    color: 'rgba(255,255,255,0.75)',
+                    textDecoration: 'none',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                  }}
+                >
+                  {breadcrumb.name}
+                </a>
+              </CBreadcrumbItem>
+            )
+          )}
+        </CBreadcrumb>
       </div>
     </div>
   )

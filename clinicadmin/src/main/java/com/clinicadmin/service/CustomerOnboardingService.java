@@ -1,8 +1,13 @@
 package com.clinicadmin.service;
 
+import java.util.List;
+import java.util.Map;
+
+import com.clinicadmin.dto.BookingInfoByInput;
 import com.clinicadmin.dto.CustomerLoginDTO;
 import com.clinicadmin.dto.CustomerOnbordingDTO;
 import com.clinicadmin.dto.Response;
+import com.clinicadmin.entity.CustomerOnbording;
 
 public interface CustomerOnboardingService {
 	Response onboardCustomer(CustomerOnbordingDTO dto);
@@ -15,7 +20,7 @@ public interface CustomerOnboardingService {
 
 	Response deleteCustomer(String customerId);
 
-	Response getCustomersByHospitalId(String hospitalId);
+	Response getCustomersByHospitalId(String hospitalId,String branchId);
 
 	Response getCustomersByBranchId(String branchId);
 
@@ -27,7 +32,12 @@ public interface CustomerOnboardingService {
 	
 	public CustomerOnbordingDTO getCustomerByToken(String token);
 	public Response getCustomerByMobiileNumber(String mobilenumber);
-		
+	public Map<String,String> getCustomerByMobilenumberAndName(String mobilenumber,String name);	
+	public CustomerOnbordingDTO getCustomerByMobileNumberAndClinicId(String mobilenumber,String clinicId);
+	//public  List<CustomerOnbordingDTO> getCustomerByNameAndClinicId(String name,String clinicId);	
+	public List<BookingInfoByInput> bookingByInput(String input,String clinicId);
+			
+			
 //
 //	Response resetPassword(ChangeDoctorPasswordDTO dto);
 }

@@ -19,6 +19,21 @@ import { validateField } from '../../../Utils/Validators'
 import capitalizeWords from '../../../Utils/capitalizeWords'
 import { showCustomToast } from '../../../Utils/Toaster'
 import { emailPattern } from '../../../Constant/Constants'
+import { COLORS } from '../../../Constant/Themes'
+import {
+  User,
+  Briefcase,
+  MapPin,
+  CreditCard,
+  FileText,
+  Mail,
+  Phone,
+  Shield,
+  Calendar,
+  Activity,
+  Award
+} from 'lucide-react'
+import '../sf-styles.css'
 
 const ReferDoctorForm = ({
   visible,
@@ -93,11 +108,8 @@ const ReferDoctorForm = ({
     // 'dateOfBirth',
     'gender',
     'mobileNumber',
-    // 'governmentId',
-    // 'department',
+    'emergencyContact',
     'yearsOfExperience',
-    // 'currentHospitalName',
-    // 'email',
     'status',
 
     // address fields (Address is @NotNull)
@@ -195,34 +207,47 @@ const ReferDoctorForm = ({
     })
 
   useEffect(() => {
-    if (initialData) {
-      // Format dateOfBirth to YYYY-MM-DD for input[type=date]
-      const formattedData = {
-        ...initialData,
-        dateOfBirth: initialData.dateOfBirth
-          ? new Date(initialData.dateOfBirth).toISOString().split('T')[0]
-          : '',
+    if (visible) {
+      if (initialData) {
+        // Format dateOfBirth to YYYY-MM-DD for input[type=date]
+        const formattedData = {
+          ...initialData,
+          dateOfBirth: initialData.dateOfBirth
+            ? new Date(initialData.dateOfBirth).toISOString().split('T')[0]
+            : '',
+        }
+        setFormData(formattedData)
+      } else {
+        setFormData(emptyForm)
       }
-      setFormData(formattedData)
-    } else {
-      setFormData(emptyForm)
+      setErrors({})
     }
   }, [initialData, visible])
 
   // 🔹 Handle text inputs (top-level fields)
   const handleChange = (field, value) => {
+    if (field === 'specialization' || field === 'currentHospitalName') {
+      value = value.replace(/[^A-Za-z\s]/g, '')
+    }
     setFormData((prev) => ({ ...prev, [field]: value }))
-
-    // Run validation on each change
-    const error = validateField(field, value, { ...formData, [field]: value }, technicians)
-
-    setErrors((prev) => ({ ...prev, [field]: error }))
+    setErrors((prev) => ({ ...prev, [field]: '' }))
   }
   const handleNestedChange = (parent, field, value) => {
     setFormData((prev) => ({
       ...prev,
       [parent]: { ...prev[parent], [field]: value },
     }))
+    if (errors[parent]?.[field] || errors[field]) {
+      setErrors(prev => {
+        const newErrors = { ...prev }
+        if (newErrors[parent]) {
+          newErrors[parent] = { ...newErrors[parent] }
+          delete newErrors[parent][field]
+        }
+        delete newErrors[field]
+        return newErrors
+      })
+    }
   }
 
   // 🔹 File upload → Base64
@@ -243,77 +268,148 @@ const ReferDoctorForm = ({
   }
 
   // 🔹 Save handler
-  const handleSubmit = async () => {
-    const missing = validateMandatoryFields(formData, mandatoryFields)
+  const validateForm = () => {
+    const newErrors = {}
+    let isValid = true
 
-    if (missing.length > 0) {
-      showCustomToast(`Please fill required fields: ${missing.join(', ')}`, 'error')
-      return
+    const fieldLabels = {
+      fullName: 'Full Name',
+      gender: 'Gender',
+      dateOfBirth: 'Date of Birth',
+      mobileNumber: 'Mobile Number',
+      email: 'Email',
+      governmentId: 'Government ID',
+      emergencyContact: 'Emergency Contact',
+      yearsOfExperience: 'Years of Experience',
+      currentHospitalName: 'Current Hospital Name',
+      specialization: 'Specialization',
+      medicalRegistrationNumber: 'Medical Registration Number',
+      status: 'Status',
+      'address.houseNo': 'House Number',
+      'address.street': 'Street',
+      'address.city': 'City',
+      'address.state': 'State',
+      'address.postalCode': 'Postal Code',
+      'address.country': 'Country',
+      'bankAccountNumber.accountNumber': 'Account Number',
+      'bankAccountNumber.accountHolderName': 'Account Holder Name',
+      'bankAccountNumber.bankName': 'Bank Name',
+      'bankAccountNumber.branchName': 'Branch Name',
+      'bankAccountNumber.ifscCode': 'IFSC Code',
+      'bankAccountNumber.panCardNumber': 'PAN Card Number',
     }
 
-    //     const missing = validateMandatoryFields(formData, mandatoryFields)
+    mandatoryFields.forEach((field) => {
+      let value = formData
+      field.split('.').forEach((key) => { value = value?.[key] })
+      if (!value || String(value).trim() === '') {
+        isValid = false
+        const label = fieldLabels[field] || field
+        if (field.includes('.')) {
+          const [parent, child] = field.split('.')
+          if (!newErrors[parent]) newErrors[parent] = {}
+          newErrors[parent][child] = `${label} is required.`
+        } else {
+          newErrors[field] = `${label} is required.`
+        }
+      }
+    })
 
-    // if (missing.length > 0) {
-    //   toast.error(`Please fill required fields: ${missing.join(', ')}`)
-    //   return
-    // }
+    if (formData.governmentId) {
+      if (formData.governmentId.length !== 12) {
+        newErrors.governmentId = 'Aadhar ID must be exactly 12 digits.'
+        isValid = false
+      } else if (/^(.)\1+$/.test(formData.governmentId)) {
+        newErrors.governmentId = 'Aadhar ID cannot have all identical digits.'
+        isValid = false
+      }
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0]
+
 
     if (formData.dateOfBirth) {
-      const dob = new Date(formData.dateOfBirth)
-      const today = new Date()
-      const age = today.getFullYear() - dob.getFullYear()
-      const isBeforeBirthday =
-        today.getMonth() < dob.getMonth() ||
-        (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())
-
-      const actualAge = isBeforeBirthday ? age - 1 : age
-
-      if (actualAge < 18) {
-        showCustomToast('Technician must be at least 18 years old.', 'error')
-        return
+      if (formData.dateOfBirth > todayStr) {
+        newErrors.dateOfBirth = 'Date of Birth cannot be in the future.'
+        isValid = false
+      } else {
+        const dob = new Date(formData.dateOfBirth)
+        const today = new Date()
+        const age = today.getFullYear() - dob.getFullYear()
+        const isBeforeBirthday =
+          today.getMonth() < dob.getMonth() ||
+          (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())
+        const actualAge = isBeforeBirthday ? age - 1 : age
+        if (actualAge < 21) {
+          newErrors.dateOfBirth = 'Doctor must be at least 21 years old.'
+          isValid = false
+        }
+        if (actualAge >= 100) {
+          newErrors.dateOfBirth = 'Doctor must be less than 100 years old.'
+          isValid = false
+        }
       }
     }
 
-    // ✅ Mobile validation (10 digits, starting with 6-9)
-    const mobileRegex = /^[6-9]\d{9}$/
-    if (!mobileRegex.test(formData.mobileNumber)) {
-      showCustomToast('Contact number must be 10 digits and start with 6-9.', 'error')
-      return
-    }
-
-    // ✅ Email validation
-    if (formData.email != '') {
-      if (!emailPattern.test(formData.email)) {
-        showCustomToast('Please enter a valid email address.', 'error')
-        return
+    if (formData.bankAccountNumber?.accountNumber) {
+      const accLen = formData.bankAccountNumber.accountNumber.length
+      if (accLen < 9 || accLen > 18) {
+        if (!newErrors.bankAccountNumber) newErrors.bankAccountNumber = {}
+        newErrors.bankAccountNumber.accountNumber = 'Account number must be between 9 and 18 digits.'
+        isValid = false
       }
     }
 
-    // ✅ Check duplicate contact number
-    const duplicateContact = technicians?.some(
-      (t) => t.mobileNumber === formData.mobileNumber && t.id !== formData.id,
-    )
-    if (duplicateContact) {
-      showCustomToast('Contact number already exists!', 'error')
-      return
+    if (formData.bankAccountNumber?.panCardNumber) {
+      if (formData.bankAccountNumber.panCardNumber.length !== 10) {
+        if (!newErrors.bankAccountNumber) newErrors.bankAccountNumber = {}
+        newErrors.bankAccountNumber.panCardNumber = 'PAN Card must be exactly 10 characters.'
+        isValid = false
+      }
     }
 
-    // ✅ Check duplicate email
-    const duplicateEmail = technicians?.some(
-      (t) => t.emailId === formData.email && t.id !== formData.id,
-    )
-    if (duplicateEmail) {
-      showCustomToast('Email already exists!', 'error')
-      return
+    if (formData.mobileNumber && !/^[6-9]\d{9}$/.test(formData.mobileNumber)) {
+      newErrors.mobileNumber = 'Invalid mobile number (must be 10 digits starting 6-9).'
+      isValid = false
     }
-    // if (Object.keys(formData.permissions).length === 0) {
-    //   toast.error('Please assign at least one user permission before saving.')
-    //   return
-    // }
+
+    if (formData.email && !emailPattern.test(formData.email)) {
+      newErrors.email = 'Invalid email address format.'
+      isValid = false
+    }
+
+    if (technicians?.some((t) => t.mobileNumber === formData.mobileNumber && t.id !== formData.id)) {
+      newErrors.mobileNumber = 'Mobile number already exists!'
+      isValid = false
+    }
+    if (technicians?.some((t) => t.emailId === formData.email && t.id !== formData.id)) {
+      newErrors.email = 'Email already exists!'
+      isValid = false
+    }
+
+    setErrors(newErrors)
+    if (!isValid) showCustomToast('Please correct the highlighted errors.', 'error')
+    return isValid
+  }
+
+  const handleSubmit = async () => {
+    if (!validateForm()) return
 
     try {
       setLoading(true)
-      const res = await onSave(formData)
+
+      // Ensure "Dr. " prefix is added if missing
+      const formattedName = formData.fullName.trim();
+      const finalFullName = formattedName.toLowerCase().startsWith('dr')
+        ? formattedName
+        : `Dr. ${formattedName}`;
+
+      const dataToSave = {
+        ...formData,
+        fullName: finalFullName
+      };
+
+      const res = await onSave(dataToSave)
       console.log(res) // Now this will log actual API response
       if (res != undefined) {
         setFormData(emptyForm)
@@ -325,68 +421,8 @@ const ReferDoctorForm = ({
     } finally {
       setLoading(false)
     }
-
-    // console.log(formData)
-    // onSave(formData)
-    // setFormData(emptyForm)
-    // onClose()
   }
 
-  const handleUserPermission = () => {
-    const missing = validateMandatoryFields(formData, mandatoryFields)
-
-    if (missing.length > 0) {
-      showCustomToast(`Please fill required fields: ${missing.join(', ')}`, 'error')
-      return
-    }
-
-    if (formData.dateOfBirth) {
-      const dob = new Date(formData.dateOfBirth)
-      const today = new Date()
-      const age = today.getFullYear() - dob.getFullYear()
-      const isBeforeBirthday =
-        today.getMonth() < dob.getMonth() ||
-        (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())
-
-      const actualAge = isBeforeBirthday ? age - 1 : age
-
-      if (actualAge < 18) {
-        showCustomToast('Technician must be at least 18 years old.', 'error')
-        return
-      }
-    }
-
-    const mobileRegex = /^[6-9]\d{9}$/
-    if (!mobileRegex.test(formData.mobileNumber)) {
-      showCustomToast('Contact number must be 10 digits and start with 6-9.', 'error')
-      return
-    }
-
-    // ✅ Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(formData.email)) {
-      showCustomToast('Please enter a valid email address.', 'error')
-      return
-    }
-
-    const duplicateContact = technicians?.some(
-      (t) => t.mobileNumber === formData.mobileNumber && t.id !== formData.id,
-    )
-    if (duplicateContact) {
-      showCustomToast('Contact number already exists!', 'error')
-      return
-    }
-
-    const duplicateEmail = technicians?.some(
-      (t) => t.emailId === formData.email && t.id !== formData.id,
-    )
-    if (duplicateEmail) {
-      showCustomToast('Email already exists!', 'error')
-      return
-    }
-    console.log(formData)
-    setShowPModal(true)
-  }
 
   // 🔹 Close Preview Modal
   const handleCloseModal = () => {
@@ -411,25 +447,54 @@ const ReferDoctorForm = ({
     }
   }
 
-  // 🔹 Small reusable info component
-  const Section = ({ title, children }) => (
-    <div>
-      <h5 className="text-lg font-semibold border-b pb-2 mb-4">{title}</h5>
-      <div className="grid grid-cols-3 gap-4">{children}</div>
+  // Reuse SecurityForm styles/components for consistent look
+  const Section = ({ title, icon: Icon, children }) => (
+    <div className="sf-card">
+      <div className="sf-card-header">
+        {Icon && <Icon size={14} className="sf-card-icon" />}
+        {title}
+      </div>
+      <div className="sf-card-body">{children}</div>
     </div>
   )
 
-  const Row = ({ label, value }) => (
-    <div>
-      <p className="text-sm font-medium text-gray-600 fw-bold">{label}</p>
-      <p className="text-base text-gray-900 text-break">{value || 'N/A'}</p>
+  const getInitials = (name) => {
+    if (!name) return ''
+    const hasDr = /^dr\.?\s+/i.test(name)
+    const cleaned = name.replace(/^dr\.?\s+/i, '').trim()
+    const parts = cleaned.split(/\s+/).filter(Boolean)
+
+    if (hasDr) {
+      // First initial is 'D' for Dr, second is first letter of actual name (if available)
+      const second = parts[0] ? parts[0][0].toUpperCase() : 'R'
+      return ('D' + second).toUpperCase()
+    }
+
+    if (parts.length === 0) return ''
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  }
+
+  const FormSectionHeading = ({ icon: Icon, title }) => (
+    <div className="sf-section-title" style={{ marginBottom: '8px' }}>
+      {Icon && <Icon size={14} className="sf-section-icon" />}
+      {title}
     </div>
   )
 
-  const RowFull = ({ label, value }) => (
-    <div className="col-span-3">
-      {label && <p className="text-sm font-medium text-gray-600 fw-bold">{label}</p>}
-      <p className="text-base text-gray-900 text-break">{value || 'N/A'}</p>
+  const Row = ({ label, value, icon: Icon }) => (
+    <div className="sf-info-row">
+      <span className="sf-info-label">{label}</span>
+      <span className="sf-info-value">{value || 'N/A'}</span>
+    </div>
+  )
+
+  const RowFull = ({ label, value, icon: Icon }) => (
+    <div className="col-12">
+      <div className="sf-info-row">
+        <span className="sf-info-label">{label}</span>
+        <span className="sf-info-value">{value || 'N/A'}</span>
+      </div>
     </div>
   )
 
@@ -481,432 +546,399 @@ const ReferDoctorForm = ({
         onClose={onClose}
         size="lg"
         className="custom-modal"
-        backdrop="static"
-      >
-        <CModalHeader>
-          <CModalTitle>{viewMode ? 'Personal Information' : 'Add / Edit ReferDoctor'}</CModalTitle>
+        backdrop="static">
+        <CModalHeader style={{ borderBottom: '0.5px solid #d0dce9', padding: '16px 20px' }}>
+          <CModalTitle style={{ fontSize: 15, fontWeight: 600, color: '#0c447c' }}>
+            {viewMode ? 'Doctor Information' : 'Add / Edit Refer Doctor'}
+          </CModalTitle>
         </CModalHeader>
-        <CModalBody>
+        <CModalBody style={{ fontSize: '0.80rem' }}>
           {viewMode ? (
-            // ✅ VIEW MODE
-
-            <div className="container my-4">
-              {/* 🩺 Doctor Basic Info Card */}
-              <div className="card p-4 mb-4 shadow-sm border-light">
-                <div className="d-flex flex-column flex-md-row justify-content-between align-items-center">
-                  {/* Left Section */}
-                  <div>
-                    <h4 className="fw-bold mb-2">Name: {formData.fullName}</h4>
-                    <p className="mb-1">
-                      <strong>Doctor ID: </strong> {formData.referralId}
-                    </p>
-                    <p className="mb-1">
-                      <strong>Email:</strong> {formData.email}
-                    </p>
-                    <p className="mb-1">
-                      <strong>Contact:</strong> {formData.mobileNumber}
-                    </p>
-                  </div>
-
-                  {/* Right Section */}
-                  <div className="text-md-end text-center mt-3 mt-md-0">
-                    <p className="mb-1">
-                      <strong>Doctor ID:</strong>
-                      {formData.referralId || 'N/A'}
-                    </p>
-                    <p className="mb-0"></p>
-                  </div>
+            <div className="container-fluid px-0">
+              {/* 🩺 Doctor Header (sf-profile-header) */}
+              <div className="sf-profile-header">
+                <div className="sf-profile-avatar">
+                  {formData.profilePicture ? (
+                    <img src={formData.profilePicture} alt={formData.fullName} />
+                  ) : (
+                    <div className="sf-initials">{getInitials(formData.fullName)}</div>
+                  )}
+                </div>
+                <div>
+                  <h3 className="sf-profile-name">
+                    {formData.fullName?.toLowerCase().startsWith('dr') ? formData.fullName : `Dr. ${formData.fullName}`}
+                  </h3>
+                  <p className="sf-profile-meta">{formData.email || 'N/A'}</p>
+                  <p className="sf-profile-meta">{formData.mobileNumber || 'N/A'}</p>
+                </div>
+                <div className="ms-auto d-none d-md-block">
+                  <span className="sf-badge">{formData.status || 'Active'}</span>
                 </div>
               </div>
 
               {/* 👤 Personal Information */}
-              <div className="card p-3 mb-4 shadow-sm border-light">
-                <h5 className="border-bottom pb-2 mb-3">Personal Information</h5>
-                <div className="row g-3">
-                  <div className="col-md-4">
-                    <Row label="Full Name" value={formData.fullName} />
-                  </div>
-                  <div className="col-md-4">
-                    <Row label="Email" value={formData.email} />
-                  </div>
-                  <div className="col-md-4">
-                    <Row label="Contact" value={formData.mobileNumber} />
-                  </div>
-                  <div className="col-md-4">
-                    <Row label="Gender" value={formData.gender} />
-                  </div>
-                  <div className="col-md-4">
-                    <Row label="Date of Birth" value={formData.dateOfBirth} />
-                  </div>
-                  <div className="col-md-4">
-                    <Row label="Government ID" value={formData.governmentId} />
-                  </div>
-                  <div className="col-md-4">
-                    <Row label="Status" value={formData.status} />
-                  </div>
+              <Section title="Personal Information" icon={User}>
+                <div className="sf-inner-grid">
+                  <Row label="Full Name" icon={User} value={formData.fullName?.toLowerCase().startsWith('dr') ? formData.fullName : `Dr. ${formData.fullName}`} />
+                  <Row label="Email Address" icon={Mail} value={formData.email} />
+                  <Row label="Contact Number" icon={Phone} value={formData.mobileNumber} />
+                  <Row label="Gender" icon={Activity} value={formData.gender} />
+                  <Row label="Date of Birth" icon={Calendar} value={formData.dateOfBirth} />
+                  <Row label="Government ID" icon={Shield} value={formData.governmentId} />
+                  <Row label="Status" icon={Activity} value={formData.status} />
                 </div>
-              </div>
+              </Section>
 
               {/* 🏥 Work Information */}
-              <div className="card p-3 mb-4 shadow-sm border-light">
-                <h5 className="border-bottom pb-2 mb-3">Work Information</h5>
-                <div className="row g-3">
-                  <div className="col-md-4">
-                    <Row label="Department" value={formData.department} />
-                  </div>
-                  <div className="col-md-4">
-                    <Row label="Experience" value={formData.yearsOfExperience} />
-                  </div>
-                  <div className="col-md-4">
-                    <Row label="Specialization" value={formData.specialization} />
-                  </div>
-                  <div className="col-md-4">
-                    <Row label="Current Hospital Name" value={formData.currentHospitalName} />
-                  </div>
-                  <div className="col-md-4">
-                    <Row label="Medical Reg. No." value={formData.medicalRegistrationNumber} />
-                  </div>
+              <Section title="Work Information" icon={Briefcase}>
+                <div className="sf-inner-grid">
+                  <Row label="Department" icon={Briefcase} value={formData.department} />
+                  <Row label="Experience (Years)" icon={Award} value={formData.yearsOfExperience} />
+                  <Row label="Specialization" icon={Award} value={formData.specialization} />
+                  <Row label="Current Hospital" icon={Briefcase} value={formData.currentHospitalName} />
+                  <Row label="Medical Reg. No." icon={Shield} value={formData.medicalRegistrationNumber} />
                 </div>
-              </div>
+              </Section>
 
               {/* 📍 Address */}
-              <div className="card p-3 mb-4 shadow-sm border-light">
-                <h5 className="border-bottom pb-2 mb-3">Address</h5>
-                <RowFull
-                  value={`${formData.address.houseNo}, ${formData.address.street}, ${formData.address.city}, ${formData.address.state} - ${formData.address.postalCode}, ${formData.address.country}`}
-                />
-              </div>
+              <Section title="Location Details" icon={MapPin}>
+                <div className="sf-inner-grid">
+                  <RowFull
+                    label="Full Address"
+                    icon={MapPin}
+                    value={`${formData.address.houseNo || ''}${formData.address.street ? ', ' + formData.address.street : ''}${formData.address.city ? ', ' + formData.address.city : ''}${formData.address.state ? ', ' + formData.address.state : ''}${formData.address.postalCode ? ' - ' + formData.address.postalCode : ''}${formData.address.country ? ', ' + formData.address.country : ''}`}
+                  />
+                </div>
+              </Section>
 
               {/* 💳 Bank Details */}
-              <div className="card p-3 mb-4 shadow-sm border-light">
-                <h5 className="border-bottom pb-2 mb-3">Bank Details</h5>
-                <div className="row g-3">
-                  <div className="col-md-4">
-                    <Row label="Account Number" value={formData.bankAccountNumber.accountNumber} />
-                  </div>
-                  <div className="col-md-4">
-                    <Row
-                      label="Account Holder Name"
-                      value={formData.bankAccountNumber.accountHolderName}
-                    />
-                  </div>
-                  <div className="col-md-4">
-                    <Row label="IFSC Code" value={formData.bankAccountNumber.ifscCode} />
-                  </div>
-                  <div className="col-md-4">
-                    <Row label="Bank Name" value={formData.bankAccountNumber.bankName} />
-                  </div>
-                  <div className="col-md-4">
-                    <Row label="Branch Name" value={formData.bankAccountNumber.branchName} />
-                  </div>
-                  <div className="col-md-4">
-                    <Row label="PAN Card" value={formData.bankAccountNumber.panCardNumber} />
-                  </div>
+              <Section title="Bank Account Details" icon={CreditCard}>
+                <div className="sf-inner-grid">
+                  <Row label="Account Number" icon={CreditCard} value={formData.bankAccountNumber.accountNumber} />
+                  <Row label="Holder Name" icon={User} value={formData.bankAccountNumber.accountHolderName} />
+                  <Row label="IFSC Code" icon={Shield} value={formData.bankAccountNumber.ifscCode} />
+                  <Row label="Bank Name" icon={Briefcase} value={formData.bankAccountNumber.bankName} />
+                  <Row label="Branch Name" icon={MapPin} value={formData.bankAccountNumber.branchName} />
+                  <Row label="PAN Card" icon={Shield} value={formData.bankAccountNumber.panCardNumber} />
                 </div>
-              </div>
+              </Section>
 
-              {/* 🗂️ Optional Documents (Future Use) */}
-              {/* Uncomment if needed */}
-              {/*
-  <div className="card p-3 mb-4 shadow-sm border-light">
-    <h5 className="border-bottom pb-2 mb-3 text-primary">Documents</h5>
-    <div className="row g-3">
-      {formData.qualificationOrCertifications ? (
-        <div className="col-md-6">
-          <FilePreview
-            label="Qualification / Certifications"
-            type={formData.qualificationOrCertificationsType}
-            data={formData.qualificationOrCertifications}
-          />
-        </div>
-      ) : (
-        <p className="col-md-6 text-muted">Not Provided Qualification / Certifications</p>
-      )}
-    </div>
-  </div>
-  */}
             </div>
           ) : (
             // ✅ EDIT MODE
             <CForm>
               {/* 🔹 Basic Info */}
-              <h5>Basic Information</h5>
+              <div className="sf-section">
+                <div className="sf-section-title">
+                  <User size={14} className="sf-section-icon" />
+                  Basic Information
+                </div>
+                <div className="sf-section-body">
 
-              <div className="row mb-3">
-                <div className="col-md-4">
-                  <div className="row">
-                    <div className="col-md-5">
-                      <CFormLabel>
-                        ClinicID <span style={{ color: 'red' }}>*</span>
-                      </CFormLabel>
-                      <CFormInput
-                        value={clinicId}
-                        disabled
-                        onChange={(e) => handleChange('clinicId', e.target.value)}
-                      />
+                  <div className="row mb-3">
+                    <div className="col-md-4">
+                      <div className="row">
+                        <div className="col-md-5">
+                          <CFormLabel>
+                            ClinicID <span style={{ color: 'red' }}>*</span>
+                          </CFormLabel>
+                          <CFormInput
+                            className="sf-input"
+                            value={clinicId}
+                            disabled
+                            onChange={(e) => handleChange('clinicId', e.target.value)}
+                          />
+                        </div>
+                        <div className="col-md-7">
+                          <CFormLabel>
+                            Role <span style={{ color: 'red' }}>*</span>
+                          </CFormLabel>
+                          <CFormInput
+                            className="sf-input"
+                            value={formData.role || 'referdoctor'}
+                            disabled
+                            onChange={(e) => handleChange('role', e.target.value)}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="col-md-7">
+                    <div className="col-md-4">
                       <CFormLabel>
-                        Role <span style={{ color: 'red' }}>*</span>
+                        Full Name <span style={{ color: 'red' }}>*</span>
                       </CFormLabel>
                       <CFormInput
-                        value={formData.role || 'referdoctor'}
-                        disabled
-                        onChange={(e) => handleChange('role', e.target.value)}
+                        className="sf-input"
+                        value={formData.fullName}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^A-Za-z\s.]/g, '')
+                          handleChange('fullName', value)
+                          const err = validateField('fullName', value)
+                          setErrors((prev) => ({ ...prev, fullName: err }))
+                        }}
                       />
+
+                      {/* show error below */}
+                      {errors.fullName && (
+                        <div style={{ color: 'red', fontSize: '12px' }}>{errors.fullName}</div>
+                      )}
+                    </div>
+                    <div className="col-md-4">
+                      <CFormLabel>Gender <span style={{ color: 'red' }}>*</span></CFormLabel>
+                      <CFormSelect
+                        className="sf-input"
+                        value={formData.gender}
+                        onChange={(e) => {
+                          handleChange('gender', e.target.value)
+                          setErrors(p => ({ ...p, gender: e.target.value ? '' : 'Gender is required.' }))
+                        }}
+                      >
+                        <option value="">Select Gender</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                      </CFormSelect>
+                      {errors.gender && <div style={{ color: 'red', fontSize: '12px' }}>{errors.gender}</div>}
                     </div>
                   </div>
-                </div>
-                <div className="col-md-4">
-                  <CFormLabel>
-                    Full Name <span style={{ color: 'red' }}>*</span>
-                  </CFormLabel>
-                  <CFormInput
-                    value={formData.fullName}
-                    onChange={(e) => {
-                      // update value
-                      handleChange('fullName', e.target.value)
 
-                      // run validation live
-                      const err = validateField('fullName', e.target.value)
-                      setErrors((prev) => ({ ...prev, fullName: err }))
-                    }}
-                  />
+                  <div className="row mb-3">
+                    <div className="col-md-4">
+                      <CFormLabel>Date of Birth</CFormLabel>
+                      <CFormInput
+                        className="sf-input"
+                        type="date"
+                        value={formData.dateOfBirth}
+                        max={
+                          new Date(new Date().setFullYear(new Date().getFullYear() - 21))
+                            .toISOString()
+                            .split('T')[0]
+                        } // ✅ only allow DOB ≤ today-18yrs
+                        onChange={(e) => {
+                          handleChange('dateOfBirth', e.target.value)
+                          setErrors(p => ({ ...p, dateOfBirth: validateField('dateOfBirth', e.target.value) }))
+                        }}
+                      />
+                      {errors.dateOfBirth && <div className="text-danger mt-1">{errors.dateOfBirth}</div>}
+                    </div>
 
-                  {/* show error below */}
-                  {errors.fullName && (
-                    <div style={{ color: 'red', fontSize: '12px' }}>{errors.fullName}</div>
-                  )}
-                </div>
-                <div className="col-md-4">
-                  <CFormLabel>Gender</CFormLabel>
-                  <CFormSelect
-                    value={formData.gender}
-                    onChange={(e) => handleChange('gender', e.target.value)}
-                  >
-                    <option value="">Select Gender</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                  </CFormSelect>
-                </div>
-              </div>
+                    <div className="col-md-4">
+                      <CFormLabel>Mobile Number <span style={{ color: 'red' }}>*</span></CFormLabel>
+                      <CFormInput
+                        className="sf-input"
+                        type="text"
+                        maxLength={10} // ✅ Restrict to 10 digits
+                        value={formData.mobileNumber}
+                        onChange={(e) => {
+                          const value = e.target.value
 
-              <div className="row mb-3">
-                <div className="col-md-4">
-                  <CFormLabel>Date of Birth</CFormLabel>
-                  <CFormInput
-                    type="date"
-                    value={formData.dateOfBirth}
-                    max={
-                      new Date(new Date().setFullYear(new Date().getFullYear() - 18))
-                        .toISOString()
-                        .split('T')[0]
-                    } // ✅ only allow DOB ≤ today-18yrs
-                    onChange={(e) => handleChange('dateOfBirth', e.target.value)}
-                  />
-                </div>
+                          // Allow only digits
+                          if (/^\d*$/.test(value)) {
+                            // Update form data
+                            handleChange('mobileNumber', value)
 
-                <div className="col-md-4">
-                  <CFormLabel>Mobile Number</CFormLabel>
-                  <CFormInput
-                    type="text"
-                    maxLength={10} // ✅ Restrict to 10 digits
-                    value={formData.mobileNumber}
-                    onChange={(e) => {
-                      const value = e.target.value
+                            // Run live validation
+                            const err = validateField('contactNumber', value, formData)
+                            setErrors((prev) => ({ ...prev, mobileNumber: err }))
+                          }
+                        }}
+                      />
+                      {errors.mobileNumber && (
+                        <div style={{ color: 'red', fontSize: '12px' }}>{errors.mobileNumber}</div>
+                      )}
+                    </div>
+                    <div className="col-md-4">
+                      <CFormLabel>Email</CFormLabel>
+                      <CFormInput
+                        className="sf-input"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => {
+                          handleChange('email', e.target.value)
+                          const err = validateField('emailId', e.target.value)
+                          setErrors((prev) => ({ ...prev, email: err }))
+                        }}
+                      />
+                      {errors.email && <div className="text-danger mt-1">{errors.email}</div>}
+                    </div>
+                  </div>
 
-                      // Allow only digits
-                      if (/^\d*$/.test(value)) {
-                        // Update form data
-                        handleChange('mobileNumber', value)
+                  <div className="row mb-3">
+                    <div className="col-md-4">
+                      <CFormLabel>GovernmentID(AadharCard No)</CFormLabel>
+                      <CFormInput
+                        className="sf-input"
+                        maxLength={12}
+                        value={formData.governmentId}
+                        onChange={(e) => {
+                          const value = e.target.value
 
-                        // Run live validation
-                        const err = validateField('contactNumber', value, formData)
-                        setErrors((prev) => ({ ...prev, mobileNumber: err }))
-                      }
-                    }}
-                  />
-                  {errors.mobileNumber && (
-                    <div className="text-danger mt-1">{errors.mobileNumber}</div>
-                  )}
-                </div>
-                <div className="col-md-4">
-                  <CFormLabel>Email</CFormLabel>
-                  <CFormInput
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => {
-                      const value = e.target.value
+                          // ✅ Only digits allowed, max 12
+                          if (/^\d*$/.test(value)) {
+                            // Update form data
+                            handleChange('governmentId', value)
 
-                      // Update form data
-                      handleChange('email', value)
+                            // Run live validation
+                            const err = validateField('governmentId', value, formData)
+                            setErrors((prev) => ({ ...prev, governmentId: err }))
+                          }
+                        }}
+                      />
+                      {errors.governmentId && (
+                        <div className="text-danger mt-1">{errors.governmentId}</div>
+                      )}
+                    </div>
 
-                      // Run live validation using your validateField function
-                      // const err = validateField('emailId', value, formData)
-                      // setErrors((prev) => ({ ...prev, email: err }))
-                    }}
-                  />
-                  {/* {errors.email && <div className="text-danger mt-1">{errors.email}</div>} */}
-                </div>
-              </div>
+                    <div className="col-md-4">
+                      <CFormLabel>Medical Registration Number</CFormLabel>
+                      <CFormInput
+                        className="sf-input"
+                        value={capitalizeWords(formData.medicalRegistrationNumber)}
+                        onChange={(e) => {
+                          const value = e.target.value
 
-              <div className="row mb-3">
-                <div className="col-md-4">
-                  <CFormLabel>GovernmentID(AadharCard No)</CFormLabel>
-                  <CFormInput
-                    maxLength={12}
-                    value={formData.governmentId}
-                    onChange={(e) => {
-                      const value = e.target.value
+                          // Update form data
+                          handleChange('medicalRegistrationNumber', value)
 
-                      // ✅ Only digits allowed, max 12
-                      if (/^\d*$/.test(value)) {
-                        // Update form data
-                        handleChange('governmentId', value)
+                          // Run live validation
+                          const err = validateField('medicalRegistrationNumber', value, formData)
+                          setErrors((prev) => ({
+                            ...prev,
+                            medicalRegistrationNumber: err,
+                          }))
+                        }}
+                      />
+                      {errors.medicalRegistrationNumber && (
+                        <div className="text-danger mt-1">{errors.medicalRegistrationNumber}</div>
+                      )}
+                    </div>
+                    <div className="col-md-4">
+                      <CFormLabel>Department</CFormLabel>
+                      <CFormInput
+                        className="sf-input"
+                        value={capitalizeWords(formData.department)}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^A-Za-z\s]/g, '')
+                          handleChange('department', value)
+                          const err = validateField('department', value, formData)
+                          setErrors((prev) => ({
+                            ...prev,
+                            department: err,
+                          }))
+                        }}
+                      />
+                      {errors.department && <div className="text-danger mt-1">{errors.department}</div>}
+                    </div>
+                    <div className="col-md-4">
+                      <CFormLabel>Specialization</CFormLabel>
+                      <CFormInput
+                        className="sf-input"
+                        type="text"
+                        value={formData.specialization}
+                        onChange={(e) => {
+                          const value = e.target.value
 
-                        // Run live validation
-                        const err = validateField('governmentId', value, formData)
-                        setErrors((prev) => ({ ...prev, governmentId: err }))
-                      }
-                    }}
-                  />
-                  {errors.governmentId && (
-                    <div className="text-danger mt-1">{errors.governmentId}</div>
-                  )}
-                </div>
+                          // Update form data
+                          handleChange('specialization', value)
 
-                <div className="col-md-4">
-                  <CFormLabel>Medical Registration Number</CFormLabel>
-                  <CFormInput
-                    value={capitalizeWords(formData.medicalRegistrationNumber)}
-                    onChange={(e) => {
-                      const value = e.target.value
+                          // Run live validation
+                          const err = validateField('specialization', value, formData)
+                          setErrors((prev) => ({
+                            ...prev,
+                            specialization: err,
+                          }))
+                        }}
+                      />
+                      {errors.specialization && (
+                        <div className="text-danger mt-1">{errors.specialization}</div>
+                      )}
+                    </div>
+                    <div className="col-md-4">
+                      {' '}
+                      <CFormLabel>Current Hospital Name</CFormLabel>
+                      <CFormInput
+                        className="sf-input"
+                        value={capitalizeWords(formData.currentHospitalName)}
+                        onChange={(e) => handleChange('currentHospitalName', e.target.value)}
+                      />{' '}
+                    </div>
+                    <div className="col-md-4">
+                      {' '}
+                      <CFormLabel>
+                        Years of Experience <span style={{ color: 'red' }}>*</span>
+                      </CFormLabel>
+                      <CFormInput
+                        className="sf-input"
+                        type="number"
+                        value={formData.yearsOfExperience}
+                        onChange={(e) => {
+                          const value = e.target.value
 
-                      // Update form data
-                      handleChange('medicalRegistrationNumber', value)
+                          // Allow only digits
+                          if (/^\d*$/.test(value)) {
+                            handleChange('yearsOfExperience', value)
 
-                      // Run live validation
-                      const err = validateField('medicalRegistrationNumber', value, formData)
-                      setErrors((prev) => ({
-                        ...prev,
-                        medicalRegistrationNumber: err,
-                      }))
-                    }}
-                  />
-                  {errors.medicalRegistrationNumber && (
-                    <div className="text-danger mt-1">{errors.medicalRegistrationNumber}</div>
-                  )}
-                </div>
-                <div className="col-md-4">
-                  <CFormLabel>Department</CFormLabel>
-                  <CFormInput
-                    value={capitalizeWords(formData.department)}
-                    onChange={(e) => {
-                      const value = e.target.value
+                            // Run live validation
+                            const err = validateField('yearsOfExperience', value, formData)
+                            setErrors((prev) => ({
+                              ...prev,
+                              yearsOfExperience: err,
+                            }))
+                          }
+                        }}
+                      />
+                      {errors.yearsOfExperience && (
+                        <div style={{ color: 'red', fontSize: '12px' }}>{errors.yearsOfExperience}</div>
+                      )}
+                    </div>
+                  </div>
 
-                      // Update form data
-                      handleChange('department', value)
+                  <div className="row mb-3">
+                    <div className="col-md-4">
+                      <CFormLabel>Status</CFormLabel>
+                      <CFormSelect
+                        className="sf-input"
+                        value={formData.status || ''} // empty initially
+                        onChange={(e) => {
+                          const value = e.target.value
+                          handleChange('status', value)
 
-                      // Run live validation
-                      const err = validateField('department', value, formData)
-                      setErrors((prev) => ({
-                        ...prev,
-                        department: err,
-                      }))
-                    }}
-                  />
-                  {errors.department && <div className="text-danger mt-1">{errors.department}</div>}
-                </div>
-                <div className="col-md-4">
-                  <CFormLabel>Specialization</CFormLabel>
-                  <CFormInput
-                    type="text"
-                    value={formData.specialization}
-                    onChange={(e) => {
-                      const value = e.target.value
+                          // Run live validation
+                          const err = validateField('status', value)
+                          setErrors((prev) => ({
+                            ...prev,
+                            status: err,
+                          }))
+                        }}
+                      >
+                        <option value="">Select Status</option>
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                      </CFormSelect>
+                      {/* {errors.status && <div className="text-danger mt-1">{errors.status}</div>} */}
+                    </div>
+                    <div className="col-md-4">
+                      <CFormLabel>Emergency Contact <span style={{ color: 'red' }}>*</span></CFormLabel>
 
-                      // Update form data
-                      handleChange('specialization', value)
+                      <CFormInput
+                        className="sf-input"
+                        type="text"
+                        maxLength={10} // ✅ Restrict to 10 digits
+                        value={formData.emergencyContact}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          // ✅ Allow only digits
+                          if (/^\d*$/.test(value)) {
+                            handleChange('emergencyContact', value)
+                          }
+                        }}
+                      />
+                      {errors.emergencyContact && <div style={{ color: 'red', fontSize: '12px' }}>{errors.emergencyContact}</div>}
+                    </div>
+                  </div>
 
-                      // Run live validation
-                      const err = validateField('specialization', value, formData)
-                      setErrors((prev) => ({
-                        ...prev,
-                        specialization: err,
-                      }))
-                    }}
-                  />
-                  {errors.specialization && (
-                    <div className="text-danger mt-1">{errors.specialization}</div>
-                  )}
-                </div>
-                <div className="col-md-4">
-                  {' '}
-                  <CFormLabel>Current Hospital Name</CFormLabel>
-                  <CFormInput
-                    value={capitalizeWords(formData.currentHospitalName)}
-                    onChange={(e) => handleChange('currentHospitalName', e.target.value)}
-                  />{' '}
-                </div>
-                <div className="col-md-4">
-                  {' '}
-                  <CFormLabel>
-                    Years of Experience <span style={{ color: 'red' }}>*</span>
-                  </CFormLabel>
-                  <CFormInput
-                    type="number"
-                    value={formData.yearsOfExperience}
-                    onChange={(e) => {
-                      const value = e.target.value
-
-                      // Allow only digits
-                      if (/^\d*$/.test(value)) {
-                        handleChange('yearsOfExperience', value)
-
-                        // Run live validation
-                        const err = validateField('yearsOfExperience', value, formData)
-                        setErrors((prev) => ({
-                          ...prev,
-                          yearsOfExperience: err,
-                        }))
-                      }
-                    }}
-                  />
-                  {errors.yearsOfExperience && (
-                    <div className="text-danger mt-1">{errors.yearsOfExperience}</div>
-                  )}
-                </div>
-              </div>
-
-              <div className="row mb-3">
-                <div className="col-md-4">
-                  <CFormLabel>Status</CFormLabel>
-                  <CFormSelect
-                    value={formData.status || ''} // empty initially
-                    onChange={(e) => {
-                      const value = e.target.value
-                      handleChange('status', value)
-
-                      // Run live validation
-                      const err = validateField('status', value)
-                      setErrors((prev) => ({
-                        ...prev,
-                        status: err,
-                      }))
-                    }}
-                  >
-                    <option value="">Select Status</option>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </CFormSelect>
-                  {/* {errors.status && <div className="text-danger mt-1">{errors.status}</div>} */}
-                </div>
-              </div>
-
-              <div className="row mb-3">
-                <div className="col-md-4">
-                  {/* <CFormLabel>
+                  <div className="row mb-3">
+                    <div className="col-md-4">
+                      {/* <CFormLabel>
                     Shift Timings / Availability <span style={{ color: 'red' }}>*</span>
                   </CFormLabel>
                   <CFormSelect
@@ -927,29 +959,13 @@ const ReferDoctorForm = ({
                     <option value="06:00-18:00">Long Day (06:00 AM – 06:00 PM) – 12 hrs</option>
                     <option value="18:00-06:00">Long Night (06:00 PM – 06:00 AM) – 12 hrs</option>
                   </CFormSelect> */}
-                </div>
+                    </div>
 
-                {/* <div className="col-md-4">
-                  <CFormLabel>Emergency Contact</CFormLabel>
-
-                  <CFormInput
-                    type="text"
-                    maxLength={10} // ✅ Restrict to 10 digits
-                    value={formData.emergencyContact}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      // ✅ Allow only digits
-                      if (/^\d*$/.test(value)) {
-                        handleChange('emergencyContact', e.target.value)
-                      }
-                    }}
-                  />
-                </div> */}
-                <div className="col-md-4">
-                  {/* <CFormLabel>
+                    <div className="col-md-4">
+                      {/* <CFormLabel>
                     Vaccination Status <span style={{ color: 'red' }}>*</span>
                   </CFormLabel> */}
-                  {/* <CFormSelect
+                      {/* <CFormSelect
                     value={formData.vaccinationStatus}
                     onChange={(e) => handleChange('vaccinationStatus', e.target.value)}
                   >
@@ -958,168 +974,186 @@ const ReferDoctorForm = ({
                     <option value="Partially Vaccinated">Partially Vaccinated</option>
                     <option value="Fully Vaccinated">Fully Vaccinated</option>
                   </CFormSelect> */}
+                    </div>
+                  </div>
+
                 </div>
               </div>
-
               {/* 🔹 Address */}
-              <h5 className="mt-3">Address</h5>
+              <div className="sf-section">
+                <div className="sf-section-title">
+                  <MapPin size={14} className="sf-section-icon" />
+                  Address
+                </div>
+                <div className="sf-section-body">
 
-              {Object.keys(formData.address)
-                .reduce((rows, field, index) => {
-                  if (index % 3 === 0) rows.push([]) // start new row every 3 fields
-                  rows[rows.length - 1].push(field)
-                  return rows
-                }, [])
-                .map((rowFields, rowIndex) => (
-                  <div className="row mb-3" key={rowIndex}>
-                    {rowFields.map((field) => (
-                      <div className="col-md-4" key={field}>
-                        <CFormLabel className="text-capitalize">{field}</CFormLabel>
-                        <CFormInput
-                          type="text"
-                          maxLength={field === 'postalCode' ? 6 : undefined}
-                          value={formData.address[field]}
-                          onChange={(e) => {
-                            let value = e.target.value
-                            if (field === 'postalCode') {
-                              // Only digits allowed
-                              if (/^\d*$/.test(value)) {
-                                handleNestedChange('address', field, value)
-                                // Live validation
-                                const err = validateField(field, value, formData)
-                                setErrors((prev) => ({
-                                  ...prev,
-                                  address: { ...prev.address, [field]: err },
-                                }))
-                              }
-                            } else {
-                              handleNestedChange('address', field, value)
-                              // Live validation
-                              const err = validateField(field, value, formData)
-                              setErrors((prev) => ({
-                                ...prev,
-                                address: { ...prev.address, [field]: err },
-                              }))
-                            }
-                          }}
-                        />
-                        {errors.address?.[field] && (
-                          <div className="text-danger mt-1">{errors.address[field]}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-
-              {/* 🔹 Bank Details */}
-              <h5 className="mt-3">Bank Account Details</h5>
-              {Object.keys(formData.bankAccountNumber)
-                .reduce((rows, field, index) => {
-                  if (index % 3 === 0) rows.push([]) // start new row every 3 fields
-                  rows[rows.length - 1].push(field)
-                  return rows
-                }, [])
-                .map((rowFields, rowIndex) => (
-                  <div className="row mb-3" key={rowIndex}>
-                    {rowFields.map((field) => (
-                      <div className="col-md-4" key={field}>
-                        <CFormLabel className="text-capitalize">{field}</CFormLabel>
-                        <CFormInput
-                          value={formData.bankAccountNumber[field]}
-                          maxLength={
-                            field === 'accountNumber'
-                              ? 20
-                              : field === 'panCardNumber'
-                                ? 10
-                                : field === 'ifscCode'
-                                  ? 11
-                                  : undefined
-                          }
-                          onChange={async (e) => {
-                            let value = e.target.value
-
-                            if (field === 'accountNumber') {
-                              if (/^\d*$/.test(value)) {
-                                handleNestedChange('bankAccountNumber', field, value)
-                                const err = validateField('accountNumber', value, formData)
-                                setErrors((prev) => ({
-                                  ...prev,
-                                  bankAccountNumber: {
-                                    ...prev.bankAccountNumber,
-                                    accountNumber: err,
-                                  },
-                                }))
-                              }
-                              return
-                            }
-
-                            if (field === 'panCardNumber') {
-                              value = value.toUpperCase()
-                              if (/^[A-Z]{0,5}[0-9]{0,4}[A-Z]{0,1}$/.test(value)) {
-                                handleNestedChange('bankAccountNumber', field, value)
-                              }
-
-                              const err = validateField('panCardNumber', value, formData)
-                              setErrors((prev) => ({
-                                ...prev,
-                                bankAccountNumber: {
-                                  ...prev.bankAccountNumber,
-                                  panCardNumber: err,
-                                },
-                              }))
-                              return
-                            }
-
-                            if (field === 'ifscCode') {
-                              value = value.toUpperCase()
-                              if (!/^[A-Z0-9]*$/.test(value)) return
-                              handleNestedChange('bankAccountNumber', field, value)
-
-                              const err = validateField('ifscCode', value, formData)
-                              setErrors((prev) => ({
-                                ...prev,
-                                bankAccountNumber: { ...prev.bankAccountNumber, ifscCode: err },
-                              }))
-
-                              if (value.length === 11 && /^[A-Z]{4}0[A-Z0-9]{6}$/.test(value)) {
-                                try {
-                                  const res = await fetch(`https://ifsc.razorpay.com/${value}`)
-                                  if (res.ok) {
-                                    const data = await res.json()
-                                    handleNestedChange(
-                                      'bankAccountNumber',
-                                      'bankName',
-                                      data.BANK || '',
-                                    )
-                                    handleNestedChange(
-                                      'bankAccountNumber',
-                                      'branchName',
-                                      data.BRANCH || '',
-                                    )
+                  {Object.keys(formData.address)
+                    .reduce((rows, field, index) => {
+                      if (index % 3 === 0) rows.push([]) // start new row every 3 fields
+                      rows[rows.length - 1].push(field)
+                      return rows
+                    }, [])
+                    .map((rowFields, rowIndex) => (
+                      <div className="row mb-3" key={rowIndex}>
+                        {rowFields.map((field) => (
+                          <div className="col-md-4" key={field}>
+                            <CFormLabel className="text-capitalize">{field}</CFormLabel>
+                            <CFormInput
+                              className="sf-input"
+                              type="text"
+                              maxLength={field === 'postalCode' ? 6 : undefined}
+                              value={formData.address[field]}
+                              onChange={(e) => {
+                                let value = e.target.value
+                                if (field === 'postalCode') {
+                                  // Only digits allowed
+                                  if (/^\d*$/.test(value)) {
+                                    handleNestedChange('address', field, value)
+                                    // Live validation
+                                    const err = validateField(field, value, formData)
+                                    setErrors((prev) => ({
+                                      ...prev,
+                                      address: { ...prev.address, [field]: err },
+                                    }))
                                   }
-                                } catch {
-                                  handleNestedChange('bankAccountNumber', 'bankName', '')
-                                  handleNestedChange('bankAccountNumber', 'branchName', '')
+                                } else {
+                                  handleNestedChange('address', field, value)
+                                  // Live validation
+                                  const err = validateField(field, value, formData)
+                                  setErrors((prev) => ({
+                                    ...prev,
+                                    address: { ...prev.address, [field]: err },
+                                  }))
                                 }
-                              } else {
-                                handleNestedChange('bankAccountNumber', 'bankName', '')
-                                handleNestedChange('bankAccountNumber', 'branchName', '')
-                              }
-                              return
-                            }
-
-                            // Other fields
-                            handleNestedChange('bankAccountNumber', field, value)
-                          }}
-                        />
-                        {errors.bankAccountNumber?.[field] && (
-                          <div className="text-danger mt-1">{errors.bankAccountNumber[field]}</div>
-                        )}
+                              }}
+                            />
+                            {errors.address?.[field] && (
+                              <div className="text-danger mt-1">{errors.address[field]}</div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     ))}
-                  </div>
-                ))}
 
+                </div>
+              </div>
+              {/* 🔹 Bank Details */}
+              <div className="sf-section">
+                <div className="sf-section-title">
+                  <CreditCard size={14} className="sf-section-icon" />
+                  Bank Account Details
+                </div>
+                <div className="sf-section-body">
+                  {Object.keys(formData.bankAccountNumber)
+                    .reduce((rows, field, index) => {
+                      if (index % 3 === 0) rows.push([]) // start new row every 3 fields
+                      rows[rows.length - 1].push(field)
+                      return rows
+                    }, [])
+                    .map((rowFields, rowIndex) => (
+                      <div className="row mb-3" key={rowIndex}>
+                        {rowFields.map((field) => (
+                          <div className="col-md-4" key={field}>
+                            <CFormLabel className="text-capitalize">{field}</CFormLabel>
+                            <CFormInput
+                              className="sf-input"
+                              value={formData.bankAccountNumber[field]}
+                              maxLength={
+                                field === 'accountNumber'
+                                  ? 18
+                                  : field === 'panCardNumber'
+                                    ? 10
+                                    : field === 'ifscCode'
+                                      ? 11
+                                      : undefined
+                              }
+                              onChange={async (e) => {
+                                let value = e.target.value
+
+                                if (field === 'accountNumber') {
+                                  if (/^\d*$/.test(value)) {
+                                    handleNestedChange('bankAccountNumber', field, value)
+                                    const err = validateField('accountNumber', value, formData)
+                                    setErrors((prev) => ({
+                                      ...prev,
+                                      bankAccountNumber: {
+                                        ...prev.bankAccountNumber,
+                                        accountNumber: err,
+                                      },
+                                    }))
+                                  }
+                                  return
+                                }
+
+                                if (field === 'panCardNumber') {
+                                  value = value.toUpperCase()
+                                  if (/^[A-Z]{0,5}[0-9]{0,4}[A-Z]{0,1}$/.test(value)) {
+                                    handleNestedChange('bankAccountNumber', field, value)
+                                  }
+
+                                  const err = validateField('panCardNumber', value, formData)
+                                  setErrors((prev) => ({
+                                    ...prev,
+                                    bankAccountNumber: {
+                                      ...prev.bankAccountNumber,
+                                      panCardNumber: err,
+                                    },
+                                  }))
+                                  return
+                                }
+
+                                if (field === 'ifscCode') {
+                                  value = value.toUpperCase()
+                                  if (!/^[A-Z0-9]*$/.test(value)) return
+                                  handleNestedChange('bankAccountNumber', field, value)
+
+                                  const err = validateField('ifscCode', value, formData)
+                                  setErrors((prev) => ({
+                                    ...prev,
+                                    bankAccountNumber: { ...prev.bankAccountNumber, ifscCode: err },
+                                  }))
+
+                                  if (value.length === 11 && /^[A-Z]{4}0[A-Z0-9]{6}$/.test(value)) {
+                                    try {
+                                      const res = await fetch(`https://ifsc.razorpay.com/${value}`)
+                                      if (res.ok) {
+                                        const data = await res.json()
+                                        handleNestedChange(
+                                          'bankAccountNumber',
+                                          'bankName',
+                                          data.BANK || '',
+                                        )
+                                        handleNestedChange(
+                                          'bankAccountNumber',
+                                          'branchName',
+                                          data.BRANCH || '',
+                                        )
+                                      }
+                                    } catch {
+                                      handleNestedChange('bankAccountNumber', 'bankName', '')
+                                      handleNestedChange('bankAccountNumber', 'branchName', '')
+                                    }
+                                  } else {
+                                    handleNestedChange('bankAccountNumber', 'bankName', '')
+                                    handleNestedChange('bankAccountNumber', 'branchName', '')
+                                  }
+                                  return
+                                }
+
+                                // Other fields
+                                handleNestedChange('bankAccountNumber', field, value)
+                              }}
+                            />
+                            {errors.bankAccountNumber?.[field] && (
+                              <div className="text-danger mt-1">{errors.bankAccountNumber[field]}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+
+                </div>
+              </div>
               {/* 🔹 Documents */}
               {/* <h5 className="mt-3">Documents</h5>
 
@@ -1129,6 +1163,7 @@ const ReferDoctorForm = ({
                       Image <span style={{ color: 'red' }}>*</span>
                   </CFormLabel>
                   <CFormInput
+                    className="sf-input"
                     type="file"
                     accept="image/*"
                     onChange={async (e) => {
@@ -1145,6 +1180,7 @@ const ReferDoctorForm = ({
                     Medical Fitness Certificate <span style={{ color: 'red' }}>*</span>
                   </CFormLabel>
                   <CFormInput
+                    className="sf-input"
                     type="file"
                     onChange={(e) => handleFileUpload(e, 'medicalFitnessCertificate')}
                   />
@@ -1153,6 +1189,7 @@ const ReferDoctorForm = ({
                 <div className="col-md-4">
                   <CFormLabel>Teaining Guard License</CFormLabel>
                   <CFormInput
+                    className="sf-input"
                     type="file"
                     onChange={(e) => handleFileUpload(e, 'qualificationOrCertifications')}
                   />
@@ -1161,6 +1198,7 @@ const ReferDoctorForm = ({
 
               <CFormLabel>Previous Employment History</CFormLabel>
               <CFormTextarea
+                className="sf-input sf-textarea"
                 rows={3} // you can adjust height
                 value={formData.previousEmploymentHistory}
                 onChange={(e) => handleChange('previousEmploymentHistory', e.target.value)}
@@ -1281,37 +1319,22 @@ const ReferDoctorForm = ({
         </CModalBody>
         <CModalFooter>
           {viewMode ? (
-            <CButton color="secondary" onClick={onClose}>
-              Close
-            </CButton>
+            <button className="sf-btn-cancel" onClick={onClose}>Close</button>
           ) : (
             <>
-              <CButton
-                style={{ backgroundColor: 'var(--color-bgcolor)', color: 'var(--color-black)' }}
-                onClick={() => setFormData(emptyForm)}
-              >
+              <button type="button" className="sf-btn-cancel" onClick={() => setFormData(emptyForm)}>
                 Clear
-              </CButton>
-              <CButton color="secondary" onClick={onClose}>
+              </button>
+              <button type="button" className="sf-btn-cancel" onClick={onClose}>
                 Cancel
-              </CButton>
-              <CButton
-                style={{ backgroundColor: 'var(--color-black)', color: 'white' }}
-                onClick={handleSubmit}
-                disabled={loading}
-              >
+              </button>
+              <button type="button" className="sf-btn-save" onClick={handleSubmit} disabled={loading}>
                 {loading ? (
-                  <>
-                    <span
-                      className="spinner-border spinner-border-sm me-2 text-white"
-                      role="status"
-                    />
-                    Saving...
-                  </>
+                  <><span className="spinner-border spinner-border-sm me-1" role="status" />Saving...</>
                 ) : (
                   'Save'
                 )}
-              </CButton>
+              </button>
             </>
           )}
         </CModalFooter>
@@ -1340,6 +1363,72 @@ const ReferDoctorForm = ({
       </CModal>
 
       {/* 🔹 Permissions */}
+      {/* ── STYLES (copied from SecurityForm) ── */}
+      <style>{`
+        .sf-profile-header { display: flex; align-items: center; gap: 16px; padding: 16px; background: #f0f5fb; border-radius: 10px; margin-bottom: 14px; }
+        .sf-profile-avatar { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #b5d4f4; flex-shrink: 0; }
+        .sf-profile-name { font-size: 16px; font-weight: 700; color: #0c447c; margin: 0 0 4px; }
+        .sf-profile-meta { font-size: 12px; color: #6b7280; margin: 0 0 2px; }
+        .sf-badge { display: inline-block; background: #185fa5; color: #fff; font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 20px; margin-top: 4px; }
+
+        .sf-card { border: 0.5px solid #d0dce9; border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
+        .sf-card-header { display: flex; align-items: center; gap: 8px; background: #185fa5; color: #fff; font-size: 12px; font-weight: 600; padding: 9px 14px; }
+        .sf-card-icon { color: #b5d4f4; }
+        .sf-card-body { padding: 14px; background: #fff; }
+        .sf-inner-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 24px; }
+        .sf-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .sf-info-row { display: flex; flex-direction: column; gap: 2px; }
+        .sf-info-label { font-size: 10.5px; font-weight: 600; color: #185fa5; text-transform: uppercase; letter-spacing: 0.3px; }
+        .sf-info-value { font-size: 13px; color: #374151; font-weight: 500; }
+        .sf-muted { font-size: 12px; color: #9ca3af; font-style: italic; margin: 0; }
+
+        .sf-section { margin-bottom: 18px; border: 0.5px solid #d0dce9; border-radius: 10px; overflow: hidden; }
+        .sf-section-title { display: flex; align-items: center; gap: 8px; background: #185fa5; color: #fff; font-size: 12px; font-weight: 600; padding: 9px 14px; }
+        .sf-section-icon { color: #b5d4f4; }
+        .sf-section-body { padding: 14px; }
+
+        .sf-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 0; }
+        .sf-col-third { flex: 1 1 calc(33.333% - 12px); min-width: 150px; }
+        .sf-col-half  { flex: 1 1 calc(50% - 12px); min-width: 140px; }
+        .sf-col-full  { flex: 1 1 100%; }
+
+        .sf-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+        .sf-label { font-size: 11px; font-weight: 600; color: #374151; display: flex; align-items: center; gap: 3px; }
+        .sf-required { color: #e24b4a; font-size: 11px; }
+        .sf-error { font-size: 11px; color: #e24b4a; margin-top: 2px; }
+
+        .sf-input {
+          width: 100%; padding: 7px 10px; font-size: 12.5px; color: #374151;
+          background: #fff; border: 0.5px solid #d0dce9; border-radius: 7px;
+          outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+          appearance: none; -webkit-appearance: none;
+        }
+        .sf-input:focus { border-color: #185fa5; box-shadow: 0 0 0 2.5px rgba(24,95,165,0.12); }
+        .sf-input-disabled { background: #f0f5fb !important; color: #9ca3af !important; cursor: not-allowed; }
+        .sf-textarea { resize: vertical; min-height: 70px; }
+
+        .sf-btn-cancel {
+          display: inline-flex; align-items: center; gap: 5px;
+          background: #fff; color: #374151; border: 0.5px solid #d0dce9;
+          border-radius: 8px; padding: 7px 16px; font-size: 12px; font-weight: 600;
+          cursor: pointer; transition: background 0.15s;
+        }
+        .sf-btn-cancel:hover { background: #f3f4f6; }
+
+        .sf-btn-save {
+          display: inline-flex; align-items: center; gap: 5px;
+          background: #185fa5; color: #fff; border: none;
+          border-radius: 8px; padding: 7px 18px; font-size: 12px; font-weight: 600;
+          cursor: pointer; transition: filter 0.15s;
+        }
+        .sf-btn-save:hover:not(:disabled) { filter: brightness(0.9); }
+        .sf-btn-save:disabled { opacity: 0.65; cursor: not-allowed; }
+
+        @media (max-width: 600px) {
+          .sf-col-third, .sf-col-half { flex: 1 1 100%; }
+          .sf-inner-grid, .sf-grid-2 { grid-template-columns: 1fr; }
+        }
+      `}</style>
     </>
   )
 }

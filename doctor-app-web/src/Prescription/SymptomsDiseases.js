@@ -1,674 +1,907 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import {
-  CRow,
-  CCol,
-  CCard,
-  CCardBody,
-  CForm,
-  CFormLabel,
-  CFormTextarea,
-  CFormInput,
-  CImage,
-  CSpinner,
-  CCarousel,
-  CCarouselItem,
-} from '@coreui/react'
-import './SymptomsDiseases.css'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { CSpinner } from '@coreui/react'
 import FileUploader from './FileUploader'
 import Button from '../components/CustomButton/CustomButton'
-import temp from '../assets/images/temp.webp'
 import Snackbar from '../components/Snackbar'
-import { COLORS } from '../Themes'
-import GradientTextCard from '../components/GradintColorText'
 import { useToast } from '../utils/Toaster'
-import { getDoctorSaveDetails, getAllDiseases, addDisease, getAdImagesView } from '../Auth/Auth' // <-- ensure this exists
+import { getBookingDetails, updateAppointmentBasedOnBookingId } from '../Auth/Auth'
 import { useDoctorContext } from '../Context/DoctorContext'
-import SymptomsModal from '../components/DisaesModal'
-import Select, { components } from 'react-select';
+import { COLORS } from '../Themes'
+import {
+  CAccordion,
+  CAccordionItem,
+  CAccordionHeader,
+  CAccordionBody,
+} from '@coreui/react'
+import { documentTextOutline } from "ionicons/icons";
+import { IonIcon } from "@ionic/react";
+// ─── helpers ────────────────────────────────────────────────────────────────
+const toImageSrc = (raw) => {
+  if (!raw) return null
 
-const SymptomsDiseases = ({ seed = {}, onNext, sidebarWidth = 0, patientData, setFormData }) => {
-  const [symptomDetails, setSymptomDetails] = useState(
-    seed.symptomDetails ?? patientData?.problem ?? '',
-  )
-  const { setUpdateTemplate } = useDoctorContext()
-
-  const [doctorObs, setDoctorObs] = useState(seed.doctorObs ?? '')
-  const [diagnosis, setDiagnosis] = useState(
-    seed.diagnosis ?? (patientData?.subServiceName && patientData.subServiceName !== 'NA'
-      ? patientData.subServiceName
-      : '')
-  )
-  const [duration, setDuration] = useState(patientData?.symptomsDuration ?? '')
-  const [attachments, setAttachments] = useState(
-    Array.isArray(seed.attachments)
-      ? seed.attachments
-      : Array.isArray(patientData?.attachments)
-        ? patientData.attachments
-        : [],
-  )
-  const [template, setTemplate] = useState({})
-  const [diseases, setDiseases] = useState([])
-  const [snackbar, setSnackbar] = useState({ show: false, message: '', type: '' })
-  const [tplLoading, setTplLoading] = useState(false)
-  const [ads, setAds] = useState([]);        // ✅ new state
-  const [loadingAds, setLoadingAds] = useState(false);
-  // Add these states near the top
-  const [probableSymptoms, setProbableSymptoms] = useState('')
-  const [keyNotes, setKeyNotes] = useState('')
-  const [modalOpen, setmodalOpen] = useState(false)
-  const [clearDiagnosis, setClearDiagnosis] = useState(false);
-  // Update probableSymptoms and keyNotes whenever diagnosis changes
-  useEffect(() => {
-    if (!diagnosis) {
-      setProbableSymptoms('')
-      setKeyNotes('')
-      return
-    }
-
-    const matched = diseases.find(
-      (d) => d.diseaseName && d.diseaseName.toLowerCase() === diagnosis.toLowerCase()
-    )
-
-    if (matched) {
-      setProbableSymptoms(matched.probableSymptoms || '')
-      setKeyNotes(matched.notes || '')
-    } else {
-      setProbableSymptoms('')
-      setKeyNotes('')
-    }
-  }, [diagnosis, diseases])
-
-
-  const [templateData, setTemplateData] = useState({
-    symptoms: '',
-    tests: {},
-    prescription: {},
-    treatments: {},
-    followUp: {},
-    summary: {},
-  })
-  // NEW: local state for react-select typing + adding
-  const [inputValue, setInputValue] = useState('')
-  const [adding, setAdding] = useState(false)
-
-  const [hasTemplate, setHasTemplate] = useState(false)
-
-  const handleNext = () => {
-    const payload = {
-      symptomDetails,
-      doctorObs,
-      diagnosis,
-      duration,
-      attachments,
-      prescription: templateData.prescription, // include current template medicines
-      tests: templateData.tests,
-      treatments: templateData.treatments,
-      followUp: templateData.followUp,
-
-    }
-    console.log('🚀 Submitting payload:', payload)
-    onNext?.(payload)
-  }
-
-  const { success, error, info, warning } = useToast()
-
-
-  // ✅ Fetch Ads on mount
-  useEffect(() => {
-    const fetchAds = async () => {
-      setLoadingAds(true);
-      const data = await getAdImagesView();
-      console.log("✅ Processed Ads:", data); // <-- check what comes back
-      setAds(data);
-      setLoadingAds(false);
-    };
-    fetchAds();
-  }, []);
-  // --- move this above useEffect
-  const fetchDiseases = async () => {
-    try {
-      const data = await getAllDiseases() || []
-
-      // Normalize: ensure each disease has a `diseaseName` for frontend
-      const normalized = data.map(d => ({
-        diseaseName: d.diseaseName || '',
-        probableSymptoms: d.probableSymptoms || '',
-        notes: d.notes || '',
-        hospitalId: d.hospitalId,
-
-      }))
-
-      setDiseases(normalized)
-    } catch (err) {
-      console.error('❌ Failed to fetch diseases:', err)
-    }
-  }
-
-
-  const openMadal = () => {
-    setmodalOpen(true)
-
-  }
-
-  // --- useEffect to fetch once on mount
-  useEffect(() => {
-    fetchDiseases()
-  }, [])
-  // put this near other hooks
-  const fetchTemplate = async (dx) => {
-    if (!dx) return
-    setTplLoading(true)
-    try {
-      const res = await getDoctorSaveDetails(dx)
-      const raw = res?.data ?? res
-      const item = Array.isArray(raw) ? raw[0] : raw
-      setTemplateData(item || {})
-      setHasTemplate(!!item)
-    } catch (e) {
-      console.error(e)
-      setHasTemplate(false)
-    } finally {
-      setTplLoading(false)
-    }
-  }
-
-  // when user picks from Select
-  const handleDiagnosisChange = async (selected) => {
-    const selectedValue = selected?.value ?? ''
-    setDiagnosis(selectedValue)
-    if (!selectedValue) {
-      setHasTemplate(false)
-      return
-    }
-    await fetchTemplate(selectedValue)
-  }
-
-  // NEW: when you return to this tab, reload the template if diagnosis exists
-  useEffect(() => {
-    const dx = (seed?.diagnosis ?? diagnosis ?? '').trim()
-    if (dx && !hasTemplate) {
-      fetchTemplate(dx)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seed?.diagnosis])
-
-  console.log(templateData)
-  const showSnackbar = (message, type) => {
-    setSnackbar({ show: true, message, type })
-    setTimeout(() => setSnackbar({ show: false, message: '', type: '' }), 3000)
-  }
-
-  // useEffect(() => {
-  //   if (!diagnosis) return
-  //   setTplLoading(true)
-  //   const timer = setTimeout(() => setTplLoading(false), 800)
-  //   return () => clearTimeout(timer)
-  // }, [diagnosis])
-
-  const applyTemplate = (dx) => {
-    const merged = mapTemplateToFormData(templateData, dx)
-
-    setFormData((prev) => ({
-      ...prev,
-      ...merged,
-      __templateApplied: { dx, at: Date.now() },
-    }))
-
-    setUpdateTemplate(true)
-    success('Template applied successfully!', { title: 'Success' })
-
-    // ✅ include prescription & tests & followUp in payload
-    const payload = {
-      symptomDetails,
-      doctorObs,
-      diagnosis: dx,
-      duration,
-      attachments,
-      prescription: merged.prescription,
-      tests: merged.tests,
-      treatments: merged.treatments,
-      followUp: merged.followUp,
-    }
-
-    console.log("🚀 Final Payload:", payload) // debug log
-    onNext?.(payload)
-  }
-
-
-  // NEW: options for react-select
-  const options = useMemo(
-    () =>
-      Array.isArray(diseases) ? diseases.map((d) => ({ label: d.diseaseName, value: d.diseaseName })) : [],
-    [diseases],
-  )
-
-  // NEW: add button visible only when user typed something that's not already an option
-  const canShowAdd =
-    inputValue.trim() &&
-    !options.some(
-      (opt) =>
-        (opt?.value || '').toLowerCase() === inputValue.trim().toLowerCase()
-    )
-
-  // NEW: Add-to-backend handler
-  const handleAddClick = async () => {
-    const name = inputValue.trim()
-    const symptoms = probableSymptoms.trim()  // assuming you have a state for this
-    const notesText = notes.trim()             // assuming you have a state for this
-
-    if (!name || adding) return
-
-    try {
-      setAdding(true)
-
-      // Pass additional fields to addDisease
-      const created = await addDisease({
-        diseaseName: name,
-        probableSymptoms: symptoms,
-        notes: notesText,
-      })
-
-      if (created) {
-        success?.(`Saved "${name}" to diagnoses`, { title: 'Success' })
-        setInputValue('')
-        setProbableSymptoms('')  // clear symptoms input
-        setNotes('')             // clear notes input
-
-        // Reload fresh list from backend
-        await fetchDiseases()
-
-        // Optionally, auto-select the newly added diagnosis
-        setDiagnosis(name)
-      } else {
-        info?.(created?.message || "Could not add disease", { title: 'Info' })
-      }
-    } catch (e) {
-      console.error(e)
-      error?.('Could not add disease. Please try again.')
-    } finally {
-      setAdding(false)
-    }
-  }
-  // Custom Clear Button
-  const ClearInput = (props) => {
-    return (
-      <components.ClearIndicator {...props}>
-        <span
-          style={{ cursor: 'pointer', color: '#7e3a93', fontWeight: 'bold' }}
-          onClick={() => props.clearValue()}
-        >
-          ✕
-        </span>
-      </components.ClearIndicator>
-    )
-  }
-
-  // put this near the top of SymptomsDiseases.jsx
-  // SymptomsDiseases.jsx
-  const mapTemplateToFormData = (t = {}, dx) => {
-    // ---- Symptoms (API has a string)
-    const symptomStr = typeof t.symptoms === 'string' ? t.symptoms : ''
-
-    // ---- Tests
-    const selectedTests = Array.isArray(t?.tests?.selectedTests) ? t.tests.selectedTests : []
-    const testReason = t?.tests?.testReason ?? ''
-
-    // ---- Prescription (map 'food' -> remindWhen)
-    const medicines = Array.isArray(t?.prescription?.medicines)
-      ? t.prescription.medicines.map((m) => {
-        const dur = m?.duration ? `${m.duration}`.trim() : "NA";
-        let unit = m?.durationUnit ? m.durationUnit.trim() : "";
-
-        // 🔹 Auto pluralize if duration > 1
-        if (dur !== "NA" && unit) {
-          const num = parseInt(dur, 10);
-          if (!isNaN(num) && num > 1 && !unit.endsWith("s")) {
-            unit = `${unit}s`;
-          }
+  const toDataUrl = (input) => {
+    let bytes
+    if (input instanceof Uint8Array) {
+      bytes = input
+    } else if (input instanceof ArrayBuffer) {
+      bytes = new Uint8Array(input)
+    } else if (typeof input === 'string') {
+      const s = input.trim().replace(/^'+|'+$/g, '')
+      try {
+        const decoded = atob(s)
+        if (btoa(decoded).replace(/=+$/, '') === s.replace(/=+$/, '')) {
+          bytes = new Uint8Array(decoded.length)
+          for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i)
         }
-
-        return {
-          id: m?.id ?? `tmp-${Date.now()}-${Math.random()}`,
-          medicineType: m?.medicineType?.trim() || "NA",
-          name: m?.name || "",
-          dose: m?.dose || "",
-          remindWhen: m?.remindWhen || "Once A Day",
-          others: m?.others || "",
-          duration: dur !== "NA" && unit ? `${dur} ${unit}` : dur, // 👈 duration + unit (with plural if needed)
-          food: m?.food || "",
-          note: m?.note || "",
-          times: Array.isArray(m?.times)
-            ? m.times.map((t) => `${t}`.trim()).filter(Boolean)
-            : m?.times && typeof m.times === "string"
-              ? m.times.split(",").map((t) => t.trim()).filter(Boolean)
-              : [],
-        };
-      })
-      : [];
-
-
-
-    // ---- Treatments
-    const generatedData = t?.treatments?.generatedData ?? {}
-    const selectedTestTreatments =
-      t?.treatments?.selectedTestTreatments ?? t?.treatments?.selectedTreatment ?? []
-    const treatmentReason = t?.treatments?.reason ?? ''
-
-    // ---- Follow up (note: API has followUpnote)
-    const followUp = {
-      durationValue: t?.followUp?.durationValue ?? '',
-      durationUnit: t?.followUp?.durationUnit ?? '',
-      nextFollowUpDate: t?.followUp?.nextFollowUpDate ?? '',
-      followUpNote: t?.followUp?.followUpnote ?? t?.followUp?.followUpNote ?? '',
+      } catch (e) {}
+      if (!bytes) {
+        bytes = new Uint8Array(s.length)
+        for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i) & 0xff
+      }
+    } else {
+      return null
     }
 
-    // ---- Final merged formData for the whole app
-    return {
-      symptoms: {
-        symptomDetails: symptomStr, // show the template’s symptom text
-        doctorObs, // keep whatever the doctor typed
-        diagnosis: dx,
-        duration,
-        attachments,
-      },
-      tests: {
-        selectedTests,
-        testReason,
-      },
-      prescription: {
-        medicines,
-      },
-      treatments: {
-        generatedData,
-        selectedTestTreatments,
-        treatmentReason,
-      },
-      followUp,
-      summary: { diagnosis: dx },
+    let mime = 'image/*'
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) mime = 'image/png'
+    else if (bytes[0] === 0xff && bytes[1] === 0xd8) mime = 'image/jpeg'
+    else if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) mime = 'image/gif'
+    else if (bytes[0] === 0x42 && bytes[1] === 0x4d) mime = 'image/bmp'
+    else if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+             bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) mime = 'image/webp'
+
+    let bin = ''
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
+    return `data:${mime};base64,${btoa(bin)}`
+  }
+
+  if (typeof raw !== 'string') {
+    try {
+      return toDataUrl(raw)
+    } catch (e) {
+      return null
     }
   }
+
+  const trimmed = raw.trim()
+  if (trimmed.startsWith('data:')) return trimmed
+  if (trimmed.startsWith('blob:')) return trimmed
+  if (trimmed.includes('X-Amz-Signature=') || trimmed.includes('X-Amz-Algorithm=') || trimmed.includes('amazonaws.com')) return trimmed
+
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    let urlWithoutQuery = trimmed
+    const queryIdx = trimmed.indexOf('?')
+    if (queryIdx !== -1) {
+      urlWithoutQuery = trimmed.substring(0, queryIdx)
+    }
+
+    let base64Part = ''
+    const awsIndex = urlWithoutQuery.lastIndexOf('amazonaws.com')
+    if (awsIndex !== -1) {
+      const remaining = urlWithoutQuery.substring(awsIndex + 'amazonaws.com'.length)
+      let extracted = ''
+      if (remaining.startsWith('/')) {
+        extracted = remaining.substring(1)
+      } else if (remaining.startsWith('%2F') || remaining.startsWith('%2f')) {
+        extracted = remaining.substring(3)
+      } else {
+        const slashIdx = remaining.indexOf('/')
+        const pctSlashIdx = remaining.toLowerCase().indexOf('%2f')
+        if (slashIdx !== -1 && (pctSlashIdx === -1 || slashIdx < pctSlashIdx)) {
+          extracted = remaining.substring(slashIdx + 1)
+        } else if (pctSlashIdx !== -1) {
+          extracted = remaining.substring(pctSlashIdx + 3)
+        } else {
+          extracted = remaining
+        }
+      }
+
+      const upperExtracted = extracted.toUpperCase()
+      const signatures = ['IVBOR', '/9J/', '9J/', 'R0LGO', 'JVBER', '%2F9J%2F']
+      let signatureIndex = -1
+      for (const sig of signatures) {
+        const idx = upperExtracted.indexOf(sig)
+        if (idx !== -1) {
+          signatureIndex = idx
+          break
+        }
+      }
+
+      if (signatureIndex !== -1) {
+        base64Part = extracted.substring(signatureIndex)
+      } else if (extracted.length > 500) {
+        base64Part = extracted
+      } else {
+        return trimmed // Normal short S3 URL
+      }
+    } else {
+      return trimmed // Not an amazonaws URL
+    }
+
+    if (base64Part) {
+      let decodedPart = base64Part
+      // Multi-pass percent decoding to handle single or double percent-encoding
+      for (let pass = 0; pass < 3; pass++) {
+        if (!decodedPart.includes('%')) break;
+        try {
+          decodedPart = decodeURIComponent(decodedPart)
+        } catch (e) {
+          const prev = decodedPart
+          decodedPart = decodedPart
+            .replace(/%2[bB]/g, '+')
+            .replace(/%2[fF]/g, '/')
+            .replace(/%3[dD]/g, '=')
+            .replace(/%25/g, '%')
+          if (decodedPart === prev) break
+        }
+      }
+
+      // Final cleanup of base64 characters
+      const cleanDecoded = decodedPart.trim()
+        .replace(/%2[bB]/g, '+')
+        .replace(/%2[fF]/g, '/')
+        .replace(/%3[dD]/g, '=')
+
+      const upperDecoded = cleanDecoded.toUpperCase()
+
+      // Direct base64 data URL assembly for known signatures
+      if (upperDecoded.startsWith('IVBOR')) {
+        return `data:image/png;base64,${cleanDecoded}`
+      }
+      if (upperDecoded.startsWith('/9J/') || upperDecoded.startsWith('9J/')) {
+        const fullBase64 = cleanDecoded.startsWith('9J') ? '/' + cleanDecoded : cleanDecoded
+        return `data:image/jpeg;base64,${fullBase64}`
+      }
+      if (upperDecoded.startsWith('R0LGO')) {
+        return `data:image/gif;base64,${cleanDecoded}`
+      }
+      if (upperDecoded.startsWith('JVBER')) {
+        return `data:application/pdf;base64,${cleanDecoded}`
+      }
+
+      if (cleanDecoded.length > 500 && !/\s/.test(cleanDecoded)) {
+        try {
+          return toDataUrl(cleanDecoded)
+        } catch (e) {
+          return `data:image/jpeg;base64,${cleanDecoded}`
+        }
+      }
+    }
+    return trimmed
+  }
+
+  if (trimmed.startsWith('/')) {
+    const upperTrimmed = trimmed.toUpperCase()
+    if (upperTrimmed.startsWith('/9J/')) {
+      return `data:image/jpeg;base64,${trimmed}`
+    }
+    return trimmed
+  }
+
+  // Pure Base64 strings: check signatures directly to prevent double-encoding bugs in toDataUrl
+  const upperTrimmed = trimmed.toUpperCase()
+  if (upperTrimmed.startsWith('IVBOR')) {
+    return `data:image/png;base64,${trimmed}`
+  }
+  if (upperTrimmed.startsWith('/9J/') || upperTrimmed.startsWith('9J/')) {
+    const fullBase64 = trimmed.startsWith('9J') ? '/' + trimmed : trimmed
+    return `data:image/jpeg;base64,${fullBase64}`
+  }
+  if (upperTrimmed.startsWith('R0LGO')) {
+    return `data:image/gif;base64,${trimmed}`
+  }
+  if (upperTrimmed.startsWith('JVBER')) {
+    return `data:application/pdf;base64,${trimmed}`
+  }
+
+  try {
+    return toDataUrl(trimmed)
+  } catch (e) {
+    if (trimmed.length > 100 && !/\s/.test(trimmed)) {
+      return `data:image/jpeg;base64,${trimmed}`
+    }
+    return trimmed
+  }
+}
+
+const flattenTherapyAnswers = (obj = {}) => {
+  if (!obj || typeof obj !== 'object') return []
+  return Object.entries(obj).map(([category, qList]) => ({
+    category,
+    questions: Array.isArray(qList) ? qList : [],
+  }))
+}
+
+const isValid = (v) =>
+  v !== undefined && v !== null && v !== '' && v !== 'NA' &&
+  !(typeof v === 'string' && v.trim().toLowerCase() === 'undefined')
+
+// ─── sub-components ──────────────────────────────────────────────────────────
+export const SLabel = ({ text }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+    <span style={{
+      fontSize: '0.82rem',
+      fontWeight: 700,
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      color: '#1B4F8A',
+    }}>{text}</span>
+    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,#b6cfe8,transparent)' }} />
+  </div>
+)
+
+const StatusBadge = ({ status }) => {
+  const map = {
+    Confirmed: { bg: '#D1FAE5', color: '#065F46', border: '#6EE7B7' },
+    Pending: { bg: '#FEF3C7', color: '#92400E', border: '#FCD34D' },
+    Cancelled: { bg: '#FEE2E2', color: '#991B1B', border: '#FECACA' },
+  }
+  const s = map[status] || { bg: '#F3F4F6', color: '#374151', border: '#D1D5DB' }
+  return (
+    <span style={{
+      background: s.bg, color: s.color, border: `1px solid ${s.border}`,
+      borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 700,
+    }}>{status}</span>
+  )
+}
+
+const AnswerBadge = ({ answer }) => {
+  const raw = answer ?? ''
+  const display = String(raw).trim()
+
+  if (!display || display.toLowerCase() === 'na' || display.toLowerCase() === 'undefined') {
+    return (
+      <span style={{
+        background: '#F9FAFB', color: '#9CA3AF',
+        border: '1px dashed #D1D5DB',
+        borderRadius: 20, padding: '2px 12px', fontSize: 12, fontWeight: 600,
+        whiteSpace: 'nowrap', fontStyle: 'italic',
+      }}>Not answered</span>
+    )
+  }
+
+  const up = display.toUpperCase()
+  const s = up === 'YES'
+    ? { bg: '#D1FAE5', color: '#065F46', border: '#6EE7B7' }
+    : up === 'NO'
+      ? { bg: '#FEE2E2', color: '#991B1B', border: '#FECACA' }
+      : { bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE' }
 
   return (
-    <CCard className="border-1 bg-white mb-5 pb-5" style={{ backgroundColor: 'transparent' }}>
-      <CForm className="w-100 " style={{ borderRadius: '10px' }}>
-        <CRow className="gx-0">
-          {/* LEFT */}
-          <CCol lg={6}>
-            <CCardBody>
-              <div className="mb-3">
-                <GradientTextCard text="Patient Complaints" />
-                <CFormTextarea
-                  className="mt-2"
-                  rows={3}
-                  value={symptomDetails}
-                  onChange={(e) => setSymptomDetails(e.target.value)}
-                  placeholder="NA"   // show NA if empty
-                />
-              </div>
+    <span style={{
+      background: s.bg, color: s.color, border: `1px solid ${s.border}`,
+      borderRadius: 20, padding: '2px 12px', fontSize: 12, fontWeight: 700,
+      whiteSpace: 'nowrap',
+    }}>{display}</span>
+  )
+}
 
-              <div className="mb-3">
-                <GradientTextCard text="Duration of Symptoms" />
-                <CFormInput
-                  className="mt-2"
-                  value={duration}
+export const card = {
+  background: '#FFFFFF',
+  borderRadius: 14,
+  padding: '18px 20px',
+  boxShadow: '0 2px 12px rgba(27,79,138,0.08)',
+  border: '1px solid #b6cfe8',
+  marginBottom: 18,
+}
+
+export const inputBase = {
+  width: '100%', borderRadius: 10, border: '1.5px solid #b6cfe8',
+  padding: '10px 13px', fontSize: '0.875rem',
+  outline: 'none', background: '#FFFFFF', color: '#1a3a5c',
+  boxSizing: 'border-box', resize: 'vertical',
+}
+
+export const checkboxStyle = {
+  display: 'flex', alignItems: 'center', gap: 8,
+  fontSize: '0.875rem', color: '#1a3a5c', cursor: 'pointer',
+  marginBottom: 6
+}
+
+const emptyPlaceholder = {
+  color: '#9CA3AF',
+  fontSize: 13,
+  fontStyle: 'italic',
+  padding: '8px 0',
+}
+
+// ─── main component ──────────────────────────────────────────────────────────
+const SymptomsDiseases = ({ seed = {}, onNext, patientData, setFormData }) => {
+
+  const [symptomDetails, setSymptomDetails] = useState(seed.symptomDetails ?? '')
+  const [duration, setDuration] = useState(seed.duration ?? '0 Days')
+  const [attachments, setAttachments] = useState(
+    Array.isArray(seed.attachments) && seed.attachments.length ? seed.attachments : []
+  )
+  const [loadingBooking, setLoadingBooking] = useState(false)
+  const [bookingRecord, setBookingRecord] = useState(null)
+  const [partImage, setPartImage] = useState(seed.partImage ?? '')
+  const [showDiagramModal, setShowDiagramModal] = useState(false)
+  const [theraphyAnswers, setTheraphyAnswers] = useState(seed.theraphyAnswers ?? {})
+  const [selectedTherapy, setSelectedTherapy] = useState(seed.selectedTherapy ?? '')
+  const [selectedTherapyID, setSelectedTherapyID] = useState(seed.selectedTherapyID ?? '')
+  const [parts, setParts] = useState(Array.isArray(seed.parts) ? seed.parts : [])
+  const [attachmentImages, setAttachmentImages] = useState(Array.isArray(seed.attachmentImages) ? seed.attachmentImages : [])
+  const [previousInjuries, setPreviousInjuries] = useState(seed.previousInjuries ?? '')
+  const [currentMedications, setCurrentMedications] = useState(seed.currentMedications ?? '')
+  const [allergies, setAllergies] = useState(seed.allergies ?? '')
+  const [occupation, setOccupation] = useState(seed.occupation ?? '')
+  const [insuranceProvider, setInsuranceProvider] = useState(seed.insuranceProvider ?? '')
+  const [activityLevels, setActivityLevels] = useState(Array.isArray(seed.activityLevels) ? seed.activityLevels : [])
+
+  const [patientPain, setPatientPain] = useState(seed.reasonforVisit ?? '')
+
+  const [snackbar, setSnackbar] = useState({ show: false, message: '', type: '' })
+  const { error } = useToast()
+
+  useEffect(() => {
+    if (!seed || typeof seed !== 'object') return
+    if (isValid(seed.symptomDetails)) setSymptomDetails(seed.symptomDetails)
+    if (isValid(seed.duration)) setDuration(seed.duration)
+    if (Array.isArray(seed.attachments) && seed.attachments.length) setAttachments(seed.attachments)
+    if (isValid(seed.partImage)) setPartImage(seed.partImage)
+    if (Array.isArray(seed.parts) && seed.parts.length) setParts(seed.parts)
+    if (isValid(seed.selectedTherapy)) setSelectedTherapy(seed.selectedTherapy)
+    if (isValid(seed.selectedTherapyID)) setSelectedTherapyID(seed.selectedTherapyID)
+    if (seed.theraphyAnswers && typeof seed.theraphyAnswers === 'object') setTheraphyAnswers(seed.theraphyAnswers)
+    if (Array.isArray(seed.attachmentImages) && seed.attachmentImages.length) setAttachmentImages(seed.attachmentImages)
+    if (isValid(seed.previousInjuries)) setPreviousInjuries(seed.previousInjuries)
+    if (isValid(seed.currentMedications)) setCurrentMedications(seed.currentMedications)
+    if (isValid(seed.allergies)) setAllergies(seed.allergies)
+    if (isValid(seed.occupation)) setOccupation(seed.occupation)
+    if (isValid(seed.insuranceProvider)) setInsuranceProvider(seed.insuranceProvider)
+    if (Array.isArray(seed.activityLevels) && seed.activityLevels.length) setActivityLevels(seed.activityLevels)
+    if (isValid(seed.patientPain)) setPatientPain(seed.patientPain)
+    else if (isValid(seed.reasonforVisit)) setPatientPain(seed.reasonforVisit)
+  }, [seed])
+
+  useEffect(() => {
+    const bookingId = patientData?.bookingId
+    console.log("✅ getBookingDetails record:", bookingId)
+
+    if (!bookingId) return
+
+    const run = async () => {
+      setLoadingBooking(true)
+      try {
+        const rawRecord = await getBookingDetails(bookingId)
+        console.log("✅ getBookingDetails raw result:", rawRecord)
+
+        // Flatten if the record is still nested (e.g. { data: { ... } })
+        const record = (rawRecord?.data && !rawRecord.bookingId) ? rawRecord.data : rawRecord
+
+        if (!record || (!record.bookingId && !record.problem)) {
+          console.warn("⚠️ No valid record data found")
+          return
+        }
+
+        setBookingRecord(record)
+
+        // Hydrate state from booking record (Unconditionally use API data)
+        console.log("🔍 Hydrating symptoms from record:", {
+          problem: record.problem,
+          duration: record.symptomsDuration,
+          therapy: record.subServiceName,
+          patientPain: record.patientPain
+        })
+
+        if (isValid(record.problem)) {
+          console.log("✅ Setting symptomDetails:", record.problem)
+          setSymptomDetails(record.problem)
+        }
+
+        if (isValid(record.symptomsDuration)) {
+          console.log("✅ Setting duration:", record.symptomsDuration)
+          setDuration(record.symptomsDuration.trim())
+        } else {
+          setDuration('0 Days')
+        }
+
+        if (isValid(record.subServiceName)) {
+          console.log("✅ Setting selectedTherapy:", record.subServiceName)
+          setSelectedTherapy(record.subServiceName)
+        }
+        if (isValid(record.subServiceId)) setSelectedTherapyID(record.subServiceId)
+
+        const fetchedPartImage = record.partImage ?? record.complaints?.painAssessmentImage ?? record.complaints?.partImage ?? record.painAssessmentImage
+        if (fetchedPartImage) {
+          console.log("✅ Setting partImage (exists)")
+          setPartImage(fetchedPartImage)
+        }
+        if (Array.isArray(record.parts) && record.parts.length) {
+          console.log("✅ Setting parts:", record.parts)
+          setParts(record.parts)
+        }
+
+        if (record.theraphyAnswers && typeof record.theraphyAnswers === 'object') {
+          console.log("✅ Setting theraphyAnswers:", record.theraphyAnswers)
+          setTheraphyAnswers(record.theraphyAnswers)
+        }
+
+        if (isValid(record.previousInjuries)) setPreviousInjuries(record.previousInjuries)
+        if (isValid(record.currentMedications)) setCurrentMedications(record.currentMedications)
+        if (isValid(record.allergies)) setAllergies(record.allergies)
+        if (isValid(record.occupation)) setOccupation(record.occupation)
+        if (isValid(record.insuranceProvider)) setInsuranceProvider(record.insuranceProvider)
+        if (Array.isArray(record.activityLevels) && record.activityLevels.length) setActivityLevels(record.activityLevels)
+
+        if (isValid(record.patientPain)) {
+          console.log("✅ Setting patientPain:", record.patientPain)
+          setPatientPain(record.patientPain)
+        }
+
+        if (Array.isArray(record.attachments) && record.attachments.length) {
+          console.log("✅ Setting attachmentImages:", record.attachments.length, "items")
+          setAttachmentImages(record.attachments)
+          setAttachments((prev) => {
+            const existingSet = new Set(prev.map((a) => a?.url ?? a))
+            const newItems = record.attachments
+              .filter((a) => !existingSet.has(a))
+              .map((raw, idx) => ({ url: toImageSrc(raw), name: `attachment_${idx + 1}`, isBase64: true }))
+            return [...prev, ...newItems]
+          })
+        }
+      } catch (e) {
+        console.error('❌ Booking fetch failed:', e)
+        error?.('Could not load booking details.')
+      } finally {
+        setLoadingBooking(false)
+      }
+    }
+    run()
+  }, [patientData?.bookingId])
+
+
+
+  const handleNext = () => {
+    // FIX 3: include selectedTherapyID and patientPain correctly in payload
+    const payload = {
+      symptomDetails,
+      duration,
+      attachments,
+      partImage,
+      parts,
+      selectedTherapy,
+      selectedTherapyID,
+      theraphyAnswers,
+      attachmentImages,
+      previousInjuries,
+      currentMedications,
+      allergies,
+      occupation,
+      insuranceProvider,
+      activityLevels,
+      patientPain,       // correct key name — was previously sent as patientPain but state init was from reasonforVisit
+      reasonforVisit: patientPain, // keep for backward compat
+    }
+    onNext?.(payload)
+
+    // Update appointment status to In-Progress
+    const bookingId = patientData?.bookingId
+    if (bookingId) {
+      updateAppointmentBasedOnBookingId({
+        data: {
+          bookingId,
+          status: 'On-Going',
+        }
+      }).catch(err => console.error('Failed to update appointment status:', err))
+    }
+  }
+
+  const therapyGroups = useMemo(() => flattenTherapyAnswers(theraphyAnswers), [theraphyAnswers])
+  const bk = bookingRecord
+
+  const focusBlue = (e) => (e.target.style.borderColor = '#1B4F8A')
+  const blurBlue = (e) => (e.target.style.borderColor = '#b6cfe8')
+
+  return (
+    <div style={{ paddingBottom: '90px', backgroundColor: '#FFFFFF', minHeight: '100vh' }}>
+
+      {/* ── Header ── */}
+      <div style={{
+        background: '#FFFFFF',
+        borderBottom: '2px solid #dceeff',
+        padding: '16px 24px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        boxShadow: '0 4px 12px rgba(27,79,138,0.10)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 8,
+            background: 'linear-gradient(135deg,#1B4F8A,#2A6DB5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 18, boxShadow: '0 2px 8px rgba(27,79,138,0.25)',
+          }}>
+            🧑‍⚕️
+          </div>
+          <h5 style={{ color: '#1B4F8A', fontWeight: 700, fontSize: '1.1rem', margin: 0 }}>
+            Patient Consultation
+          </h5>
+        </div>
+
+        {bk && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              background: '#EFF6FF', borderRadius: 24, padding: '6px 16px',
+              color: '#1B4F8A', fontSize: 13, fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 8,
+              border: '1px solid #b6cfe8',
+              boxShadow: '0 2px 6px rgba(27,79,138,0.10)',
+            }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1B4F8A' }} />
+              {bk.name} · {bk.age}yr {bk.gender?.charAt(0)}
+            </div>
+            <StatusBadge status={bk.status} />
+          </div>
+        )}
+      </div>
+
+
+
+      {/* ── Loading Banner ── */}
+      {loadingBooking && (
+        <div style={{
+          background: '#EFF6FF', padding: '8px 20px',
+          display: 'flex', alignItems: 'center', gap: 8,
+          borderBottom: '1px solid #b6cfe8',
+        }}>
+          <CSpinner size="sm" style={{ color: '#1B4F8A' }} />
+          <span style={{ color: '#1B4F8A', fontSize: 13 }}>Loading booking details…</span>
+        </div>
+      )}
+
+      {/* ── Two-Column Main Grid ── */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr',
+        gap: 20, maxWidth: 1200, margin: '20px auto 0', padding: '0 20px',
+      }}>
+
+        {/* ════ LEFT COLUMN ════ */}
+        <div>
+
+          {/* ── Chief Complaint Details ── */}
+          <div style={card}>
+            <SLabel text="Chief Complaint Details" />
+            <textarea
+              rows={4} value={symptomDetails}
+              onChange={(e) => setSymptomDetails(e.target.value)}
+              placeholder="Describe patient's main complaint…"
+              style={{ ...inputBase, marginBottom: 14 }}
+              onFocus={focusBlue} onBlur={blurBlue}
+            />
+
+            {/* ── Duration + Affected Body Parts ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+              <div>
+                <SLabel text="Duration" />
+                <input
+                  value={duration || '0 Days'}
                   onChange={(e) => setDuration(e.target.value)}
-                  placeholder="NA"   // show NA if empty
+                  placeholder="e.g. 3 weeks"
+                  style={{ ...inputBase, resize: 'none' }}
+                  onFocus={focusBlue} onBlur={blurBlue}
                 />
               </div>
+              <div>
+                <SLabel text="Affected Body Parts" />
+                {parts.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 2 }}>
+                    {parts.map((p) => (
+                      <span key={p} style={{
+                        background: '#EFF6FF', color: '#1B4F8A',
+                        border: '1px solid #b6cfe8', borderRadius: 20,
+                        padding: '4px 12px', fontSize: 12, fontWeight: 700,
+                        textTransform: 'capitalize',
+                      }}>{p}</span>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={emptyPlaceholder}>No body parts selected</div>
+                )}
+              </div>
+            </div>
 
+            {/* FIX 4: Patient Pain field — correctly bound to patientPain state */}
+            <div style={{ marginBottom: 14 }}>
+              <SLabel text="Patient Pain / Reason for Visit" />
 
-              <div className="mb-3">
-                <GradientTextCard text="Doctor Additional Observations" />
-                <CFormTextarea
-                  className="mt-2"
-                  rows={3}
-                  value={doctorObs}
-                  onChange={(e) => setDoctorObs(e.target.value)}
+              <input
+                value={patientPain}
+                onChange={(e) => setPatientPain(e.target.value)}
+                placeholder="e.g. none"
+                style={{ ...inputBase, resize: 'none' }}
+                onFocus={focusBlue} onBlur={blurBlue}
+              />
+            </div>
+
+            {/* ── Previous Injuries + Current Medications ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+              <div>
+                <SLabel text="Previous Injuries" />
+                <input
+                  value={previousInjuries}
+                  onChange={(e) => setPreviousInjuries(e.target.value)}
+                  placeholder="e.g. none"
+                  style={{ ...inputBase, resize: 'none' }}
+                  onFocus={focusBlue} onBlur={blurBlue}
                 />
               </div>
-
-              <div className="mb-0">
-                <GradientTextCard text="Probable Disease" />
-
-                <div className="mt-2 d-flex align-items-start gap-2">
-                  <div className="flex-grow-1">
-                    <Select
-                      value={
-                        diagnosis
-                          ? { label: diagnosis, value: diagnosis }
-                          : patientData?.subServiceName && patientData.subServiceName !== 'NA'
-                            ? { label: patientData.subServiceName, value: patientData.subServiceName }
-                            : null
-                      }
-                      onChange={handleDiagnosisChange}   // ✅ FIXED
-                      inputValue={inputValue}
-                      onInputChange={(val, meta) => {
-                        if (meta.action === 'input-change') setInputValue(val);
-                      }}
-                      options={options}
-                      isClearable
-                      components={{ ClearIndicator: ClearInput }}
-                      placeholder="Select diagnosis..."
-                      menuPlacement="auto"
-                      menuPosition="fixed"
-                      menuPortalTarget={document.body}
-                      noOptionsMessage={() =>
-                        inputValue
-                          ? `No matches. Click Add to create "${inputValue}" as a diagnosis`
-                          : 'Type to search...'
-                      }
-                      styles={{
-                        input: (provided) => ({ ...provided, color: 'black' }),
-                        singleValue: (provided) => ({ ...provided, color: 'black' }),
-                        placeholder: (provided) => ({ ...provided, color: '#000' }),
-                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                      }}
-                    />
-
-
-
-                  </div>
-
-                  <div className="pt-1 d-flex gap-2">
-                    {/* ADD button */}
-                    <button
-                      type="button"
-                      disabled={!canShowAdd || adding}
-                      onClick={openMadal}
-                      style={{
-                        backgroundColor: !canShowAdd || adding ? "#a5c4d4ff" : "#7e3a93",
-                        color: !canShowAdd || adding ? "#7e3a93" : "#fff",
-                        cursor: !canShowAdd || adding ? "not-allowed" : "pointer",
-                        border: "none",
-                        padding: "6px 14px",
-                        borderRadius: "6px",
-                        fontWeight: "600",
-                        transition: "all 0.3s ease",
-                      }}
-                      title={canShowAdd ? "Add new disease" : "Type a new disease name"}
-                    >
-                      {adding ? "Adding…" : "Add"}
-                    </button>
-
-                    {/* AI button */}
-                    <button
-                      type="button"
-                      // onClick={handleAISuggest}
-                      style={{
-                        backgroundColor: "#a5c4d4ff",
-                        color: "#7e3a93",
-                        border: "none",
-                        padding: "6px 14px",
-                        borderRadius: "6px",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                        transition: "all 0.3s ease",
-                      }}
-                      title="AI Suggestion"
-                    >
-                      AI
-                    </button>
-                  </div>
-
-
-                  <SymptomsModal
-                    visible={modalOpen}
-                    onClose={() => setmodalOpen(false)}
-                    addDisease={addDisease}
-                    fetchDiseases={fetchDiseases}
-                    setDiagnosis={(val) => {
-                      setDiagnosis(val);
-                      setClearDiagnosis(false);
-                    }}
-                    success={success}
-                    info={info}
-                    error={error}
-                    defaultDiseaseName={inputValue}
-                  />
-                </div>
+              <div>
+                <SLabel text="Current Medications" />
+                <input
+                  value={currentMedications}
+                  onChange={(e) => setCurrentMedications(e.target.value)}
+                  placeholder="e.g. none"
+                  style={{ ...inputBase, resize: 'none' }}
+                  onFocus={focusBlue} onBlur={blurBlue}
+                />
               </div>
-              {/* Display probableSymptoms and keyNotes automatically */}
-              {diagnosis && probableSymptoms && (
-                <div className="mt-3">
-                  <div>
-                    <strong>Category : </strong> <span>{probableSymptoms}</span>
+            </div>
 
-                  </div>
-
-                  <div className="mt-2">
-                    <strong>Key Notes : </strong> <p>{keyNotes}</p>
-
-                  </div>
-                </div>
-              )}
-
-            </CCardBody>
-          </CCol>
-
-          {/* RIGHT */}
-          <CCol>
-            <CCardBody>
-              <div className="mb-1">
-                <GradientTextCard text="Previous Reports & Prescriptions (if any)" />
-                <FileUploader attachments={attachments} />
+            {/* ── Allergies + Occupation ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+              <div>
+                <SLabel text="Allergies" />
+                <input
+                  value={allergies}
+                  onChange={(e) => setAllergies(e.target.value)}
+                  placeholder="e.g. none"
+                  style={{ ...inputBase, resize: 'none' }}
+                  onFocus={focusBlue} onBlur={blurBlue}
+                />
               </div>
+              <div>
+                <SLabel text="Occupation" />
+                <input
+                  value={occupation}
+                  onChange={(e) => setOccupation(e.target.value)}
+                  placeholder="e.g. worker"
+                  style={{ ...inputBase, resize: 'none' }}
+                  onFocus={focusBlue} onBlur={blurBlue}
+                />
+              </div>
+            </div>
 
-              {tplLoading ? (
-                <div className="d-flex align-items-center gap-2 text-body-secondary">
-                  <CSpinner size="sm" />
-                  <span>Loading recommendation…</span>
-                </div>
-              ) : hasTemplate ? (
-                <div className="mb-3">
-                  <CFormLabel className="mb-2">
-                    <GradientTextCard text="Recommended Template:" />
-                    <strong> {diagnosis}</strong>
-                  </CFormLabel>
-                  <CCard className="border-0 bg-light clickable-card">
-                    <CCardBody className="d-flex align-items-center gap-3">
-                      <CImage
-                        src={temp}
-                        alt="Template Preview"
-                        width={72}
-                        height={72}
-                        style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }}
-                      />
-                      <Button
-                        type="button"
-                        size="small"
-                        variant="outline"
-                        sx={{
-                          backgroundColor: COLORS.bgcolor,
-                          color: COLORS.black,
-                          border: "2px solid #000",
-                        }}
-                        onClick={() => applyTemplate(diagnosis)}
-                      >
-                        Apply
-                      </Button>
-
-
-                    </CCardBody>
-                  </CCard>
+            {/* ── Activity Levels ── */}
+            <div style={{ marginBottom: 14 }}>
+              <SLabel text="Activity Levels" />
+              {activityLevels.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {activityLevels.map((lvl) => (
+                    <span key={lvl} style={{
+                      background: '#EFF6FF', color: '#1B4F8A',
+                      border: '1px solid #b6cfe8', borderRadius: 20,
+                      padding: '4px 12px', fontSize: 12, fontWeight: 700,
+                    }}>{lvl}</span>
+                  ))}
                 </div>
               ) : (
-                <div className="text-body-secondary small">No recommended template</div>
+                <div style={emptyPlaceholder}>No activity levels recorded</div>
               )}
-            </CCardBody>
-
-            {/* {loadingAds ? (
-              <div className="d-flex align-items-center gap-2 text-body-secondary p-3">
-                <CSpinner size="sm" /> <span>Loading ads…</span>
-              </div>
-            ) : ads.length > 0 ? (
-              <CCarousel controls indicators interval={3000} className="p-3">
-                {ads.map((ad, idx) => (
-                  <CCarouselItem key={ad.id || idx}>
-                    {ad.type === "video" ? (
-                      <video
-                        className="d-block w-100"
-                        src={ad.url}
-                        height={150}
-                        style={{ borderRadius: 8, objectFit: "cover" }}
-                        autoPlay
-                        loop
-                        muted
-                      />
-                    ) : (
-                      <CImage
-                        className="d-block w-100"
-                        src={ad.url}
-                        alt={`Ad ${idx + 1}`}
-                        height={150}
-                        style={{ borderRadius: 8, objectFit: "cover" }}
-                      />
-                    )}
-                  </CCarouselItem>
-                ))}
-              </CCarousel>
-            ) : (
-              <div className="text-body-secondary small p-3">
-                No advertisements available
-              </div>
-            )} */}
-            <div
-              className="d-flex align-items-center justify-content-center"
-              style={{
-                height: 150,
-                width: 500,                   // set the desired width
-                borderRadius: 8,
-                border: `1px dashed ${COLORS.primary}`,
-                backgroundColor: COLORS.bgcolor,
-                color: COLORS.black,
-                fontWeight: 'bold',
-                fontSize: '1rem',
-              }}
-            >
-              Ad Space
             </div>
-          </CCol>
-        </CRow>
-      </CForm>
 
-      {/* Fixed bottom-right action */}
-      <div
-        className="position-fixed bottom-0 p-2"
-        style={{
-          left: 0,
-          right: 0,
-          // left: sidebarWidth || 'auto',
-          zIndex: 1000,
-          backgroundColor: COLORS.theme,
-          display: 'flex',
-          justifyContent: 'flex-end',
-        }}
-      >
-        <Button onClick={handleNext} customColor={COLORS.bgcolor} // background color of button
-          color={COLORS.black}>Next</Button>
+            {/* ── Insurance Provider ── */}
+            <div>
+              <SLabel text="Insurance Provider" />
+              <input
+                value={insuranceProvider}
+                onChange={(e) => setInsuranceProvider(e.target.value)}
+                placeholder="e.g. none"
+                style={{ ...inputBase, resize: 'none' }}
+                onFocus={focusBlue} onBlur={blurBlue}
+              />
+            </div>
+          </div>
+
+          {/* ── Selected Therapy (read-only display) ── */}
+          {isValid(selectedTherapy) && (
+            <div style={card}>
+              <SLabel text="Selected Therapy" />
+              <div style={{
+                background: '#EFF6FF', border: '1px solid #b6cfe8',
+                borderRadius: 10, padding: '10px 14px',
+                fontSize: 13, fontWeight: 700, color: '#1B4F8A',
+              }}>
+                {selectedTherapy}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ════ RIGHT COLUMN ════ */}
+        <div>
+
+          {/* ── Body Part Diagram ── */}
+          <div style={card}>
+            <SLabel text="Body Part Diagram" />
+            {isValid(partImage) ? (
+              <>
+                <div
+                  onClick={() => setShowDiagramModal(true)}
+                  style={{
+                    background: '#EFF6FF', borderRadius: 10, overflow: 'hidden',
+                    display: 'flex', justifyContent: 'center', border: '1px solid #b6cfe8',
+                    cursor: 'zoom-in', position: 'relative',
+                  }}
+                >
+                  <img
+                    src={toImageSrc(partImage)}
+                    alt="Body Part Diagram"
+                    style={{ maxHeight: 220, objectFit: 'contain', display: 'block' }}
+                  />
+                </div>
+
+                {/* ── Lightbox Modal ── */}
+                {showDiagramModal && (
+                  <div
+                    onClick={() => setShowDiagramModal(false)}
+                    style={{
+                      position: 'fixed', inset: 0, zIndex: 9999,
+                      background: 'rgba(10,30,60,0.75)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      backdropFilter: 'blur(4px)',
+                    }}
+                  >
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        background: '#fff', borderRadius: 18,
+                        padding: 24, maxWidth: '90vw', maxHeight: '90vh',
+                        boxShadow: '0 16px 64px rgba(27,79,138,0.30)',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
+                        position: 'relative',
+                      }}
+                    >
+                      <button
+                        onClick={() => setShowDiagramModal(false)}
+                        style={{
+                          position: 'absolute', top: 12, right: 12,
+                          background: '#FEE2E2', border: 'none', borderRadius: '50%',
+                          width: 32, height: 32, cursor: 'pointer',
+                          fontSize: 16, color: '#991B1B', fontWeight: 700,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >✕</button>
+                      <span style={{ fontWeight: 700, color: '#1B4F8A', fontSize: 15 }}>
+                        Body Part Diagram
+                      </span>
+                      <img
+                        src={toImageSrc(partImage)}
+                        alt="Body Part Diagram"
+                        style={{
+                          maxWidth: '80vw', maxHeight: '75vh',
+                          objectFit: 'contain', borderRadius: 10,
+                          border: '1px solid #b6cfe8',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{
+                background: '#F8FBFF', borderRadius: 10, border: '1px dashed #b6cfe8',
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', padding: '32px 20px', gap: 8,
+              }}>
+                <span style={{ fontSize: 32 }}>🦴</span>
+                <span style={{ color: '#9CA3AF', fontSize: 13, fontStyle: 'italic' }}>
+                  No body part diagram available
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* ── Records / Reports ── */}
+          <div style={card}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <SLabel text="Records/reports" />
+              <IonIcon icon={documentTextOutline} style={{ fontSize: "18px" }} />
+            </div>
+            <FileUploader attachments={attachments} setAttachments={setAttachments} />
+          </div>
+        </div>
+      </div>
+
+      {/* ══ THERAPY QUESTIONNAIRE ══ */}
+      <div style={{ maxWidth: 1200, margin: '0 auto 24px', padding: '0 20px' }}>
+        <div style={{
+          background: '#FFFFFF', borderRadius: 18, padding: 20,
+          boxShadow: '0 8px 24px rgba(27,79,138,0.08)',
+          border: '1px solid #b6cfe8',
+        }}>
+          <SLabel text="Therapy Questionnaire" />
+
+          {therapyGroups.length > 0 ? (
+            <CAccordion flush style={{ marginTop: 14, zIndex: 1 }}>
+              {therapyGroups.map(({ category, questions }, index) => {
+                const validQuestions = questions.filter(q => isValid(q.question))
+                if (validQuestions.length === 0) return null
+                return (
+                  <CAccordionItem key={category} itemKey={index + 1} style={{
+                    marginBottom: 12, border: '1px solid #b6cfe8',
+                    borderRadius: 14, overflow: 'hidden',
+                  }}>
+                    <CAccordionHeader style={{
+                      background: 'linear-gradient(90deg,#EFF6FF,#F0F9FF)',
+                      color: '#1B4F8A', fontWeight: 700, textTransform: 'capitalize',
+                    }}>
+                      {category}
+                      <span style={{
+                        marginLeft: 8, fontSize: 11, fontWeight: 600,
+                        color: '#1B4F8A', background: '#dceeff',
+                        borderRadius: 20, padding: '2px 8px',
+                      }}>
+                        {validQuestions.length} questions
+                      </span>
+                    </CAccordionHeader>
+                    <CAccordionBody style={{ padding: 0 }}>
+                      {validQuestions.map((q, idx) => (
+                        <div key={q.questionId ?? idx} style={{
+                          display: 'flex', justifyContent: 'space-between',
+                          alignItems: 'center', gap: 14, padding: '12px 16px',
+                          borderBottom: idx < validQuestions.length - 1 ? '1px solid #EFF6FF' : 'none',
+                          background: idx % 2 === 0 ? '#F8FBFF' : '#FFFFFF',
+                        }}>
+                          <div style={{ flex: 1, fontSize: 13, color: '#374151', fontWeight: 500 }}>
+                            <span style={{
+                              display: 'inline-block', minWidth: 22, height: 22,
+                              borderRadius: '50%', background: '#dceeff',
+                              color: '#1B4F8A', fontSize: 11, fontWeight: 700,
+                              textAlign: 'center', lineHeight: '22px', marginRight: 8,
+                            }}>{idx + 1}</span>
+                            {q.question || `Question ${q.questionId}`}
+                          </div>
+                          <AnswerBadge answer={q.answer} />
+                        </div>
+                      ))}
+                    </CAccordionBody>
+                  </CAccordionItem>
+                )
+              })}
+            </CAccordion>
+          ) : (
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              justifyContent: 'center', padding: '32px 20px', gap: 8,
+              background: '#F8FBFF', borderRadius: 12, border: '1px dashed #b6cfe8',
+              marginTop: 14,
+            }}>
+              <span style={{ fontSize: 28 }}>📋</span>
+              <span style={{ color: '#9CA3AF', fontSize: 13, fontStyle: 'italic' }}>
+                No therapy questionnaire data available
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Sticky Bottom Bar ── */}
+      <div className="position-fixed bottom-0" style={{
+        left: 0, right: 0,
+        background: '#FFFFFF',
+        borderTop: '2px solid #1B4F8A',
+        display: 'flex', justifyContent: 'flex-end', gap: 16,
+        padding: '10px 24px',
+        boxShadow: '0 -2px 10px rgba(27,79,138,0.12)',
+      }}>
+        <Button
+          customColor="#1B4F8A"
+          onClick={handleNext}
+          style={{
+            borderRadius: '20px', fontWeight: 700,
+            padding: '6px 24px',
+            color: '#FFFFFF',
+            boxShadow: '0 2px 8px rgba(27,79,138,0.30)',
+            border: '1.5px solid #1B4F8A',
+          }}
+        >
+          Next
+        </Button>
       </div>
 
       {snackbar.show && <Snackbar message={snackbar.message} type={snackbar.type} />}
-    </CCard>
+    </div>
   )
 }
 

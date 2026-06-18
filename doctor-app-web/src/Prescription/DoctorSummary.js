@@ -31,7 +31,7 @@ import { PDFDownloadLink, View, StyleSheet, Text } from '@react-pdf/renderer'
  * Props:
  * - patientData
  * - formData: {
- *    symptoms: { symptomDetails, doctorObs, diagnosis, duration }
+ *    symptoms: { symptomDetails, doctorObs, complaints, duration }
  *    tests: { selectedTests: [{name, reason?}] }
  *    prescription: { medicines: [{ id, medicine, dose, remind, note, duration, time }] }
  *    treatments: { selectedTreatments: [{name, reason?}] }
@@ -47,7 +47,7 @@ const DoctorSummary = ({
   formData = {},
 }) => {
   const styles = StyleSheet.create({
-    page: { padding: 28, fontSize: 11, fontFamily: 'Helvetica' },
+    page: { padding: 28, fontSize: 11 },
 
     /* Header */
     header: {
@@ -156,7 +156,7 @@ const DoctorSummary = ({
   const attachments = formData?.symptoms?.attachments ?? patientData?.attachments ?? '—'
   // const reports = Array.isArray(formData.symptoms.reports) ? patientData?.reports : []
 
-  const diagnosis = formData?.symptoms?.diagnosis ?? formData?.summary?.diagnosis ?? ''
+  const complaints = formData?.symptoms?.complaints ?? formData?.summary?.complaints ?? ''
 
   const tests = Array.isArray(formData?.tests?.selectedTests) ? formData.tests.selectedTests : []
   const testsReason = formData?.tests?.testReason ? formData.tests.testReason : ''
@@ -202,7 +202,7 @@ const DoctorSummary = ({
         <head>
           <title>Patient Summary</title>
           <style>
-            body { margin: 20px; color: #000; font-family: Segoe UI, Arial, sans-serif; }
+            body { margin: 20px; color: #000;  }
             h3, h4, h5 { margin-top: 16px; font-size: 18px; }
             table { width: 100%; border-collapse: collapse; margin-top: 10px; }
             th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; }
@@ -313,11 +313,13 @@ const DoctorSummary = ({
       // ✅ Call API after saving template
       const payload = {
         bookingId: patientData.bookingId,
+        status: formData.overallStatus || patientData?.status || 'Completed',
         // doctorName: doctorDetails.doctorName,
         customerId: patientData?.customerId,
         clinicName: clinicDetails.name,
         clinicId: clinicDetails.hospitalId,
         patientId: patientData.patientId,
+        mobileNumber: patientData?.patientMobileNumber ?? patientData?.mobileNumber ?? '',
         doctorId: doctorDetails.doctorId,
         symptoms: formData.symptoms,
         tests: formData.tests,
@@ -349,11 +351,13 @@ const DoctorSummary = ({
     // ✅ Call API after saving template
     const payload = {
       bookingId: patientData.bookingId,
+      status: formData.overallStatus || patientData?.status || 'Completed',
       doctorName: doctorDetails.doctorName,
       customerId: patientData?.customerId,
       clinicName: clinicDetails.name,
       clinicId: clinicDetails.hospitalId,
       patientId: patientData.patientId,
+      mobileNumber: patientData?.patientMobileNumber ?? patientData?.mobileNumber ?? '',
       doctorId: doctorDetails.doctorId,
       symptoms: formData.symptoms,
       tests: formData.tests,
@@ -374,39 +378,31 @@ const DoctorSummary = ({
     }
   }
   console.log('durationValue:', followUp.durationValue)
-  const handleClick = () => {
-    // First, call your save function
-    onSaveTemplate?.()
+  const handleClick = async () => {
+    // First, call your save function and await its result
+    const saved = await onSaveTemplate?.()
 
-    // Then navigate to the desired screen
-    navigate('/Dashboard') // <-- replace with your route
+    // Then navigate to the desired screen if save succeeded (did not return false)
+    if (saved !== false) {
+      navigate('/Dashboard') // <-- replace with your route
+    }
   }
   return (
     <div className="pb-5" style={{ backgroundColor: COLORS.theme }}>
       <CContainer fluid className="p-0" id="print-area">
-        {diagnosis ||
+        {complaints ||
           tests.length > 0 ||
           treatments.length > 0 ||
           (treatmentSchedules && Object.keys(treatmentSchedules).length > 0) ||
           medicines.length > 0 ||
           followUp.durationValue !== 'NA' ? (
           <>
-            {/* Diagnosis */}
-            {diagnosis && (
-              <CCard className="shadow-sm mb-3">
-                <CCardHeader className="py-2">
-                  <strong>Probable Disease</strong>
-                </CCardHeader>
-                <CCardBody>
-                  <div className="fs-6">{diagnosis}</div>
-                </CCardBody>
-              </CCard>
-            )}
-            {/* Medication Table */}
+
+            {/* Diagnosis Table */}
             {medicines.length > 0 && (
               <CCard className="shadow-sm mb-3">
                 <CCardHeader className="py-2">
-                  <strong style={{ color: COLORS.black }}>Medication Details</strong>
+                  <strong style={{ color: COLORS.black }}>Diagnosis Details</strong>
                 </CCardHeader>
                 <CCardBody>
                   <CTable striped hover responsive className="align-middle">
@@ -472,43 +468,13 @@ const DoctorSummary = ({
               </CCard>
             )}
 
-            {/* Tests */}
-            {(tests.length > 0 || testsReason) && (
-              <CCard className="shadow-sm mb-3">
-                <CCardHeader className="py-2">
-                  <strong style={{ color: COLORS.black }}>Investigations</strong>
-                </CCardHeader>
-                <CCardBody>
-                  {tests.length > 0 ? (
-                    <ul className="mb-2">
-                      {tests.map((t, i) => (
-                        <li key={`test-${i}`}>
-                          <span className="fw-semibold">Recommended Test (Optional): </span>
-                          <span>{typeof t === 'string' ? t : t?.name || '—'}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="mb-2">
-                      <span className="fw-semibold">Recommended Test (Optional):</span> NA
-                    </p>
-                  )}
 
-                  {testsReason && (
-                    <div className="mt-2">
-                      <div className="text-muted fw-semibold">Reason:{testsReason}</div>
-
-                    </div>
-                  )}
-                </CCardBody>
-              </CCard>
-            )}
 
             {/* Treatments */}
             {treatments.length > 0 && (
               <CCard className="shadow-sm mb-3">
                 <CCardHeader className="py-2">
-                  <strong style={{ color: COLORS.black }}>Procedures</strong>
+                  <strong style={{ color: COLORS.black }}>TreatmentPlan</strong>
                 </CCardHeader>
                 <CCardBody>
                   <ul className="mb-2">
@@ -591,11 +557,11 @@ const DoctorSummary = ({
 
 
 
-            {/* Follow-up Plan */}
+            {/* TherapySessions Plan */}
             {followUp.durationValue !== 'NA' && (
               <CCard className="shadow-sm mb-4">
                 <CCardHeader className="py-2">
-                  <strong style={{ color: COLORS.black }}>Follow-up Plan</strong>
+                  <strong style={{ color: COLORS.black }}>TherapySessions Plan</strong>
                 </CCardHeader>
                 <CCardBody>
                   <CCol xs={12} md={6}>

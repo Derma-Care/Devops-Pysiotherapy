@@ -21,7 +21,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import com.dermaCare.customerService.dto.BookingRequset;
 import com.dermaCare.customerService.dto.BookingResponse;
 import com.dermaCare.customerService.dto.BranchDTO;
@@ -36,8 +38,10 @@ import com.dermaCare.customerService.dto.CustomerRatingDomain;
 import com.dermaCare.customerService.dto.DoctorSaveDetailsDTO;
 import com.dermaCare.customerService.dto.DoctorsDTO;
 import com.dermaCare.customerService.dto.FavouriteDoctorsDTO;
+import com.dermaCare.customerService.dto.FirstVisitHistoryRequest;
 import com.dermaCare.customerService.dto.LoginDTO;
 import com.dermaCare.customerService.dto.NotificationToCustomer;
+import com.dermaCare.customerService.dto.PatientFeedbackDTO;
 import com.dermaCare.customerService.dto.ReportsAndDoctorSaveDetailsDto;
 import com.dermaCare.customerService.dto.ReportsDtoList;
 import com.dermaCare.customerService.dto.ServicesDto;
@@ -45,6 +49,8 @@ import com.dermaCare.customerService.dto.SubServicesDetailsDto;
 import com.dermaCare.customerService.dto.SubServicesDto;
 import com.dermaCare.customerService.dto.TempBlockingSlot;
 import com.dermaCare.customerService.dto.TheraphyAnswersDTO;
+import com.dermaCare.customerService.dto.TherapistRecordRequest;
+import com.dermaCare.customerService.dto.VisitHistoryRequest;
 import com.dermaCare.customerService.entity.ConsultationEntity;
 import com.dermaCare.customerService.entity.Customer;
 import com.dermaCare.customerService.entity.CustomerRating;
@@ -53,10 +59,10 @@ import com.dermaCare.customerService.entity.QuestionsByPartEntity;
 import com.dermaCare.customerService.entity.QuestionsEntity;
 import com.dermaCare.customerService.feignClient.AdminFeign;
 import com.dermaCare.customerService.feignClient.BookingFeign;
-import com.dermaCare.customerService.feignClient.CategoryServicesFeign;
 import com.dermaCare.customerService.feignClient.ClinicAdminFeign;
 import com.dermaCare.customerService.feignClient.DoctorServiceFeign;
 import com.dermaCare.customerService.feignClient.NotificationFeign;
+import com.dermaCare.customerService.feignClient.PhysioFeign;
 import com.dermaCare.customerService.repository.ConsultationRep;
 import com.dermaCare.customerService.repository.CustomerFavouriteDoctors;
 import com.dermaCare.customerService.repository.CustomerRatingRepository;
@@ -91,7 +97,6 @@ public class CustomerServiceImpl implements CustomerService {
     @Autowired
     private BookingFeign bookingFeign;
     
-    @Autowired
     private GetByKey getByKey;
     
     @Autowired
@@ -100,20 +105,23 @@ public class CustomerServiceImpl implements CustomerService {
     @Autowired
     private  CustomerFavouriteDoctors customerFavouriteDoctors;
     
-    @Autowired 
-    private CategoryServicesFeign categoryServicesFeign;
+//    @Autowired 
+//    private CategoryServicesFeign categoryServicesFeign;
     
     @Autowired 
     private AdminFeign adminFeign;
     
-    @Autowired
-    private FirebaseMessagingService firebaseMessagingService;
-    
+//    @Autowired
+//    private FirebaseMessagingService firebaseMessagingService;
+//    
     @Autowired
     private NotificationFeign notificationFeign;
     
     @Autowired
     private DoctorServiceFeign doctorServiceFeign;
+    
+    @Autowired
+    private PhysioFeign physioFeign;
     
     
     private static final Logger log = LoggerFactory.getLogger(CustomerServiceImpl.class);
@@ -124,134 +132,134 @@ public class CustomerServiceImpl implements CustomerService {
     private static final long OTP_EXPIRY_MILLIS = 1 * 60 * 1000;
    
 
-   @Override
-    public ResponseEntity<Response> verifyUserCredentialsAndGenerateAndSendOtp(LoginDTO loginDTO) {
-	   Response response = new Response();
-     try {
-    	 if(!isIndianMobileNumber(loginDTO.getMobileNumber())) {
-    		 response.setMessage("Please Enter Valid MobileNumber");
- 	    	response.setStatus(400);
- 	    	response.setSuccess(false);}
-   	    Optional<Customer> custmer = customerRepository.findByMobileNumber(loginDTO.getMobileNumber());
-   	    log.info("customer found with mobilenumber",custmer.get().getMobileNumber());
-	    if(custmer.isPresent()) {
-	    	custmer.get().setDeviceId(loginDTO.getDeviceId());
-	    	customerRepository.save(custmer.get());}
-	    	String otp = randomNumber();
-	    	if(loginDTO.getDeviceId() != null) {
-	    		firebaseMessagingService.sendPushNotification(
-	    			    loginDTO.getDeviceId(),
-	    			    "🔐 Hello,Here’s your OTP!",
-	    			    "Use " + otp + " to verify your login. Expires in 1 minute.",
-	    			    "OTP",
-	    			    "OTPVerificationScreen",
-	    			    "default"
-	    			);
-	    	log.info("OTP sent successfully {}", loginDTO.getMobileNumber());
-	    	generatedOtps.put(loginDTO.getMobileNumber(),otp);
-	    	session.put(loginDTO.getMobileNumber(),System.currentTimeMillis());
-	    	log.info("OTP successfully stored locally {}", loginDTO.getMobileNumber());
-	    	response.setMessage("OTP Sent Successfully");
-	    	response.setStatus(200);
-	    	response.setSuccess(true);}
-	    	else {
-	    		response.setMessage("Please Provide DeviceId");
-		    	response.setStatus(400);
-		    	response.setSuccess(false);
-		    	log.warn("Device ID not found {}", loginDTO.getMobileNumber());
-		    	}
-	    }catch(Exception e) {
-	    	response.setMessage(e.getMessage());
-	    	response.setStatus(500);
-	    	response.setSuccess(false);
-	    	log.error("Exception occured {}", e.getMessage());}
-     return ResponseEntity.status(response.getStatus()).body(response);
-}
-   
-   
-     
-    private boolean isIndianMobileNumber(String mobileNumber) {
-        mobileNumber = mobileNumber.replaceAll("[\\s\\-()]", "");
-        String regex = "^(\\+91|91|0)?[6-9]\\d{9}$";
-        return mobileNumber.matches(regex);
-    }
- 
-     private String randomNumber() {
-         Random random = new Random();    
-         int sixDigitNumber = 100000 + random.nextInt(900000); // Generates number from 100000 to 999999
-         return String.valueOf(sixDigitNumber);
-     }
-     
-     
-    
-   public ResponseEntity<Response> verifyOtp(LoginDTO loginDTO){
-	   Response response = new Response();
-	   try {
-		   String otp = generatedOtps.get(loginDTO.getMobileNumber());
-           log.info("OTP found",loginDTO.getMobileNumber() );
-		   long createdTime = session.get(loginDTO.getMobileNumber());
-		   log.info("otpCreatedAt time successfully found",loginDTO.getMobileNumber() );
-		   if(!isExpired(createdTime)) {
-			   if(loginDTO.getOtp().equals(otp)) {
-			   response.setMessage("OTP Successfully Verified");
-			   response.setStatus(200);
-				response.setSuccess(true);
-			   return ResponseEntity.status(response.getStatus()).body(response);
-			   }else {
-				   response.setMessage("Invalid OTP Please Enter Correct OTP");
-				   response.setStatus(400);
-				   return ResponseEntity.status(response.getStatus()).body(response);}
-		   }else {
-			   response.setMessage("OTP Expired Please Click On Resend OTP");
-			   response.setStatus(410);
-			   return ResponseEntity.status(response.getStatus()).body(response);
-		   }}catch(Exception e) {
-			   response.setMessage(e.getMessage());
-			   response.setStatus(500);
-			   log.error("Exception occured", e.getMessage());
-			   return ResponseEntity.status(response.getStatus()).body(response);}
-  }
-
-   
-   private boolean isExpired(long createdAt) {
-       return System.currentTimeMillis() - createdAt > OTP_EXPIRY_MILLIS;
-   }
-   
- 
-   
-   public  ResponseEntity<Response> resendOtp(LoginDTO loginDTO){
-	   Response response = new Response();
-	   try {
-		   if(!isIndianMobileNumber(loginDTO.getMobileNumber())) {
-	    		response.setMessage("Please Enter Valid MobileNumber");
-	 	    	response.setStatus(400);
-	 	    	response.setSuccess(false);
-	 	    	return ResponseEntity.status(response.getStatus()).body(response);}		   
-		    String otp = randomNumber();
-		    log.info("OTP generated successfully", loginDTO.getMobileNumber());
-		    if(loginDTO.getDeviceId() != null) {
-		    	firebaseMessagingService.sendPushNotification(
-	    			    loginDTO.getDeviceId(),
-	    			    "🔐 Hello,Here’s your ResendOTP!",
-	    			    "Use " + otp + " to verify your login. Expires in 1 minute.",
-	    			    "OTP",
-	    			    "OTPVerificationScreen",
-	    			    "default"
-	    			);
-		    	log.info("notification for OTP sent",  loginDTO.getMobileNumber());
-	    	generatedOtps.put(loginDTO.getMobileNumber(),otp);
-	    	session.put(loginDTO.getMobileNumber(),System.currentTimeMillis());
-	    	response.setMessage("OTP Sent Successfully");
-			response.setStatus(200);
-			response.setSuccess(true);
-	    	}else{
-		    	response.setMessage("Please Provide DeviceId");
-				response.setStatus(400);}
-	        }catch(Exception e) {
-		    response.setMessage(e.getMessage());
-		    response.setStatus(500);}
-	        return ResponseEntity.status(response.getStatus()).body(response);
-   }
+//   @Override
+//    public ResponseEntity<Response> verifyUserCredentialsAndGenerateAndSendOtp(LoginDTO loginDTO) {
+//	   Response response = new Response();
+//     try {
+//    	 if(!isIndianMobileNumber(loginDTO.getMobileNumber())) {
+//    		 response.setMessage("Please Enter Valid MobileNumber");
+// 	    	response.setStatus(400);
+// 	    	response.setSuccess(false);}
+//   	    Optional<Customer> custmer = customerRepository.findByMobileNumber(loginDTO.getMobileNumber());
+//   	    log.info("customer found with mobilenumber",custmer.get().getMobileNumber());
+//	    if(custmer.isPresent()) {
+//	    	custmer.get().setDeviceId(loginDTO.getDeviceId());
+//	    	customerRepository.save(custmer.get());}
+//	    	String otp = randomNumber();
+//	    	if(loginDTO.getDeviceId() != null) {
+//	    		firebaseMessagingService.sendPushNotification(
+//	    			    loginDTO.getDeviceId(),
+//	    			    "🔐 Hello,Here’s your OTP!",
+//	    			    "Use " + otp + " to verify your login. Expires in 1 minute.",
+//	    			    "OTP",
+//	    			    "OTPVerificationScreen",
+//	    			    "default"
+//	    			);
+//	    	log.info("OTP sent successfully {}", loginDTO.getMobileNumber());
+//	    	generatedOtps.put(loginDTO.getMobileNumber(),otp);
+//	    	session.put(loginDTO.getMobileNumber(),System.currentTimeMillis());
+//	    	log.info("OTP successfully stored locally {}", loginDTO.getMobileNumber());
+//	    	response.setMessage("OTP Sent Successfully");
+//	    	response.setStatus(200);
+//	    	response.setSuccess(true);}
+//	    	else {
+//	    		response.setMessage("Please Provide DeviceId");
+//		    	response.setStatus(400);
+//		    	response.setSuccess(false);
+//		    	log.warn("Device ID not found {}", loginDTO.getMobileNumber());
+//		    	}
+//	    }catch(Exception e) {
+//	    	response.setMessage(e.getMessage());
+//	    	response.setStatus(500);
+//	    	response.setSuccess(false);
+//	    	log.error("Exception occured {}", e.getMessage());}
+//     return ResponseEntity.status(response.getStatus()).body(response);
+//}
+//   
+//   
+//     
+//    private boolean isIndianMobileNumber(String mobileNumber) {
+//        mobileNumber = mobileNumber.replaceAll("[\\s\\-()]", "");
+//        String regex = "^(\\+91|91|0)?[6-9]\\d{9}$";
+//        return mobileNumber.matches(regex);
+//    }
+// 
+//     private String randomNumber() {
+//         Random random = new Random();    
+//         int sixDigitNumber = 100000 + random.nextInt(900000); // Generates number from 100000 to 999999
+//         return String.valueOf(sixDigitNumber);
+//     }
+//     
+//     
+//    
+//   public ResponseEntity<Response> verifyOtp(LoginDTO loginDTO){
+//	   Response response = new Response();
+//	   try {
+//		   String otp = generatedOtps.get(loginDTO.getMobileNumber());
+//           log.info("OTP found",loginDTO.getMobileNumber() );
+//		   long createdTime = session.get(loginDTO.getMobileNumber());
+//		   log.info("otpCreatedAt time successfully found",loginDTO.getMobileNumber() );
+//		   if(!isExpired(createdTime)) {
+//			   if(loginDTO.getOtp().equals(otp)) {
+//			   response.setMessage("OTP Successfully Verified");
+//			   response.setStatus(200);
+//				response.setSuccess(true);
+//			   return ResponseEntity.status(response.getStatus()).body(response);
+//			   }else {
+//				   response.setMessage("Invalid OTP Please Enter Correct OTP");
+//				   response.setStatus(400);
+//				   return ResponseEntity.status(response.getStatus()).body(response);}
+//		   }else {
+//			   response.setMessage("OTP Expired Please Click On Resend OTP");
+//			   response.setStatus(410);
+//			   return ResponseEntity.status(response.getStatus()).body(response);
+//		   }}catch(Exception e) {
+//			   response.setMessage(e.getMessage());
+//			   response.setStatus(500);
+//			   log.error("Exception occured", e.getMessage());
+//			   return ResponseEntity.status(response.getStatus()).body(response);}
+//  }
+//
+//   
+//   private boolean isExpired(long createdAt) {
+//       return System.currentTimeMillis() - createdAt > OTP_EXPIRY_MILLIS;
+//   }
+//   
+// 
+//   
+//   public  ResponseEntity<Response> resendOtp(LoginDTO loginDTO){
+//	   Response response = new Response();
+//	   try {
+//		   if(!isIndianMobileNumber(loginDTO.getMobileNumber())) {
+//	    		response.setMessage("Please Enter Valid MobileNumber");
+//	 	    	response.setStatus(400);
+//	 	    	response.setSuccess(false);
+//	 	    	return ResponseEntity.status(response.getStatus()).body(response);}		   
+//		    String otp = randomNumber();
+//		    log.info("OTP generated successfully", loginDTO.getMobileNumber());
+//		    if(loginDTO.getDeviceId() != null) {
+//		    	firebaseMessagingService.sendPushNotification(
+//	    			    loginDTO.getDeviceId(),
+//	    			    "🔐 Hello,Here’s your ResendOTP!",
+//	    			    "Use " + otp + " to verify your login. Expires in 1 minute.",
+//	    			    "OTP",
+//	    			    "OTPVerificationScreen",
+//	    			    "default"
+//	    			);
+//		    	log.info("notification for OTP sent",  loginDTO.getMobileNumber());
+//	    	generatedOtps.put(loginDTO.getMobileNumber(),otp);
+//	    	session.put(loginDTO.getMobileNumber(),System.currentTimeMillis());
+//	    	response.setMessage("OTP Sent Successfully");
+//			response.setStatus(200);
+//			response.setSuccess(true);
+//	    	}else{
+//		    	response.setMessage("Please Provide DeviceId");
+//				response.setStatus(400);}
+//	        }catch(Exception e) {
+//		    response.setMessage(e.getMessage());
+//		    response.setStatus(500);}
+//	        return ResponseEntity.status(response.getStatus()).body(response);
+//   }
    
    
 
@@ -880,6 +888,16 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 	    ResponseEntity<ResponseStructure<BookingResponse>> res = null;
 	    try {
 	        log.debug("BOOK_SERVICE :: CALLING_BOOKING_SERVICE");
+//	        if(req.getBodyPartId() != null) {
+//	        for(QuestionsDTO dto:req.getQuestions()) {
+//	        //Optional<QuestionsEntity> entity = physiotherapyRepo.findByQuestionId(dto.getQuestionId());
+//	        if(entity.isPresent()) {
+//	        dto.setQuestion(entity.get().getQuestion());}}
+//	        res = bookingFeign.bookService(req);
+//	        bookingResponse = res.getBody().getData();
+//	        }else {
+//	        res = bookingFeign.bookService(req);
+//	        bookingResponse = res.getBody().getData();}
 	        if(req.getTheraphyAnswers()!= null) {
 	        
 	        	if (req.getTheraphyAnswers() != null && !req.getTheraphyAnswers().isEmpty()) {
@@ -890,17 +908,17 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 
 	        	        String key = entry.getKey(); // e.g., "back"
 	        	        List<TheraphyAnswersDTO> answersList = entry.getValue();
-
-	        	        // 🔍 Fetch DB data based on key
-	        	        QuestionsByPartEntity entity = getByKey.getByKey(key);
-
+	        	        QuestionsByPartEntity entity = null;
+	        	        try {
+	        	        entity = getByKey.getByKey(key);
+	        	        }catch(Exception e) {}
 	        	        if (entity == null || entity.getQuestionsByPart() == null) {
 	        	            continue;
 	        	        }
 
 	        	        List<QuestionsEntity> questionsList = entity.getQuestionsByPart().get(key);
 
-	        	        if (questionsList == null) {
+	        	        if (questionsList == null || questionsList.isEmpty()  ) {
 	        	            continue;
 	        	        }
 
@@ -917,8 +935,6 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 	        	        }
 	        	    }
 	        	}
-	        double due = req.getTotalFee() - req.getPartAmount();
-	        req.setDueAmount(due);
 	        res = bookingFeign.bookService(req);
 	        bookingResponse = res.getBody().getData();
 	        }else {
@@ -961,6 +977,9 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 
 	    return response;
 	}
+	
+	
+	
 
 	  	   
 	public Response deleteBookedService(String id) {
@@ -1115,7 +1134,7 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 
 	    } catch (FeignException e) {
 	        log.error("GET_ALL_BOOKINGS :: FEIGN_ERROR", e);
-
+     System.out.println(e.getMessage());
 	        return new ResponseStructure<>(
 	                null,
 	                ExtractFeignMessage.clearMessage(e),
@@ -1682,198 +1701,6 @@ public Response updateCustomerBasicDetails( CustomerDTO customerDTO ,String mobi
 	}
 
 
-///CATEGORYANDSERVICES
-
-
-	@Override
-	public Response getAllCategory() {
-
-	    log.info("GET_ALL_CATEGORY :: START");
-
-	    Response response = new Response();
-
-	    try {
-	        ResponseEntity<ResponseStructure<List<CategoryDto>>> res =
-	                categoryServicesFeign.getAllCategory();
-
-	        if (res.hasBody()) {
-	            ResponseStructure<List<CategoryDto>> rs = res.getBody();
-
-	            log.info("GET_ALL_CATEGORY :: SUCCESS :: count={}",
-	                    rs.getData() != null ? rs.getData().size() : 0);
-
-	            response.setData(rs);
-	            response.setStatus(rs.getHttpStatus().value());
-	        }
-
-	    } catch (FeignException e) {
-	        log.error("GET_ALL_CATEGORY :: FEIGN_ERROR", e);
-
-	        response.setStatus(e.status());
-	        response.setMessage(ExtractFeignMessage.clearMessage(e));
-	        response.setSuccess(false);
-	    }
-
-	    return response;
-	}
-
-
-	@Override
-	public Response getServiceById(String categoryId) {
-
-	    log.info("GET_SERVICE_BY_CATEGORY :: START :: categoryId={}", categoryId);
-
-	    Response response = new Response();
-
-	    try {
-	        ResponseEntity<ResponseStructure<List<ServicesDto>>> res =
-	                categoryServicesFeign.getServiceById(categoryId);
-
-	        if (res.getBody() != null) {
-	            ResponseStructure<List<ServicesDto>> rs = res.getBody();
-
-	            log.info("GET_SERVICE_BY_CATEGORY :: SUCCESS :: categoryId={}, count={}",
-	                    categoryId,
-	                    rs.getData() != null ? rs.getData().size() : 0);
-
-	            response.setData(rs);
-	            response.setStatus(rs.getHttpStatus().value());
-	        }
-
-	    } catch (FeignException e) {
-	        log.error("GET_SERVICE_BY_CATEGORY :: FEIGN_ERROR :: categoryId={}", categoryId, e);
-
-	        response.setStatus(e.status());
-	        response.setMessage(ExtractFeignMessage.clearMessage(e));
-	        response.setSuccess(false);
-	    }
-
-	    return response;
-	}
-	
-	@Override
-	public Response getSubServicesByServiceId(String serviceId) {
-
-	    log.info("GET_SUBSERVICES_BY_SERVICE :: START :: serviceId={}", serviceId);
-
-	    Response response = new Response();
-
-	    try {
-	        ResponseEntity<Response> res =
-	                categoryServicesFeign.getSubServicesByServiceId(serviceId);
-
-	        log.info("GET_SUBSERVICES_BY_SERVICE :: SUCCESS :: serviceId={}", serviceId);
-
-	        return res.getBody();
-
-	    } catch (FeignException e) {
-	        log.error("GET_SUBSERVICES_BY_SERVICE :: FEIGN_ERROR :: serviceId={}", serviceId, e);
-
-	        response.setStatus(500);
-	        response.setMessage(ExtractFeignMessage.clearMessage(e));
-	        response.setSuccess(false);
-	        return response;
-	    }
-	}
-
-
-	public Response getSubServiceInfoBySubServiceId(String subServiceId)
-	        throws JsonProcessingException {
-
-	    log.info("GET_SUBSERVICE_INFO :: START :: subServiceId={}", subServiceId);
-
-	    Response responseObj = new Response();
-
-	    try {
-	        ResponseEntity<ResponseStructure<List<SubServicesDto>>> res =
-	                categoryServicesFeign.retrieveSubServicesBySubServiceId(subServiceId);
-
-	        List<SubServicesDetailsDto> hospitalAndSubServiceInfo = new ArrayList<>();
-
-	        if (res.getBody().getData() != null && !res.getBody().getData().isEmpty()) {
-
-	            log.debug("GET_SUBSERVICE_INFO :: SUBSERVICE_COUNT :: {}",
-	                    res.getBody().getData().size());
-
-	            for (SubServicesDto subsrvice : res.getBody().getData()) {
-
-	                if (subsrvice.getSubServiceId().equals(subServiceId)) {
-
-	                    Response respnse =
-	                            adminFeign.getClinicById(subsrvice.getHospitalId());
-
-	                    ClinicDTO clncDto =
-	                            new ObjectMapper().convertValue(respnse.getData(), ClinicDTO.class);
-
-	                    if (clncDto != null) {
-
-	                        SubServicesDetailsDto subServicesDetailsDto =
-	                                new SubServicesDetailsDto();
-
-	                        subServicesDetailsDto.setServiceName(subsrvice.getServiceName());
-	                        subServicesDetailsDto.setSubServiceName(subsrvice.getSubServiceName());
-	                        subServicesDetailsDto.setSubServicePrice(subsrvice.getFinalCost());
-	                        subServicesDetailsDto.setDiscountedCost(subsrvice.getDiscountedCost());
-	                        subServicesDetailsDto.setDiscountPercentage(subsrvice.getDiscountPercentage());
-	                        subServicesDetailsDto.setPrice(subsrvice.getPrice());
-	                        subServicesDetailsDto.setTaxAmount(subsrvice.getTaxAmount());
-	                        subServicesDetailsDto.setConsultationFee(subsrvice.getConsultationFee());
-
-	                        Response response =
-	                                adminFeign.getClinicById(subsrvice.getHospitalId());
-
-	                        if (response.getData() != null) {
-	                            ClinicDTO clinicDto =
-	                                    new ObjectMapper().convertValue(response.getData(), ClinicDTO.class);
-
-	                            subServicesDetailsDto.setHospitalId(clinicDto.getHospitalId());
-	                            subServicesDetailsDto.setHospitalName(clinicDto.getName());
-	                            subServicesDetailsDto.setHospitalLogo(clinicDto.getHospitalLogo());
-	                            subServicesDetailsDto.setRecommanded(clinicDto.isRecommended());
-	                            subServicesDetailsDto.setHospitalOverallRating(
-	                                    clinicDto.getHospitalOverallRating());
-	                            subServicesDetailsDto.setWebsite(clinicDto.getWebsite());
-	                            subServicesDetailsDto.setWalkthrough(clinicDto.getWalkthrough());
-	                            subServicesDetailsDto.setCity(clinicDto.getCity());
-	                        }
-
-	                        hospitalAndSubServiceInfo.add(subServicesDetailsDto);
-	                    }
-	                }
-	            }
-
-	            if (!hospitalAndSubServiceInfo.isEmpty()) {
-	                log.info("GET_SUBSERVICE_INFO :: SUCCESS :: subServiceId={}", subServiceId);
-
-	                responseObj.setData(hospitalAndSubServiceInfo);
-	                responseObj.setStatus(200);
-	                responseObj.setSuccess(true);
-
-	            } else {
-	                log.warn("GET_SUBSERVICE_INFO :: NO_DATA_AFTER_FILTER :: subServiceId={}", subServiceId);
-
-	                responseObj.setMessage("SubServices Data Not Found ");
-	                responseObj.setStatus(200);
-	            }
-
-	        } else {
-	            log.warn("GET_SUBSERVICE_INFO :: NO_SUBSERVICE_DATA :: subServiceId={}", subServiceId);
-
-	            responseObj.setMessage("No SubService Data Found ");
-	            responseObj.setStatus(200);
-	        }
-
-	    } catch (FeignException e) {
-	        log.error("GET_SUBSERVICE_INFO :: FEIGN_ERROR :: subServiceId={}", subServiceId, e);
-
-	        responseObj.setMessage(ExtractFeignMessage.clearMessage(e));
-	        responseObj.setStatus(e.status());
-	        responseObj.setSuccess(false);
-	    }
-
-	    return responseObj;
-	}
-
 
 	
 
@@ -1897,137 +1724,6 @@ private double haversine(double lat1, double lon1, double lat2, double lon2) {
 }
 
 
-//CUSTOMERNOTIFICATION
-
-public Response getBranchesInfoBySubServiceId(String clinicId,String subServiceId,
-        String latitude,String longtitude) throws JsonProcessingException {
-
-    log.info("GET_BRANCHES_BY_SUBSERVICE :: START :: clinicId={}, subServiceId={}, lat={}, lon={}",
-            clinicId, subServiceId, latitude, longtitude);
-
-    Response responseObj = new Response();
-
-    try {
-        ResponseEntity<ResponseStructure<SubServicesDto>> res =
-                categoryServicesFeign.getSubServiceBySubServiceId(clinicId, subServiceId);
-
-        log.debug("GET_BRANCHES_BY_SUBSERVICE :: SUBSERVICE_RESPONSE_RECEIVED");
-
-        BranchInfo hospitalAndSubServiceInfo = new BranchInfo();
-
-        if (res.getBody().getData() != null) {
-
-            SubServicesDto subsrvice = res.getBody().getData();
-
-            log.info("GET_BRANCHES_BY_SUBSERVICE :: SUBSERVICE_FOUND :: hospitalId={}",
-                    subsrvice.getHospitalId());
-
-            Response rs = adminFeign.getClinicById(subsrvice.getHospitalId());
-            ClinicDTO cDto = new ObjectMapper().convertValue(rs.getData(), ClinicDTO.class);
-           
-            if (cDto != null) {
-
-                log.debug("GET_BRANCHES_BY_SUBSERVICE :: CLINIC_FOUND :: hospitalId={}",
-                        subsrvice.getHospitalId());
-
-                hospitalAndSubServiceInfo.setServiceName(subsrvice.getServiceName());
-                hospitalAndSubServiceInfo.setSubServiceName(subsrvice.getSubServiceName());
-                hospitalAndSubServiceInfo.setSubServicePrice(subsrvice.getFinalCost());
-                hospitalAndSubServiceInfo.setDiscountedCost(subsrvice.getDiscountedCost());
-                hospitalAndSubServiceInfo.setDiscountPercentage(subsrvice.getDiscountPercentage());
-                hospitalAndSubServiceInfo.setPrice(subsrvice.getPrice());
-                hospitalAndSubServiceInfo.setTaxAmount(subsrvice.getTaxAmount());
-                hospitalAndSubServiceInfo.setConsultationFee(subsrvice.getConsultationFee());
-
-                Response response =
-                        adminFeign.getBranchByClinicId(subsrvice.getHospitalId()).getBody();
-
-//                Response respnse =
-//                        adminFeign.getClinicById(subsrvice.getHospitalId());
-
-//                if (response.getData() != null) {
-//
-//                    ClinicDTO clinicDto =
-//                            new ObjectMapper().convertValue(respnse.getData(), ClinicDTO.class);
-
-                    hospitalAndSubServiceInfo.setHospitalId(cDto.getHospitalId());
-                    hospitalAndSubServiceInfo.setHospitalName(cDto.getName());
-                    hospitalAndSubServiceInfo.setHospitalLogo(cDto.getHospitalLogo());
-                    hospitalAndSubServiceInfo.setRecommanded(cDto.isRecommended());
-                    hospitalAndSubServiceInfo.setHospitalOverallRating(
-                    		cDto.getHospitalOverallRating());
-                    hospitalAndSubServiceInfo.setWebsite(cDto.getWebsite());
-                    hospitalAndSubServiceInfo.setWalkthrough(cDto.getWalkthrough());
-                    hospitalAndSubServiceInfo.setCity(cDto.getCity());
-                
-                List<BranchDTO> branchDto =
-                        new ObjectMapper().convertValue(response.getData(),
-                                new TypeReference<List<BranchDTO>>() {});
-
-                log.info("GET_BRANCHES_BY_SUBSERVICE :: BRANCH_COUNT :: {}",
-                        branchDto != null ? branchDto.size() : 0);
-
-                List<BranchDTO> branchDtoWithKms =
-                        branchDto.stream().map(n -> {
-                            double d = haversine(
-                                    Double.valueOf(latitude),
-                                    Double.valueOf(longtitude),
-                                    Double.valueOf(n.getLatitude()),
-                                    Double.valueOf(n.getLongitude())
-                            );
-                            n.setDistance(d);
-                            n.setKms(String.format("%.1f", d) + " km");
-                            return n;
-                        }).toList();
-
-                List<BranchDTO> branchDtoWithKmsAsndng =
-                        branchDtoWithKms.stream()
-                                .sorted(Comparator.comparingDouble(BranchDTO::getDistance))
-                                .toList();
-
-                hospitalAndSubServiceInfo.setBranches(branchDtoWithKmsAsndng);
-
-            } else {
-                log.warn("GET_BRANCHES_BY_SUBSERVICE :: CLINIC_NOT_FOUND :: hospitalId={}",
-                        subsrvice.getHospitalId());
-
-                responseObj.setMessage("Hospital Not Found ");
-                responseObj.setStatus(200);
-            }
-
-            if (hospitalAndSubServiceInfo != null) {
-                log.info("GET_BRANCHES_BY_SUBSERVICE :: SUCCESS :: subServiceId={}", subServiceId);
-
-                responseObj.setData(hospitalAndSubServiceInfo);
-                responseObj.setStatus(200);
-                responseObj.setSuccess(true);
-            } else {
-                log.warn("GET_BRANCHES_BY_SUBSERVICE :: SUBSERVICE_NOT_FOUND :: subServiceId={}",
-                        subServiceId);
-
-                responseObj.setMessage("SubServices Not Found ");
-                responseObj.setStatus(200);
-            }
-
-        } else {
-            log.warn("GET_BRANCHES_BY_SUBSERVICE :: NO_SUBSERVICE_DATA :: subServiceId={}",
-                    subServiceId);
-
-            responseObj.setMessage("No SubService Found ");
-            responseObj.setStatus(200);
-        }
-
-    } catch (FeignException e) {
-        log.error("GET_BRANCHES_BY_SUBSERVICE :: FEIGN_ERROR :: clinicId={}, subServiceId={}",
-                clinicId, subServiceId, e);
-
-        responseObj.setMessage(e.getMessage());
-        responseObj.setStatus(e.status());
-        responseObj.setSuccess(false);
-    }
-
-    return responseObj;
-}
 
 public ResponseEntity<?> getInProgressAppointments(String mnumber) {
 
@@ -2179,13 +1875,23 @@ public Response getDoctorsByHospitalBranchAndSubService(
                         .filter(dto -> {
                             if (dto.getConsultation() == null) return false;
                             switch (consultationType) {
-                                case 1:
-                                    return dto.getConsultation().getInClinic() == 1;
-                                case 2:
-                                    return dto.getConsultation().getVideoOrOnline() == 2;
-                                case 3:
-                                    return dto.getConsultation().getServiceAndTreatments() == 3;
-                                default:
+//                                case 1:
+//                                    return dto.getConsultation().getInClinic() == 1;
+//                                case 2:
+//                                    return dto.getConsultation().getVideoOrOnline() == 2;
+//                                case 3:
+//                                    return dto.getConsultation().getServiceAndTreatments() == 3;
+//
+                            case 1:
+                                return Optional.ofNullable(dto.getConsultation().getInClinic()).orElse(0) == 1;
+
+                            case 2:
+                                return Optional.ofNullable(dto.getConsultation().getVideoOrOnline()).orElse(0) == 2;
+
+                            case 3:
+                                return Optional.ofNullable(dto.getConsultation().getServiceAndTreatments()).orElse(0) == 3;
+                            default:
+                            
                                     return false;
                             }
                         })
@@ -2304,19 +2010,14 @@ public ResponseEntity<ResponseStructure<List<BookingResponse>>> getBookingsByCli
 
 
 @Override
-public ResponseEntity<ResponseStructure<List<BookingResponse>>> getBookingsByCustomerId(String customerId) {
+public ResponseEntity<?> getBookingsByCustomerId(String customerId) {
 
     log.info("GET_BOOKINGS_BY_CUSTOMER :: START :: customerId={}", customerId);
 
     ResponseStructure<List<BookingResponse>> res = new ResponseStructure<>();
 
     try {
-        ResponseEntity<ResponseStructure<List<BookingResponse>>> response =
-                bookingFeign.getBookingByCustomerId(customerId);
-
-        log.info("GET_BOOKINGS_BY_CUSTOMER :: SUCCESS :: customerId={}", customerId);
-
-        return response;
+         return bookingFeign.getBookingByCustomerId(customerId);
 
     } catch (FeignException e) {
 
@@ -2333,6 +2034,34 @@ public ResponseEntity<ResponseStructure<List<BookingResponse>>> getBookingsByCus
         return ResponseEntity.status(res.getStatusCode()).body(res);
     }
 }
+
+
+@Override
+public ResponseEntity<?> getCompletedBookingsByCustomerId(String customerId) {
+
+    log.info("GET_BOOKINGS_BY_CUSTOMER :: START :: customerId={}", customerId);
+
+    ResponseStructure<List<BookingResponse>> res = new ResponseStructure<>();
+
+    try {
+         return bookingFeign.getCompletedBookingByCustomerId(customerId);
+
+    } catch (FeignException e) {
+
+        log.error("GET_BOOKINGS_BY_CUSTOMER :: FEIGN_ERROR :: customerId={}",
+                customerId, e);
+
+        res = new ResponseStructure<>(
+                null,
+                ExtractFeignMessage.clearMessage(e),
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                e.status()
+        );
+
+        return ResponseEntity.status(res.getStatusCode()).body(res);
+    }
+}
+
 
 @Override
 public ResponseEntity<?> getInprogressBookingsByCustomerId(String customerId) {
@@ -2513,6 +2242,109 @@ public CustomerDTO getCustomerByToken(String token) {
     }
 }
 
+@Override
+public ResponseEntity<Response> getTherapistSessionDetails(TherapistRecordRequest request) {
+    Response response = new Response();
+    try {
+    	return clinicAdminFeign.getTherapistSessionDetails(request);  
+    } catch (FeignException e) {      
+        response.setStatus(e.status());
+        response.setMessage(ExtractFeignMessage.clearMessage(e));
+        response.setSuccess(false);
+    } return ResponseEntity.status(response.getStatus()).body(response);}
+
+
+
+
+@Override
+public ResponseEntity<Response> getVisitHistoryByDoctor(VisitHistoryRequest request) {
+    Response response = new Response();
+    try {
+    	return physioFeign.getVisitHistoryByDoctor(request);  
+    } catch (FeignException e) {      
+        response.setStatus(e.status());
+        response.setMessage(ExtractFeignMessage.clearMessage(e));
+        response.setSuccess(false);
+    } return ResponseEntity.status(response.getStatus()).body(response);}
+
+@Override
+public ResponseEntity<Response> getFirstVisitHistory(FirstVisitHistoryRequest request) {
+    Response response = new Response();
+    try {
+    	return physioFeign.getFirstVisitHistory(request);  
+    } catch (FeignException e) {      
+        response.setStatus(e.status());
+        response.setMessage(ExtractFeignMessage.clearMessage(e));
+        response.setSuccess(false);
+    } return ResponseEntity.status(response.getStatus()).body(response);}
+
+
+@Override
+public ResponseEntity<?> bookPhysioAppointment(BookingRequset req) {   	
+        Response response = new Response();
+        try {
+        	 if(req.getTheraphyAnswers()!= null) {
+     	        
+    	        	if (req.getTheraphyAnswers() != null && !req.getTheraphyAnswers().isEmpty()) {
+
+    	        	    Map<String, List<TheraphyAnswersDTO>> map = req.getTheraphyAnswers();
+
+    	        	    for (Map.Entry<String, List<TheraphyAnswersDTO>> entry : map.entrySet()) {
+
+    	        	        String key = entry.getKey(); // e.g., "back"
+    	        	        List<TheraphyAnswersDTO> answersList = entry.getValue();
+
+    	        	        // 🔍 Fetch DB data based on key
+    	        	        QuestionsByPartEntity entity = null;
+    	        	        try {
+    		        	        entity = getByKey.getByKey(key);
+    		        	        }catch(Exception e) {}
+    	        	        if (entity == null || entity.getQuestionsByPart() == null) {
+    	        	            continue;
+    	        	        }	        	       
+    	        	        List<QuestionsEntity> questionsList = entity.getQuestionsByPart().get(key);
+
+    	        	        if (questionsList == null || questionsList.isEmpty()  ) {
+    	        	            continue;
+    	        	        }
+
+    	        	        // 🔁 Match questionId and set question
+    	        	        for (TheraphyAnswersDTO dto : answersList) {
+
+    	        	            for (QuestionsEntity q : questionsList) {
+
+    	        	                if (q.getQuestionId() == dto.getQuestionId()) {
+    	        	                    dto.setQuestion(q.getQuestion());
+    	        	                    break; // stop once matched
+    	        	                }
+    	        	            }
+    	        	        }
+    	        	    }
+    	        	} if(req!= null) {
+    	        		 clinicAdminFeign.updateDoctorSlotWhileBooking(         
+    	        				 req.getDoctorId(),
+    	    	                    req.getBranchId(),
+    	    	                    req.getServiceDate(),
+    	    	                    req.getServicetime()
+    	    	            );} 
+    	        return bookingFeign.bookPhysioAppointment(req);
+    	        }else {
+    	        	 if(req!= null) {
+    	        		 clinicAdminFeign.updateDoctorSlotWhileBooking(         
+    	        				 req.getDoctorId(),
+    	    	                    req.getBranchId(),
+    	    	                    req.getServiceDate(),
+    	    	                    req.getServicetime()
+    	    	            );} 
+        	    return bookingFeign.bookPhysioAppointment(req);}        	       	
+    } catch (FeignException e) {      
+        response.setStatus(e.status());
+        response.setMessage(ExtractFeignMessage.clearMessage(e));
+        response.setSuccess(false);
+    } return ResponseEntity.status(response.getStatus()).body(response);}
+
+
+
 public ResponseEntity<ResBody<List<NotificationToCustomer>>> notificationToCustomer(
         String customerMobileNumber) {
 
@@ -2532,5 +2364,48 @@ public ResponseEntity<ResBody<List<NotificationToCustomer>>> notificationToCusto
         return ResponseEntity.status(e.status()).body(res);
     }
 }
+
+
+@Override
+public ResponseEntity<Response> getStaffInfo(
+       String hospitalId,
+        String branchId){
+    Response response = new Response();
+    try {
+    	return clinicAdminFeign.getStaffInfo(hospitalId, branchId);  
+    } catch (FeignException e) {      
+        response.setStatus(e.status());
+        response.setMessage(ExtractFeignMessage.clearMessage(e));
+        response.setSuccess(false);
+    } return ResponseEntity.status(response.getStatus()).body(response);}
+
+
+
+@Override
+public Response createFeedback(
+        PatientFeedbackDTO dto){
+    Response response = new Response();
+    try {
+    	return clinicAdminFeign.createFeedback(dto);  
+    } catch (FeignException e) {      
+        response.setStatus(e.status());
+        response.setMessage(ExtractFeignMessage.clearMessage(e));
+        response.setSuccess(false);
+    } return response;}
+
+
+@Override
+public ResponseEntity<Response> getByClinicIdAndBranchId(
+      String clinicId,
+      String branchId,
+      String patientId){
+    Response res = new Response();
+    try {
+    	return clinicAdminFeign.getByClinicIdAndBranchIdAndPatirntId(clinicId, branchId, patientId);  
+    } catch (FeignException e) {      
+        res.setStatus(e.status());
+        res.setMessage(ExtractFeignMessage.clearMessage(e));
+        res.setSuccess(false);
+    } return ResponseEntity.status(res.getStatus()).body(res);}
 
 }

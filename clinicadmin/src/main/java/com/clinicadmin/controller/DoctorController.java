@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.clinicadmin.dto.ChangeDoctorPasswordDTO;
@@ -29,7 +29,7 @@ import com.clinicadmin.dto.DoctorsDTO;
 import com.clinicadmin.dto.Response;
 import com.clinicadmin.dto.TempBlockingSlot;
 import com.clinicadmin.dto.UpdateSlotRequestDTO;
-import com.clinicadmin.service.DoctorNoteService;
+//import com.clinicadmin.service.DoctorNoteService;
 import com.clinicadmin.service.DoctorService;
 import com.clinicadmin.validations.FormatChecks;
 import com.clinicadmin.validations.RequiredChecks;
@@ -46,8 +46,8 @@ public class DoctorController {
 	@Autowired
 	private DoctorService doctorService;
 	
-	@Autowired
-	private DoctorNoteService doctorNoteService;
+//	@Autowired
+//	private DoctorNoteService doctorNoteService;
 	
 	@Autowired
 	private Validator validator;
@@ -107,6 +107,35 @@ public class DoctorController {
 		response = doctorService.addDoctor(dto);
 		return ResponseEntity.status(response.getStatus()).body(response);
 	}
+	
+//	 // ================= START VERIFICATION =================
+//    @PutMapping("/start-verificationForDoctor/{doctorId}")
+//    public ResponseEntity<Response> startVerification(@PathVariable String doctorId) {
+//
+//        Response response = doctorService.startVerificationProcess(doctorId);
+//
+//        return ResponseEntity.status(response.getStatus()).body(response);
+//    }
+//
+//    // ================= VERIFY DOCTOR =================
+//    @PutMapping("/verifyDoctor/{doctorId}")
+//    public ResponseEntity<Response> verifyDoctor(@PathVariable String doctorId) {
+//
+//        Response response = doctorService.verifyDoctor(doctorId);
+//
+//        return ResponseEntity.status(response.getStatus()).body(response);
+//    }
+//
+//    // ================= REJECT DOCTOR =================
+//    @PutMapping("/rejectDoctor/{doctorId}")
+//    public ResponseEntity<Response> rejectDoctor(
+//            @PathVariable String doctorId,
+//            @RequestParam String reason) {
+//
+//        Response response = doctorService.rejectDoctor(doctorId, reason);
+//
+//        return ResponseEntity.status(response.getStatus()).body(response);
+//    }
 
 	/**
 	 * Get all doctors.
@@ -128,7 +157,7 @@ public class DoctorController {
 	 */
 	@PutMapping("/updateDoctor/{doctorId}")
 	public ResponseEntity<Response> updateDoctorById(@PathVariable String doctorId,
-			@Validated(RequiredChecks.class) @RequestBody DoctorsDTO dto) {
+			 @RequestBody DoctorsDTO dto) {
 		dto.trimAllDoctorFields();
 		Response response = doctorService.upDateDoctorById(doctorId, dto);
 		return ResponseEntity.status(response.getStatus()).body(response);
@@ -232,22 +261,22 @@ public class DoctorController {
 	}
 
 //		------------------Get Doctors by hopital id and subServiceId----------------------------------------------------------------------------------------
-	@GetMapping("/doctors/hospital/{hospitalId}/subServiceId/{subServiceId}")
-	public ResponseEntity<Response> getDoctorsBySubServiceId(@PathVariable String hospitalId,
-			@PathVariable String subServiceId) {
-		Response response = doctorService.getDoctorsBySubserviceId(hospitalId, subServiceId);
-		return ResponseEntity.status(response.getStatus()).body(response);
-	}
+//	@GetMapping("/doctors/hospital/{hospitalId}/subServiceId/{subServiceId}")
+//	public ResponseEntity<Response> getDoctorsBySubServiceId(@PathVariable String hospitalId,
+//			@PathVariable String subServiceId) {
+//		Response response = doctorService.getDoctorsBySubserviceId(hospitalId, subServiceId);
+//		return ResponseEntity.status(response.getStatus()).body(response);
+//	}
 
-	  @GetMapping("doctors/{hospitalId}/{branchId}/{subServiceId}")
-	    public ResponseEntity<Response> getDoctorsByHospitalBranchAndSubService(
-	            @PathVariable String hospitalId,
-	            @PathVariable String branchId,
-	            @PathVariable String subServiceId) {
-
-	        Response response = doctorService.getDoctorsByHospitalIdAndBranchIdSubserviceId(hospitalId, branchId, subServiceId);
-	        return ResponseEntity.status(response.getStatus()).body(response);
-	    }
+//	  @GetMapping("doctors/{hospitalId}/{branchId}/{subServiceId}")
+//	    public ResponseEntity<Response> getDoctorsByHospitalBranchAndSubService(
+//	            @PathVariable String hospitalId,
+//	            @PathVariable String branchId,
+//	            @PathVariable String subServiceId) {
+//
+//	        Response response = doctorService.getDoctorsByHospitalIdAndBranchIdSubserviceId(hospitalId, branchId, subServiceId);
+//	        return ResponseEntity.status(response.getStatus()).body(response);
+//	    }
 	/*
 	 * -----------------------------------------------------------------------------
 	 * -------------------------------------------------
@@ -340,29 +369,29 @@ public class DoctorController {
 //		---------------------------------------------------------------------------------------------------------------------------
 
 // -------------------------Get Hopitals and Doctors using SubserviceId------------------------------------------------
-	@GetMapping("/getHospitalAndDoctorUsingSubServiceId/{subServiceId}")
-	public ResponseEntity<Response> getHospitalAndDoctorUsingSubServiceId(@PathVariable String subServiceId) {
-		Response response = doctorService.getHospitalAndDoctorsUsingSubserviceId(subServiceId);
-		return ResponseEntity.status(response.getStatus()).body(response);
-	}
+//	@GetMapping("/getHospitalAndDoctorUsingSubServiceId/{subServiceId}")
+//	public ResponseEntity<Response> getHospitalAndDoctorUsingSubServiceId(@PathVariable String subServiceId) {
+//		Response response = doctorService.getHospitalAndDoctorsUsingSubserviceId(subServiceId);
+//		return ResponseEntity.status(response.getStatus()).body(response);
+//	}
 //--------------------------- Get ALl Doctors By SubServiceId ----------------------------------------------------------------
-	
-			@GetMapping("/getAllDoctorsBySubServiceId/{subServiceId}")
-			public ResponseEntity<Response> getAllDoctorsBySubServiceId(@PathVariable String subServiceId) {
-				Response response = doctorService.getAllDoctorsBySubserviceId(subServiceId);
-				return ResponseEntity.status(response.getStatus()).body(response);
-			}
+//	
+//			@GetMapping("/getAllDoctorsBySubServiceId/{subServiceId}")
+//			public ResponseEntity<Response> getAllDoctorsBySubServiceId(@PathVariable String subServiceId) {
+//				Response response = doctorService.getAllDoctorsBySubserviceId(subServiceId);
+//				return ResponseEntity.status(response.getStatus()).body(response);
+//			}
 
 	/* ---------------------------------------------------------------------------------------------------------------------------
        --------------------------------------------- Notes -----------------------------------------------------------------------
        ---------------------------------------------------------------------------------------------------------------------------*/
 
 	// -------------------------getAllNotes-----------------------------------------------
-	@GetMapping("/notes/getAllNotes")
-	public ResponseEntity<Response> getAllNotes() {
-		Response response = doctorNoteService.getAllNotes();
-		return ResponseEntity.status(response.getStatus()).body(response);
-	}
+//	@GetMapping("/notes/getAllNotes")
+//	public ResponseEntity<Response> getAllNotes() {
+//		Response response = doctorNoteService.getAllNotes();
+//		return ResponseEntity.status(response.getStatus()).body(response);
+//	}
 	
 	
 	//NOTIFICATION OF DOCTOR
@@ -380,11 +409,11 @@ public class DoctorController {
 			return ResponseEntity.status(response.getStatus()).body(response);
 		}
 		// -----------------------------Get Best Doctor subserviceId---------------------------------
-		@GetMapping("/bestDoctor/{subServiceId}")
-		public ResponseEntity<Response> getBestDoctors(@PathVariable String subServiceId){
-			Response response=doctorService.getBestDoctorBySubService(subServiceId);
-			return ResponseEntity.status(response.getStatus()).body(response);
-		}
+//		@GetMapping("/bestDoctor/{subServiceId}")
+//		public ResponseEntity<Response> getBestDoctors(@PathVariable String subServiceId){
+//			Response response=doctorService.getBestDoctorBySubService(subServiceId);
+//			return ResponseEntity.status(response.getStatus()).body(response);
+//		}
 		// ----------------------------- Using key GET CLINICS AND DOCTORS BUY RECOMMONDATION ----------------------------------------
 		@GetMapping("/clinics/{keyPoints}")
 		public ResponseEntity<Response> getRecommendedClinicsAndDoctors(@PathVariable String keyPoints) {

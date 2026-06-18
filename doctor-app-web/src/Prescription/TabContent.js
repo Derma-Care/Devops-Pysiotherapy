@@ -2,18 +2,40 @@ import React from 'react'
 import PrescriptionTab from './PrescriptionTab'
 import SymptomsDiseases from './SymptomsDiseases'
 import DoctorSymptoms from './DoctorSymptoms'
-import TestsTreatments from './TestsTreatments'
-import FollowUp from './FollowUp'
 import DoctorFollowUp from './DoctorFollowUp'
 import VisitHistory from './VisitHistory'
 import Summary from './Summary'
 import DoctorSummary from './DoctorSummary'
-import Tests from './Tests'
 import MultiImageUpload from './ClinicImages'
 import { COLORS } from '../Themes'
 import ReportDetails from '../components/Reports/Reports'
 import ImageGallery from './RetiveImages'
-import Investigations from './Tests'
+import Assessment from './Tests'
+import FollowUpnew from './FollowUpnew'
+import TherapySession from './TreatmentPlan'
+import HomePlan from './ExercisePlan'
+import Investigation from './Investigation'
+import RedFlagScreening from './RedFlagScreening'
+import NeuroFunctionalInfo from './NeuroFunctionalInfo'
+
+/* ─── deepMerge ──────────────────────────────────────────────────────────── */
+const deepMerge = (target, source) => {
+  if (!source || typeof source !== 'object') return target
+  const result = { ...target }
+  Object.keys(source).forEach(key => {
+    const srcVal = source[key]
+    const tgtVal = target[key]
+    if (
+      srcVal !== null && typeof srcVal === 'object' && !Array.isArray(srcVal) &&
+      tgtVal !== null && typeof tgtVal === 'object' && !Array.isArray(tgtVal)
+    ) {
+      result[key] = deepMerge(tgtVal, srcVal)
+    } else {
+      result[key] = srcVal
+    }
+  })
+  return result
+}
 
 const TabContent = ({
   activeTab,
@@ -25,45 +47,126 @@ const TabContent = ({
   setFormData,
   fromDoctorTemplate,
   setImage,
+  complaintsSeed,
 }) => {
+
+  /* ── handleNext ────────────────────────────────────────────────────────────
+     Immediately deep-merges the tab's partial payload into formData so that:
+     1. If the user navigates BACK, the restored seed already has their edits.
+     2. The parent's onNextMap handler then does its own mergeAndLog — which
+        is also safe because deepMerge is idempotent.
+
+     For the Plan tab, TherapySession calls onNext with:
+       {
+         therapySessions: [...],   ← array of session objects
+         therapists:      [...],   ← full multi-therapist array  ✅
+         therapistIds:    [...],
+         therapistNames:  [...],
+         therapistId:     '...',   ← single back-compat
+         therapistName:   '...',
+         ...
+       }
+     We pre-merge using the same shape the parent stores so returning to Plan
+     restores ALL selected therapists correctly.
+  ─────────────────────────────────────────────────────────────────────────── */
+  const handleNext = (payload) => {
+    if (setFormData && payload && typeof payload === 'object') {
+      if (activeTab === 'Plan') {
+        const planPatch = {
+          therapySessions: {
+            sessions: Array.isArray(payload.therapySessions) ? payload.therapySessions : [],
+            therapists: Array.isArray(payload.therapists) ? payload.therapists : [],
+            therapistIds: Array.isArray(payload.therapistIds) ? payload.therapistIds : [],
+            therapistNames: Array.isArray(payload.therapistNames) ? payload.therapistNames : [],
+            therapistId: payload.therapistId ?? (payload.therapists?.[0]?.therapistId ?? ''),
+            therapistName: payload.therapistName ?? (payload.therapists?.[0]?.fullName ?? ''),
+            manualTherapy: payload.manualTherapy ?? '',
+            precautions: Array.isArray(payload.precautions) ? payload.precautions : [],
+            modalitiesUsed: Array.isArray(payload.modalitiesUsed) ? payload.modalitiesUsed : [],
+            patientResponse: payload.patientResponse ?? '',
+          },
+        }
+        setFormData(prev => deepMerge(prev, planPatch))
+      } else if (activeTab === 'Assessment') {
+        setFormData(prev => deepMerge(prev, { assessment: payload }))
+      } else if (activeTab === 'Complaints') {
+        setFormData(prev => deepMerge(prev, { complaints: payload }))
+      } else if (activeTab === 'Diagnosis') {
+        setFormData(prev => deepMerge(prev, { diagnosis: payload }))
+      } else if (activeTab === 'Investigation') {
+        const patch = {
+          investigation: payload.investigation || { selectedTests: payload.selectedTests, notes: payload.notes }
+        }
+        if (payload.uptoInvestigation !== undefined) {
+          patch.uptoInvestigation = payload.uptoInvestigation
+        }
+        if (payload.therapyRecordId) {
+          patch.therapyRecordId = payload.therapyRecordId
+          patch.id = payload.therapyRecordId
+        }
+        setFormData(prev => deepMerge(prev, patch))
+      } else if (activeTab === 'FollowUp') {
+        setFormData(prev => deepMerge(prev, { followUp: payload }))
+      } else {
+        setFormData(prev => deepMerge(prev, payload))
+      }
+    }
+    onNext?.(payload)
+  }
+
   let content = null
 
   switch (activeTab) {
+    case 'Complaints':
+      content = fromDoctorTemplate ? (
+        <DoctorSymptoms seed={complaintsSeed || formData.symptoms || {}} onNext={handleNext} sidebarWidth={260} patientData={patientData} setFormData={setFormData} formData={formData} />
+      ) : (
+        <SymptomsDiseases seed={complaintsSeed || formData.symptoms || {}} onNext={handleNext} sidebarWidth={260} patientData={patientData} setFormData={setFormData} formData={formData} />
+      )
+      break
+
+    case 'Assessment':
+      content = <Assessment seed={formData.assessment || {}} onNext={handleNext} sidebarWidth={260} formData={formData} setFormData={setFormData} />
+      break
+
     case 'Diagnosis':
+      content = <PrescriptionTab seed={{ diagnosis: formData.diagnosis || {} }} onNext={handleNext} formData={formData} setFormData={setFormData} />
+      break
+
+    case 'Investigation':
+      content = <Investigation seed={formData.investigation || {}} onNext={handleNext} formData={formData} setFormData={setFormData} patientData={patientData} />
+      break
+
+    case 'Plan':
+      /* ── KEY FIX: pass formData.therapySessions as seed ──────────────────
+         TherapySession reads:
+           seed.sessions[0].serviceType     → restores mode
+           seed.therapists                  → restores ALL selected therapists ✅
+           seed.therapistId / therapistName → single back-compat fallback
+           restoreTherophyDataState(seed.sessions) → rebuilds exercise table
+      ────────────────────────────────────────────────────────────────────── */
       content = fromDoctorTemplate ? (
-        <DoctorSymptoms seed={formData.symptoms || {}} onNext={onNext} sidebarWidth={260} patientData={patientData} setFormData={setFormData} formData={formData} />
+        <DoctorFollowUp seed={formData.therapySessions || {}} onNext={handleNext} patientData={patientData} formData={formData} setFormData={setFormData} />
       ) : (
-        <SymptomsDiseases seed={formData.symptoms || {}} onNext={onNext} sidebarWidth={260} patientData={patientData} setFormData={setFormData} formData={formData} />
+        <TherapySession seed={formData.therapySessions || {}} onNext={handleNext} patientData={patientData} formData={formData} setFormData={setFormData} />
       )
       break
 
-    case 'Investigations':
-      content = <Investigations seed={formData.tests || {}} onNext={onNext} sidebarWidth={260} formData={formData} />
+    case 'HomePlan':
+      content = <HomePlan seed={formData.exercisePlan || {}} onNext={handleNext} sidebarWidth={260} patientData={patientData} />
       break
 
-    case 'Medication':
-      content = <PrescriptionTab seed={formData.prescription || {}} onNext={onNext} formData={formData} />
-      break
-
-    case 'Procedures':
-      content = <TestsTreatments seed={formData.treatments || {}} onNext={onNext} formData={formData} />
-      break
-
-    case 'Follow-up':
-      content = fromDoctorTemplate ? (
-        <DoctorFollowUp seed={formData.followUp || {}} onNext={onNext} patientData={patientData} formData={formData} setFormData={setFormData} />
-      ) : (
-        <FollowUp seed={formData.followUp || {}} onNext={onNext} patientData={patientData} formData={formData} setFormData={setFormData} />
-      )
+    case 'FollowUp':
+      content = <FollowUpnew seed={Array.isArray(formData.followUp) ? formData.followUp : []} onNext={handleNext} sidebarWidth={260} />
       break
 
     case 'History':
       content = (
         <VisitHistory
           seed={formData.history || {}}
-          onNext={onNext}
+          onNext={handleNext}
           patientId={patientData?.patientId || formData.patientId}
-          doctorId={patientData?.doctorId || formData.doctorId}
+          bookingId={patientData?.bookingId || formData.bookingId}
           patientData={patientData}
           formData={formData}
         />
@@ -72,15 +175,15 @@ const TabContent = ({
 
     case 'Prescription':
       content = fromDoctorTemplate ? (
-        <DoctorSummary onNext={onNext} onSaveTemplate={onSaveTemplate} patientData={patientData} formData={formData} setFormData={setFormData} sidebarWidth={260} />
+        <DoctorSummary onNext={handleNext} onSaveTemplate={onSaveTemplate} patientData={patientData} formData={formData} setFormData={setFormData} sidebarWidth={260} />
       ) : (
-        <Summary onNext={onNext} onSaveTemplate={onSaveTemplate} patientData={patientData} formData={formData} sidebarWidth={260} />
+        <Summary onNext={handleNext} onSaveTemplate={onSaveTemplate} patientData={patientData} formData={formData} sidebarWidth={260} />
       )
       break
 
     case 'Images':
       content = setImage ? (
-        <MultiImageUpload data={formData} onSubmit={onNext} patientData={patientData} />
+        <MultiImageUpload data={formData} onSubmit={handleNext} patientData={patientData} />
       ) : (
         <ImageGallery data={formData} patientData={patientData} />
       )
@@ -94,7 +197,11 @@ const TabContent = ({
       content = null
   }
 
-  return <div style={{ marginTop: '3%', backgroundColor: COLORS.theme }}>{content}</div>
+  return (
+    <div style={{ marginTop: '3%', backgroundColor: COLORS.theme }}>
+      {content}
+    </div>
+  )
 }
 
 export default TabContent

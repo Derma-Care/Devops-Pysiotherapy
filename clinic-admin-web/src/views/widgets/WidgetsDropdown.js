@@ -25,21 +25,23 @@ import Slider from 'react-slick'
 import { getStyle } from '@coreui/utils'
 import { CChartLine } from '@coreui/react-chartjs'
 import CIcon from '@coreui/icons-react'
-import { cilOptions } from '@coreui/icons'
+import { cilArrowRight, cilOptions } from '@coreui/icons'
 import 'slick-carousel/slick/slick.css'
 import 'slick-carousel/slick/slick-theme.css'
 import axios from 'axios'
 import { MainAdmin_URL, AllCustomerAdvertisements } from '../../baseUrl'
-// import { appointments_Ref } from '../../baseUrl'
-import { AppointmentData, GetBookingByClinicIdData } from '../AppointmentManagement/appointmentAPI'
+import { AppointmentData, bookingUpdate, GetBookingByClinicIdData, GetTodayBooking } from '../AppointmentManagement/appointmentAPI'
 import { DoctorData, getDoctorByClinicIdData } from '../Doctors/DoctorAPI'
-import { COLORS } from '../../Constant/Themes'
+import { COLORS, FONT_SIZES } from '../../Constant/Themes'
 import './Widget.css'
 import LoadingIndicator from '../../Utils/loader'
 import { useGlobalSearch } from '../Usecontext/GlobalSearchContext'
 import { http } from '../../Utils/Interceptors'
 import Pagination from '../../Utils/Pagination'
 import { CustomerByClinicNdBranchId } from '../customerManagement/CustomerManagementAPI'
+import { Eye, Printer, Search, X } from 'lucide-react'
+import PrintLetterHead from '../../Utils/PrintLetterHead'
+import ConfirmationModal from '../../components/ConfirmationModal'
 
 const WidgetsDropdown = (props) => {
   const [slides, setSlides] = useState([])
@@ -47,24 +49,24 @@ const WidgetsDropdown = (props) => {
   const currentIndex = useRef(0)
   const intervalRef = useRef(null)
   const [bookings, setBookings] = useState([])
-  const [activeCard, setActiveCard] = useState('') // state to keep track of which card is clicked eg:"appointments"
+  const [activeCard, setActiveCard] = useState('')
   const [len, setLen] = useState(0)
   const widgetChartRef1 = useRef(null)
   const widgetChartRef2 = useRef(null)
   const widgetChartRef3 = useRef(null)
   const [todayBookings, setTodayBookings] = useState([])
-  const [totalAppointmentsCount, setTotalAppointmentsCount] = useState(0) // NEW: State to hold total appointments count
-  const [totalDoctorsCount, setTotalDoctorsCount] = useState(0) // NEW: State to hold total appointments count
-  const [totalPatientsCount, setTotalPatientsCount] = useState(0) // NEW: State to hold total appointments count
-  const [loadingAppointments, setLoadingAppointments] = useState(true) // New state for loading indicator
-  const [appointmentError, setAppointmentError] = useState(null) // New state for appointment fetch error
-  const [loadingPatients, setLoadingPatients] = useState(true) // New state for loading indicator
-  const [loadingDoctors, setLoadingDoctors] = useState(true) // New state for loading indicator
-  const [patientError, setPatientError] = useState(null) 
-  const [doctorError, setDoctorError] = useState(null) 
+  const [totalAppointmentsCount, setTotalAppointmentsCount] = useState(0)
+  const [totalDoctorsCount, setTotalDoctorsCount] = useState(0)
+  const [totalPatientsCount, setTotalPatientsCount] = useState(0)
+  const [loadingAppointments, setLoadingAppointments] = useState(true)
+  const [appointmentError, setAppointmentError] = useState(null)
+  const [loadingPatients, setLoadingPatients] = useState(true)
+  const [loadingDoctors, setLoadingDoctors] = useState(true)
+  const [patientError, setPatientError] = useState(null)
+  const [doctorError, setDoctorError] = useState(null)
   const [doctors, setDoctors] = useState([])
   const [patients, setPatients] = useState([])
-  const { searchQuery } = useGlobalSearch()
+  const { searchQuery, setSearchQuery } = useGlobalSearch()
   const [filteredData, setFilteredData] = useState([])
   const [filterTypes, setFilterTypes] = useState([])
   const [statusFilters, setStatusFilters] = useState([])
@@ -73,8 +75,26 @@ const WidgetsDropdown = (props) => {
   const [inprogressApt, setInprogressApt] = useState([])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(5)
-
+  const [statusFilter, setStatusFilter] = useState('')
   const [showAppointments, setShowAppointments] = useState(false)
+  const [editingPaymentId, setEditingPaymentId] = useState(null)
+  const [printData, setPrintData] = useState(null)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [confirmData, setConfirmData] = useState({ bookingId: null, paymentType: '' })
+  const [openPayDropdown, setOpenPayDropdown] = useState(null)
+  const payDropdownRef = useRef(null)
+
+  // ── Close payment dropdown when clicking outside ────────────────────────
+  useEffect(() => {
+    const handler = (e) => {
+      if (payDropdownRef.current && !payDropdownRef.current.contains(e.target)) {
+        setOpenPayDropdown(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   const statusLabelMap = {
     'In-Progress': 'Active',
     Completed: 'Completed',
@@ -82,142 +102,165 @@ const WidgetsDropdown = (props) => {
     Rejected: 'Rejected',
     Confirmed: 'Confirmed',
   }
-  const handleStatusChange = (e) => {
-    const value = e.target.value
 
-    if (statusFilters.includes(value)) {
-      setStatusFilters([]) // Deselect if the same one is clicked
-    } else {
-      setStatusFilters([value]) // Allow only one selection
+  // Status badge color map aligned with pm-* design language
+  const statusColorMap = {
+    'In-Progress': { bg: '#e6f1fb', color: '#185fa5', border: '#b5d4f4' },
+    Completed: { bg: '#eaf3de', color: '#3b6d11', border: '#c0dd97' },
+    Pending: { bg: '#fff8e1', color: '#92680a', border: '#f0d080' },
+    Rejected: { bg: '#fcebeb', color: '#a32d2d', border: '#f4b5b5' },
+    Confirmed: { bg: '#eaf3de', color: '#3b6d11', border: '#c0dd97' },
+  }
+  const paymentOptions = ['Cash', 'Card', 'UPI']
+
+  const handlePaymentUpdate = async (bookingId, paymentType) => {
+    try {
+      await bookingUpdate({
+        bookingId,
+        paymentType,
+        status: 'confirmed',
+      })
+
+      fetchAppointments(localStorage.getItem('HospitalId'))
+      setEditingPaymentId(null)
+    } catch (error) {
+      console.error('Payment update failed:', error)
     }
   }
+
+  const role = localStorage.getItem('role')
+
+  const PrintContent = ({ data }) => {
+    if (!data) return null
+    return (
+      <PrintLetterHead>
+        <div style={{ padding: 20, fontFamily: 'Arial' }}>
+          <h2 style={{ textAlign: 'center', marginBottom: 10 }}>CONSULTATION RECEIPT</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 10 }}>
+            <div><strong>Booking Id:</strong> {data.bookingId || '---'}</div>
+            <div><strong>Date:</strong> {data.serviceDate}</div>
+          </div>
+          <hr />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: 14, color: 'black' }}>
+            <p style={{ color: 'black' }}><strong>Patient ID:</strong> {data.patientId}</p>
+            <p style={{ color: 'black' }}><strong>Name:</strong> {data.name}</p>
+            <p style={{ color: 'black' }}><strong>Doctor:</strong> {data.doctorName}</p>
+            <p style={{ color: 'black' }}><strong>Time:</strong> {data.slot || data.servicetime}</p>
+          </div>
+          <hr />
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 10 }}>
+            <thead>
+              <tr style={{ background: '#f2f2f2' }}>
+                <th style={thStyle}>#</th>
+                <th style={thStyle}>Description</th>
+                <th style={thStyle}>Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={tdStyle}>1</td>
+                <td style={tdStyle}>Consultation Fee</td>
+                <td style={tdStyle}>{data.consultationFee ?? 0}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style={{ marginTop: 15, display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ border: '1px solid black', padding: '10px 20px', fontWeight: 'bold' }}>
+              Total: ₹ {data.consultationFee ?? 0}
+            </div>
+          </div>
+          <div style={{ marginTop: 20, fontSize: 12, textAlign: 'center', color: 'gray' }}>
+            * This is a computer-generated receipt. No signature required.
+          </div>
+        </div>
+      </PrintLetterHead>
+    )
+  }
+
   const navigate = useNavigate()
+
   const toggleFilter = (type) => {
     if (filterTypes.includes(type)) {
-      // setFilterTypes(filterTypes.filter((t) => t !== type))// multiple selections.
-      setFilterTypes([]) //one selection at a time
+      setFilterTypes([])
     } else {
-      setFilterTypes([type]) //one selection at a time
-      // setFilterTypes([...filterTypes, type])// multiple selections.
+      setFilterTypes([type])
     }
   }
+
   const convertToISODate = useCallback((dateString) => {
     if (!dateString) return ''
-
     let date
-    // Check if dateString is already in YYYY-MM-DD format (preferred)
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
       date = new Date(dateString)
     } else if (/^\d{2}-\d{2}-\d{4}$/.test(dateString)) {
-      // dd-MM-yyyy format
       const [day, month, year] = dateString.split('-')
       date = new Date(`${year}-${month}-${day}`)
     } else {
-      // Attempt to parse other formats, though YYYY-MM-DD or dd-MM-yyyy are safer
       date = new Date(dateString)
     }
-
-    if (isNaN(date.getTime())) {
-      // Use getTime() for robust NaN check
-      // console.warn('Invalid date string for conversion:', dateString)
-      return ''
-    }
-
+    if (isNaN(date.getTime())) return ''
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const day = String(date.getDate()).padStart(2, '0')
-
     return `${year}-${month}-${day}`
   }, [])
 
   const normalize = (str) => (str ? str.toString().toLowerCase().trim() : '')
-
-  // Get today's date in YYYY-MM-DD format, using a consistent method
   const todayISO = new Date().toISOString().split('T')[0]
 
-  // Fetch Advertisements (unchanged)
   const fetchAdvertisements = async () => {
     try {
-      const response = await axios.get(`${MainAdmin_URL}/${AllCustomerAdvertisements}`) //TODO:chnage when apigetway call axios to http
-      console.log('✅ Advertisements Response:', response.data)
+      const response = await axios.get(`${MainAdmin_URL}/${AllCustomerAdvertisements}`)
       if (Array.isArray(response.data)) {
         setSlides(response.data)
-      } else {
-        console.error('No advertisements found:', response.data)
       }
     } catch (error) {
       console.error('Error fetching advertisements:', error)
     }
   }
 
-  // Use useCallback for fetchAppointments to stabilize the function reference
-  const fetchAppointments = useCallback(
-    async (clinicId) => {
-      setLoadingAppointments(true)
-      setAppointmentError(null)
-
-      try {
-        const response = await GetBookingByClinicIdData(clinicId)
-        console.log('Raw Appointments Data:', response)
-
-        if (response && Array.isArray(response.data)) {
-          const allAppointments = response.data
-          setTotalAppointmentsCount(allAppointments.length)
-
-          const inprogreeAppointments = allAppointments.filter((item) => {
-            const itemDate = item.status.toLowerCase()
-            return itemDate === 'in-progress'
-          })
-          const filteredAppointments = allAppointments.filter((item) => {
-            const itemDate = item.serviceDate ? convertToISODate(item.serviceDate) : ''
-            return itemDate === todayISO && item.clinicId === clinicId
-          })
-          setInprogressApt(inprogreeAppointments)
-          setTodayBookings(filteredAppointments)
-        } else {
-          setTodayBookings([])
-          setAppointmentError('No  appointments found.')
-        }
-      } catch (error) {
-        console.error('Failed to fetch appointments:', error)
-        setAppointmentError('No Appointment Found')
+  const fetchAppointments = useCallback(async (clinicId) => {
+    setLoadingAppointments(true)
+    setAppointmentError(null)
+    try {
+      const response = await GetTodayBooking()
+      if (response && Array.isArray(response.data)) {
+        const allAppointments = response.data
+        setTotalAppointmentsCount(allAppointments.length)
+        const inprogreeAppointments = allAppointments.filter((item) => item.status === 'in-progress')
+        setInprogressApt(inprogreeAppointments)
+        setTodayBookings(allAppointments)
+      } else {
         setTodayBookings([])
-      } finally {
-        setLoadingAppointments(false)
+        setAppointmentError('No appointments found.')
       }
-    },
-    [todayISO, convertToISODate],
-  )
-const fetchPatients = useCallback(async (clinicId) => {
+    } catch (error) {
+      setAppointmentError('No Appointment Found')
+      setTodayBookings([])
+    } finally {
+      setLoadingAppointments(false)
+    }
+  }, [todayISO, convertToISODate])
+
+  const fetchPatients = useCallback(async (clinicId) => {
     setLoadingPatients(true)
     setPatientError(null)
     try {
       const branchId = localStorage.getItem('branchId')
-      // The response here is ALREADY the array of patients, 
-      // as determined by the CustomerByClinicNdBranchId function.
-      const response = await CustomerByClinicNdBranchId(clinicId, branchId) 
-      console.log('Raw Patients Data:', response)
-
-      //  Access the response directly, not response?.data
-      const patientArray = response || [] 
-
+      const response = await CustomerByClinicNdBranchId(clinicId, branchId)
+      const patientArray = response || []
       if (Array.isArray(patientArray)) {
-        // Use setTotalPatientsCount, not setTotalDoctorsCount
-        setTotalPatientsCount(patientArray.length) 
+        setTotalPatientsCount(patientArray.length)
         setPatients(patientArray)
       } else {
-        console.error('Invalid patients response format:', response)
-        //Use setPatientError, not setDoctorError
-        setPatientError('No patients found.') 
+        setPatientError('No patients found.')
       }
     } catch (error) {
-      console.error('Failed to fetch patients:', error)
-      //  Use setPatientError, not setDoctorError
-      setPatientError('Failed to fetch patients.') 
+      setPatientError('Failed to fetch patients.')
     } finally {
       setLoadingPatients(false)
     }
-}, [])
+  }, [])
 
   const fetchDoctors = useCallback(async (clinicId) => {
     setLoadingDoctors(true)
@@ -225,20 +268,14 @@ const fetchPatients = useCallback(async (clinicId) => {
     try {
       const branchId = localStorage.getItem('branchId')
       const response = await getDoctorByClinicIdData(clinicId, branchId)
-      console.log('Raw Doctors Data:', response)
-
-      // ✅ Access the inner data array
       const doctorArray = response?.data || []
-
       if (Array.isArray(doctorArray)) {
         setTotalDoctorsCount(doctorArray.length)
         setDoctors(doctorArray)
       } else {
-        console.error('Invalid doctors response format:', response)
         setDoctorError('No doctors found.')
       }
     } catch (error) {
-      console.error('Failed to fetch doctors:', error)
       setDoctorError('Failed to fetch doctors.')
     } finally {
       setLoadingDoctors(false)
@@ -251,52 +288,33 @@ const fetchPatients = useCallback(async (clinicId) => {
 
   useEffect(() => {
     const hospitalId = localStorage.getItem('HospitalId')
-    console.log(hospitalId)
     if (hospitalId) {
       fetchAppointments(hospitalId)
       fetchDoctors(hospitalId)
       fetchPatients(hospitalId)
-      // Set up daily refresh:
-      // 1. Calculate time until next midnight
       const now = new Date()
       const tomorrow = new Date(now)
       tomorrow.setDate(now.getDate() + 1)
-      tomorrow.setHours(0, 0, 0, 0) // Set to midnight of the next day
-
+      tomorrow.setHours(0, 0, 0, 0)
       const timeUntilMidnight = tomorrow.getTime() - now.getTime()
-
-      // 2. Set a timeout to refresh exactly at midnight
       const midnightTimeout = setTimeout(() => {
-        fetchAppointments(hospitalId) // Fetch date at midnight
-        // After the first midnight fetch, set up an interval for daily fetches
-        const dailyInterval = setInterval(() => fetchAppointments(hospitalId), 24 * 60 * 60 * 1000) // Fetch every 24 hours
-        return () => clearInterval(dailyInterval) // Cleanup interval on unmount
+        fetchAppointments(hospitalId)
+        const dailyInterval = setInterval(() => fetchAppointments(hospitalId), 24 * 60 * 60 * 1000)
+        return () => clearInterval(dailyInterval)
       }, timeUntilMidnight)
-
-      // Cleanup the initial midnight timeout if the component unmounts
       return () => clearTimeout(midnightTimeout)
     } else {
-      // console.warn('No HospitalId in localStorage for fetching appointments')
       setAppointmentError('No appointments found for this Hospital Id')
       setLoadingAppointments(false)
     }
-  }, [fetchAppointments, fetchDoctors]) // Depend on fetchAppointments
+  }, [fetchAppointments, fetchDoctors])
 
-  // confirmed appointments count for today
-  const confirmedTodayCount = todayBookings.filter(
-    (item) => item.status?.toLowerCase() === 'confirmed',
-  ).length
-
-  // Slider settings for react-slick
   useEffect(() => {
-    // Clear existing interval
     clearInterval(intervalRef.current)
     if (slides.length === 0 || !sliderRef.current) return
-
     const handleSlide = () => {
       const currentSlide = slides[currentIndex.current]
       const isVideo = currentSlide.mediaUrlOrImage?.toLowerCase().endsWith('.mp4')
-
       if (isVideo) {
         const video = document.getElementById(`video-${currentIndex.current}`)
         if (video) {
@@ -314,89 +332,26 @@ const fetchPatients = useCallback(async (clinicId) => {
         }, 3000)
       }
     }
-
     handleSlide()
-
-    return () => {
-      clearInterval(intervalRef.current)
-    }
+    return () => clearInterval(intervalRef.current)
   }, [slides])
+
   const consultationTypeMap = {
     'Service & Treatment': 'services & treatments',
-    'Tele Consultation': ['tele consultation', 'online consultation'], // Map a single button to multiple backend values
+    'Tele Consultation': ['tele consultation', 'online consultation'],
     'In-clinic': 'in-clinic consultation',
   }
+
   const getMediaSrc = (src) => {
     if (!src) return ''
     if (src.startsWith('data:') || src.startsWith('http') || src.startsWith('blob:')) return src
-    if (src.toLowerCase().endsWith('.mp4')) return src // for external mp4 links
-    return `data:image/png;base64,${src}` // adjust type if JPG or SVG
+    if (src.toLowerCase().endsWith('.mp4')) return src
+    return `data:image/png;base64,${src}`
   }
 
-  const sliderSettings = {
-    dots: true,
-    infinite: slides.length > 1, // Only enable loop when more than 1
-    speed: 500,
-    slidesToShow: 1,
-    slidesToScroll: 1,
-    autoplay: true,
-    autoplaySpeed: 3000,
-    arrows: true,
-  }
+  const thStyle = { border: '1px solid black', padding: '8px', textAlign: 'center' }
+  const tdStyle = { border: '1px solid black', padding: '8px', textAlign: 'center' }
 
-  // Auto-slide for images
-  useEffect(() => {
-    let imageTimer
-    if (slides.length > 0) {
-      // Watch current slide index
-      const handleBeforeChange = (oldIndex, newIndex) => {
-        // Clear previous timer
-        clearTimeout(imageTimer)
-
-        const current = slides[newIndex]
-        const isVideo = isVideoFile(current.mediaUrlOrImage)
-
-        if (!isVideo) {
-          // For images: move to next after 3s
-          imageTimer = setTimeout(() => {
-            if (sliderRef.current) {
-              sliderRef.current.slickNext()
-            }
-          }, 1000)
-        }
-      }
-
-      // attach to slider events
-      sliderRef.current?.innerSlider?.list.addEventListener('transitionend', () => {
-        // optionally handle something after transition
-      })
-
-      // If using react-slick, you can get current index in afterChange
-      sliderRef.current?.props?.afterChange && sliderRef.current.props.afterChange(0)
-
-      return () => {
-        clearTimeout(imageTimer)
-      }
-    }
-  }, [slides])
-
-  // After component mounts, attach ended listeners for each video
-  useEffect(() => {
-    slides.forEach((item, idx) => {
-      const videoEl = document.getElementById(`video-${idx}`)
-      if (videoEl) {
-        // Clean up previous listener
-        videoEl.onended = null
-        videoEl.onended = () => {
-          if (sliderRef.current) {
-            sliderRef.current.slickNext()
-          }
-        }
-      }
-    })
-  }, [slides])
-
-  // Helper to check if it's video
   const isVideoFile = (src) => {
     if (!src) return false
     const lower = src.toLowerCase()
@@ -405,362 +360,396 @@ const fetchPatients = useCallback(async (clinicId) => {
       lower.endsWith('.mp4') ||
       lower.endsWith('.webm') ||
       lower.endsWith('.ogg') ||
-      lower.includes('video') // fallback if backend sends mime type
+      lower.includes('video')
     )
   }
+
+  useEffect(() => {
+    if (printData) {
+      const timer = setTimeout(() => {
+        window.print()
+        setTimeout(() => setPrintData(null), 300)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [printData])
+
+  const handlePrint = (item) => {
+    setPrintData(item)
+  }
+
+  // ── Filter button styles (matching pm-* aesthetic) ────────────────────────
+  const filterBtnBase = {
+    fontSize: '12px',
+    fontWeight: '500',
+    padding: '5px 13px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    lineHeight: '1.5',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '5px',
+    whiteSpace: 'nowrap',
+    transition: 'background 0.15s, color 0.15s',
+    border: '0.5px solid #d0dce9',
+  }
+
+  const filterBtnActive = {
+    ...filterBtnBase,
+    backgroundColor: '#185fa5',
+    color: '#fff',
+    border: '0.5px solid #185fa5',
+    boxShadow: '0 2px 8px rgba(24,95,165,0.18)',
+  }
+
+  const filterBtnInactive = {
+    ...filterBtnBase,
+    backgroundColor: '#f0f5fb',
+    color: '#374151',
+  }
+
   return (
     <>
-      {/*to display cards*/}
-      <CRow className={props.className} xs={{ gutter: 4 }}>
-        <CCol sm={6} xl={4}>
-          <CWidgetStatsA
-            color="info"
-            value={totalAppointmentsCount}
-            title="Total Appointments"
-            action={
-              <CDropdown alignment="end">
-                <CDropdownToggle color="transparent" caret={false} className="p-0">
-                  <CIcon icon={cilOptions} className="text-high-emphasis-inverse" />
-                </CDropdownToggle>
-                <CDropdownMenu>
-                  <CDropdownItem onClick={() => navigate('/appointment-management')}>
-                    View All Appointments
-                  </CDropdownItem>{' '}
-                  {/* Link to your appointments page */}
-                  <CDropdownItem>Export</CDropdownItem>
-                </CDropdownMenu>
-              </CDropdown>
-            }
-            chart={
-              <CChartLine
-                ref={widgetChartRef1}
-                className="mt-3 mx-3"
-                style={{ height: '70px' }}
-                data={{
-                  labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                  datasets: [
-                    {
-                      label: 'Appointments',
-                      backgroundColor: 'transparent',
-                      borderColor: 'rgba(255,255,255,.55)',
-                      pointBackgroundColor: getStyle('--cui-primary'),
-                      data: [30, 50, 40, 60, 55, 65, 70],
-                    },
-                  ],
-                }}
-                options={{
-                  plugins: { legend: { display: false } },
-                  maintainAspectRatio: false,
-                  scales: { x: { display: false }, y: { display: false } },
-                  elements: { line: { tension: 0.4 }, point: { radius: 0 } },
-                }}
-              />
-            }
-          />
-        </CCol>
+      {/* ── TODAY'S APPOINTMENTS SECTION ─────────────────────────────────── */}
+      <div className="container mt-3">
 
-        <CCol sm={6} xl={4}>
-          <CWidgetStatsA
-            color="success"
-            value={totalPatientsCount}
-            title="Total Patients"
-            action={
-              <CDropdown alignment="end">
-                <CDropdownToggle color="transparent" caret={false} className="p-0">
-                  <CIcon icon={cilOptions} className="text-high-emphasis-inverse" />
-                </CDropdownToggle>
-                <CDropdownMenu>
-                  <CDropdownItem onClick={() => navigate('/patient-management')}>
-                    View All Patients
-                  </CDropdownItem>{' '}
-                  <CDropdownItem>Export</CDropdownItem>
-                </CDropdownMenu>
-              </CDropdown>
-            }
-            chart={
-              <CChartLine
-                ref={widgetChartRef2}
-                className="mt-3 mx-3"
-                style={{ height: '70px' }}
-                data={{
-                  labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                  datasets: [
-                    {
-                      label: 'Patients',
-                      backgroundColor: 'transparent',
-                      borderColor: 'rgba(255,255,255,.55)',
-                      pointBackgroundColor: getStyle('--cui-success'),
-                       data: [100, 150, 130, 180, 170, 190, 200],
-                    },
-                  ],
-                }}
-                options={{
-                  plugins: { legend: { display: false } },
-                  maintainAspectRatio: false,
-                  scales: { x: { display: false }, y: { display: false } },
-                  elements: { line: { tension: 0.4 }, point: { radius: 0 } },
-                }}
-              />
-            }
-          />
-        </CCol>
-
-        <CCol sm={6} xl={4}>
-          <CWidgetStatsA
-            color="warning"
-            value={totalDoctorsCount}
-            title="Total Doctors"
-            action={
-              <CDropdown alignment="end">
-                <CDropdownToggle color="transparent" caret={false} className="p-0">
-                  <CIcon icon={cilOptions} className="text-high-emphasis-inverse" />
-                </CDropdownToggle>
-                <CDropdownMenu>
-                  <CDropdownItem onClick={() => navigate('/employee-management/doctor')}>
-                    View All Doctors
-                  </CDropdownItem>{' '}
-                  <CDropdownItem>Export</CDropdownItem>
-                </CDropdownMenu>
-              </CDropdown>
-            }
-            chart={
-              <CChartLine
-                ref={widgetChartRef3}
-                className="mt-3 mx-3"
-                style={{ height: '70px' }}
-                data={{
-                  labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                  datasets: [
-                    {
-                      label: 'Doctors',
-                      backgroundColor: 'transparent',
-                      borderColor: 'rgba(255,255,255,.55)',
-                      pointBackgroundColor: getStyle('--cui-warning'),
-                      data: [10, 12, 13, 15, 14, 16, 17],
-                    },
-                  ],
-                }}
-                options={{
-                  plugins: { legend: { display: false } },
-                  maintainAspectRatio: false,
-                  scales: { x: { display: false }, y: { display: false } },
-                  elements: { line: { tension: 0.4 }, point: { radius: 0 } },
-                }}
-              />
-            }
-          />
-        </CCol>
-      </CRow>
-
-      {/* Carousel Section */}
-      <CCard
-        className="mt-4 text-center border-2 border-dashed rounded"
-        style={{ backgroundColor: 'var(--color-bgcolor)' }}
-      >
-        <CCardBody className="fw-bold fs-5 " style={{ color: 'var(--color-black)' }}>
-          Ad Space
-        </CCardBody>
-      </CCard>
-
-      {/*to display today Appointments Table */}
-      <div className="container mt-4 ">
-        <h5 className="mb-4">Today Appointments</h5>
-        <div className="row">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            {/* Left side buttons */}
-            <div className="d-flex gap-2">
-              <CButton
-                style={{ backgroundColor: 'var(--color-black)', color: COLORS.white }}
-                onClick={() => {
-                  setSelectedServiceTypes([])
-                  setSelectedConsultationTypes([])
-                  setFilterTypes([])
-                  setStatusFilters([])
-                }}
-              >
-                All
-              </CButton>
-
-              <button
-                onClick={() => toggleFilter('Service & Treatment')}
-                className={`btn ${
-                  filterTypes.includes('Service & Treatment') ? 'btn-selected' : 'btn-unselected'
-                }`}
-              >
-                Service & Treatment
-              </button>
-
-              <button
-                onClick={() => toggleFilter('In-clinic')}
-                className={`btn ${
-                  filterTypes.includes('In-clinic') ? 'btn-selected' : 'btn-unselected'
-                }`}
-              >
-                In-Clinic Consultation
-              </button>
-
-              {/* <button
-                onClick={() => toggleFilter('Tele Consultation')}
-                className={`btn ${
-                  filterTypes.includes('Tele Consultation') ? 'btn-selected' : 'btn-unselected'
-                }`}
-              >
-                Tele Consultation
-              </button> */}
+        {/* ── Page Header (matches pm-page-header) ─────────────────────── */}
+        <div className="wd-page-header">
+          <div className="wd-page-title-group">
+            <div className="wd-page-icon">
+              {/* Calendar SVG icon */}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
             </div>
-            {/* Right side reset button */}
-            {/* {!showAppointments && (
-              <CButton
-                style={{ backgroundColor: 'var(--color-black)', color: 'white' }}
-                onClick={() => setShowAppointments(true)}
-              >
-                Active Appointments ({inprogressApt?.length || 0})
-              </CButton>
-            )} */}
+            <div>
+              <h4 className="wd-page-title">Today's Appointments</h4>
+              <p className="wd-page-sub">{todayBookings.length} appointment{todayBookings.length !== 1 ? 's' : ''} found</p>
+            </div>
+          </div>
 
-            {/* Conditionally render table inside dashboard */}
-            {/* {showAppointments && (
-              <ActiveAppointmentsScreen
-                inprogressApt={inprogressApt}
-                onBack={() => setShowAppointments(false)}
-              />
-            )} */}
-            <CButton
-              className="mx-2"
-              style={{ backgroundColor: 'var(--color-black)', color: COLORS.white }}
-              onClick={() => navigate('/in-progress')}
-            >
-              Active Appointments
-            </CButton>
+          <div className="cm-search-wrapper">
+            <Search size={14} className="cm-search-icon-left" />
+            <input
+              type="text"
+              placeholder="Search bookings, patients..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="cm-search-input"
+            />
+            {searchQuery && (
+              <button className="cm-search-clear" onClick={() => setSearchQuery('')}>
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* ── Right side: filter buttons + nav buttons ───────────────── */}
+          <div className="wd-header-right">
+            {/* Status filter buttons */}
+            <button style={statusFilter === '' ? filterBtnActive : filterBtnInactive} onClick={() => setStatusFilter('')}>All</button>
+            <button style={statusFilter === 'confirmed' ? filterBtnActive : filterBtnInactive} onClick={() => setStatusFilter('confirmed')}>Confirmed</button>
+            <button style={statusFilter === 'pending' ? filterBtnActive : filterBtnInactive} onClick={() => setStatusFilter('pending')}>Pending</button>
+
+            {/* Divider */}
+            <div className="wd-divider" />
+
+            {/* Search Patients */}
+            <button className="wd-nav-btn" onClick={() => navigate('/Patient-Management')}>
+              <span className="wd-count-badge">{totalPatientsCount}</span>
+              Search Patients
+              <CIcon icon={cilArrowRight} style={{ width: '13px', height: '13px' }} />
+            </button>
+
+
+
+            {/* Search Doctors */}
+            {
+              role?.toLowerCase() === "admin" && (
+                <button
+                  className="wd-nav-btn"
+                  onClick={() => navigate('/employee-management/doctor')}
+                >
+                  <span className="wd-count-badge">{totalDoctorsCount}</span>
+
+                  Search Doctors
+
+                  <CIcon
+                    icon={cilArrowRight}
+                    style={{ width: '13px', height: '13px' }}
+                  />
+                </button>
+              )
+            }
+
+            {/* Attendance Tracker */}
+            <button className="wd-nav-btn" onClick={() => navigate('/attendance-tracker')} style={{ backgroundColor: '#185fa5', color: '#fff', border: 'none' }}>
+              Attendance Tracker
+              <CIcon icon={cilArrowRight} style={{ width: '13px', height: '13px', color: '#fff' }} />
+            </button>
           </div>
         </div>
 
-        <CTable striped hover responsive>
-          <CTableHead className="pink-table">
-            <CTableRow>
-              <CTableHeaderCell>S.No</CTableHeaderCell>
-              <CTableHeaderCell>Patient File_ID</CTableHeaderCell>
-              <CTableHeaderCell>Name</CTableHeaderCell>
-              <CTableHeaderCell>Doctor Name</CTableHeaderCell>
-              <CTableHeaderCell>Consultation Type</CTableHeaderCell>
-              <CTableHeaderCell>Date</CTableHeaderCell>
-              <CTableHeaderCell>Time</CTableHeaderCell>
-              <CTableHeaderCell>Status</CTableHeaderCell>
-              <CTableHeaderCell>Action</CTableHeaderCell>
-            </CTableRow>
-          </CTableHead>
-
-          <CTableBody>
-            {loadingAppointments ? (
+        {/* ── TABLE (matches pm-table-wrapper / pm-table) ───────────────── */}
+        <div className="wd-table-wrapper">
+          <CTable className="wd-table">
+            <CTableHead>
               <CTableRow>
-                <CTableDataCell
-                  colSpan="9"
-                  className="text-center"
-                  style={{ color: 'var(--color-black)' }}
-                >
-                  <LoadingIndicator message="Loading appointments..." />
-                </CTableDataCell>
+                <CTableHeaderCell className="wd-th" style={{ width: 52 }}>S.No</CTableHeaderCell>
+                <CTableHeaderCell className="wd-th">Booking Id</CTableHeaderCell>
+                <CTableHeaderCell className="wd-th">Patient File ID</CTableHeaderCell>
+                <CTableHeaderCell className="wd-th">Name</CTableHeaderCell>
+                <CTableHeaderCell className="wd-th">Doctor Name</CTableHeaderCell>
+                <CTableHeaderCell className="wd-th">Date</CTableHeaderCell>
+                <CTableHeaderCell className="wd-th">Time</CTableHeaderCell>
+                <CTableHeaderCell className="wd-th">Visit Type</CTableHeaderCell>
+                <CTableHeaderCell className="wd-th"  >Payment Type</CTableHeaderCell>
+                <CTableHeaderCell className="wd-th">Status</CTableHeaderCell>
+                <CTableHeaderCell className="wd-th" style={{ width: 100 }}>Action</CTableHeaderCell>
               </CTableRow>
-            ) : appointmentError ? (
-              <CTableRow>
-                <CTableDataCell
-                  colSpan="9"
-                  className="text-center "
-                  style={{ color: 'var(--color-black)' }}
-                >
-                  {appointmentError}
-                </CTableDataCell>
-              </CTableRow>
-            ) : (
-              (() => {
-                // 1. Filter by status (Confirmed appointments)
-                const confirmed = todayBookings.filter(
-                  (item) => item.status?.toLowerCase() === 'confirmed',
-                )
+            </CTableHead>
 
-                // 2. Filter by consultation type
-                const filteredByTypes = confirmed.filter((item) => {
-                  if (filterTypes.length === 0) {
-                    return true
-                  }
-                  const itemType = item.consultationType?.toLowerCase().trim()
-                  return filterTypes.some((type) => {
-                    const mappedValues = consultationTypeMap[type]
-                    if (Array.isArray(mappedValues)) {
-                      return mappedValues.some((val) => itemType === val.toLowerCase().trim())
-                    } else {
-                      return itemType === mappedValues.toLowerCase().trim()
-                    }
-                  })
-                })
-
-                // 3. Apply global search filter to the result
-                const finalFilteredData = filteredByTypes.filter((item) => {
-                  if (searchQuery.trim().length < 2) {
-                    return true
-                  }
-                  return Object.values(item).some((val) =>
-                    normalize(val).includes(normalize(searchQuery)),
-                  )
-                })
-
-                // 4. Handle no results found
-                if (finalFilteredData.length === 0) {
-                  return (
-                    <CTableRow>
-                      <CTableDataCell
-                        colSpan="9"
-                        className="text-center"
-                        style={{ color: 'var(--color-black)' }}
+            <CTableBody>
+              {loadingAppointments ? (
+                <CTableRow>
+                  <CTableDataCell colSpan="9" className="text-center wd-td" style={{ padding: '32px 0' }}>
+                    <LoadingIndicator message="Loading appointments..." />
+                  </CTableDataCell>
+                </CTableRow>
+              ) : appointmentError ? (
+                <CTableRow>
+                  <CTableDataCell colSpan="9" className="wd-td">
+                    <div
+                      className="wd-empty"
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        textAlign: "center",
+                        padding: "20px",
+                      }}
+                    >
+                      <svg
+                        width="40"
+                        height="40"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="wd-empty-icon"
                       >
-                        {searchQuery || filterTypes.length > 0
-                          ? 'No appointments match your search and filters.'
-                          : 'No appointments for today.'}
-                      </CTableDataCell>
-                    </CTableRow>
-                  )
-                }
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
 
-                // 5. Render the filtered data
-                return finalFilteredData
-                  .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-                  .map((item, index) => (
-                    <CTableRow key={`${item.id}-${index}`} className="pink-table">
-                      <CTableDataCell>{(currentPage - 1) * pageSize + index + 1}</CTableDataCell>
-                      <CTableDataCell>{item.patientId}</CTableDataCell>
-                      <CTableDataCell>{item.name}</CTableDataCell>
-                      <CTableDataCell>{item.doctorName}</CTableDataCell>
-                      <CTableDataCell>{item.consultationType}</CTableDataCell>
-                      <CTableDataCell>{item.serviceDate}</CTableDataCell>
-                      <CTableDataCell>{item.slot || item.servicetime}</CTableDataCell>
-                      <CTableDataCell>
-                        <CBadge
-                          style={{ backgroundColor: 'var(--color-black)', color: COLORS.white }}
+                      <p>{appointmentError}</p>
+                    </div>
+                  </CTableDataCell>
+                </CTableRow>
+              ) : (
+                (() => {
+                  // 1. Filter by status
+                  const filteredByStatus = todayBookings.filter((item) => {
+                    if (!statusFilter) return true
+                    return item.status?.toLowerCase() === statusFilter
+                  })
+
+                  // 2. Filter by consultation type
+                  const filteredByTypes = filteredByStatus.filter((item) => {
+                    if (filterTypes.length === 0) return true
+                    const itemType = item.consultationType?.toLowerCase().trim()
+                    return filterTypes.some((type) => {
+                      const mappedValues = consultationTypeMap[type]
+                      if (Array.isArray(mappedValues)) {
+                        return mappedValues.some((val) => itemType === val.toLowerCase().trim())
+                      } else {
+                        return itemType === mappedValues.toLowerCase().trim()
+                      }
+                    })
+                  })
+
+                  // 3. Global search filter
+                  const finalFilteredData = filteredByTypes.filter((item) => {
+                    if (searchQuery.trim().length < 2) return true
+                    return Object.values(item).some((val) =>
+                      normalize(val).includes(normalize(searchQuery)),
+                    )
+                  })
+
+                  // 4. No results
+                  if (finalFilteredData.length === 0) {
+                    return (
+                      <CTableRow>
+                        <CTableDataCell
+                          colSpan="10"
+                          style={{
+                            color: 'var(--color-black)',
+                            padding: '40px 0',
+                            fontSize: '15px',
+                            fontWeight: '500',
+                          }}
                         >
-                          {statusLabelMap[item.status] || item.status}
-                        </CBadge>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <CButton
-                          style={{ backgroundColor: 'var(--color-black)' }}
-                          className="text-white"
-                          size="sm"
-                          onClick={() =>
-                            navigate(`/appointment-details/${item.bookingId}`, {
-                              state: { appointment: item },
-                            })
-                          }
-                        >
-                          View
-                        </CButton>
-                      </CTableDataCell>
-                    </CTableRow>
-                  ))
-              })()
-            )}
-          </CTableBody>
-        </CTable>
+                          <div
+                            className="d-flex flex-column align-items-center justify-content-center"
+                            style={{ textAlign: 'center' }}
+                          >
+                            <Search size={40} className="mb-2 text-muted" style={{ opacity: 0.3 }} />
+                            No appointments match your search and filters.
+                          </div>
+                        </CTableDataCell>
+                      </CTableRow>
+
+                    )
+                  }
+
+                  // 5. Render rows
+                  return finalFilteredData
+                    .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                    .map((item, index) => {
+                      const statusKey = statusLabelMap[item.status] || item.status
+                      const statusStyle = statusColorMap[item.status] || { bg: '#f0f5fb', color: '#374151', border: '#d0dce9' }
+                      return (
+                        <CTableRow key={`${item.id}-${index}`} className="wd-tr">
+                          <CTableDataCell className="wd-td wd-td-num">
+                            {(currentPage - 1) * pageSize + index + 1}
+                          </CTableDataCell>
+                          <CTableDataCell className="wd-td">
+                            <span className="wd-booking-id">{item.bookingId || '-'}</span>
+                          </CTableDataCell>
+                          <CTableDataCell className="wd-td">
+                            {item.patientId || '-'}
+                          </CTableDataCell>
+                          <CTableDataCell className="wd-td">
+                            <span className="wd-name">{item.name}</span>
+                          </CTableDataCell>
+                          <CTableDataCell className="wd-td">
+                            {item.doctorName}
+                          </CTableDataCell>
+                          <CTableDataCell className="wd-td">
+                            {item.serviceDate}
+                          </CTableDataCell>
+                          <CTableDataCell className="wd-td">
+                            {item.slot || item.servicetime}
+                          </CTableDataCell>
+                          <CTableDataCell className="wd-td">
+                            {item.slot || item.visitType}
+                          </CTableDataCell><CTableDataCell className="wd-td">
+                            {item.paymentType}
+                          </CTableDataCell>
+                          <CTableDataCell className="wd-td" style={{ position: 'relative', overflow: 'visible' }}>
+                            {item.status?.toLowerCase() === 'pending' ? (
+                              <div
+                                className="wd-pay-dropdown"
+                                ref={openPayDropdown === item.bookingId ? payDropdownRef : null}
+                              >
+                                <button
+                                  className="wd-pay-trigger"
+                                  onClick={() => setOpenPayDropdown(openPayDropdown === item.bookingId ? null : item.bookingId)}
+                                >
+                                  <span className="wd-pay-dot" />
+                                  Confirm Payment
+                                  <svg className={`wd-pay-chevron${openPayDropdown === item.bookingId ? ' open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                    <polyline points="6 9 12 15 18 9" />
+                                  </svg>
+                                </button>
+                                {openPayDropdown === item.bookingId && (
+                                  <div className="wd-pay-menu">
+                                    {[
+                                      { label: 'Cash', icon: '💵', desc: 'Physical currency' },
+                                      { label: 'Card', icon: '💳', desc: 'Debit / Credit' },
+                                      { label: 'UPI', icon: '📲', desc: 'GPay / PhonePe' },
+                                    ].map((opt) => (
+                                      <button
+                                        key={opt.label}
+                                        className="wd-pay-option"
+                                        onClick={() => {
+                                          setOpenPayDropdown(null)
+                                          setConfirmData({ bookingId: item.bookingId, paymentType: opt.label })
+                                          setShowConfirm(true)
+                                        }}
+                                      >
+                                        <span className="wd-pay-opt-icon">{opt.icon}</span>
+                                        <span className="wd-pay-opt-text">
+                                          <span className="wd-pay-opt-label">{opt.label}</span>
+                                          <span className="wd-pay-opt-desc">{opt.desc}</span>
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span
+                                className="wd-status-badge"
+                                style={{
+                                  background: statusStyle.bg,
+                                  color: statusStyle.color,
+                                  border: `0.5px solid ${statusStyle.border}`,
+                                }}
+                              >
+                                {statusKey}
+                              </span>
+                            )}
+                          </CTableDataCell>
+                          <CTableDataCell className="wd-td">
+                            <div className="wd-actions">
+                              <button
+                                className="wd-action-btn view"
+                                title="View"
+                                onClick={() =>
+                                  navigate(`/appointment-details/${item.bookingId}`, {
+                                    state: { appointment: item },
+                                  })
+                                }
+                              >
+                                <Eye size={14} />
+                              </button>
+                              <button
+                                className="wd-action-btn print"
+                                title="Print"
+                                onClick={() => handlePrint(item)}
+                              >
+                                <Printer size={14} />
+                              </button>
+                            </div>
+                          </CTableDataCell>
+                        </CTableRow>
+                      )
+                    })
+                })()
+              )}
+            </CTableBody>
+          </CTable>
+        </div>
+
+        <ConfirmationModal
+          isVisible={showConfirm}
+          title="Confirm Payment"
+          message={`Are you sure you want to confirm payment via ${confirmData.paymentType}?`}
+          confirmText="Confirm"
+          confirmColor={COLORS.primary}
+          onConfirm={() => {
+            handlePaymentUpdate(confirmData.bookingId, confirmData.paymentType)
+            setShowConfirm(false)
+          }}
+          onCancel={() => setShowConfirm(false)}
+        />
       </div>
+
+      {/* ── ADMIN CARDS ───────────────────────────────────────────────────── */}
+      {role?.toLowerCase() === 'admin' && (
+        <CRow className={props.className} xs={{ gutter: 4 }} />
+      )}
+
+      {/* ── PAGINATION ───────────────────────────────────────────────────── */}
       {todayBookings.length > 0 && (
         <Pagination
           currentPage={currentPage}
@@ -770,6 +759,301 @@ const fetchPatients = useCallback(async (clinicId) => {
           onPageSizeChange={setPageSize}
         />
       )}
+
+      {/* ── PRINT AREA ───────────────────────────────────────────────────── */}
+      <div
+        id="print-area"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          background: 'white',
+          zIndex: 9999,
+          display: printData ? 'block' : 'none',
+        }}
+      >
+        {printData && <PrintContent data={printData} />}
+      </div>
+
+      {/* ── STYLES ───────────────────────────────────────────────────────── */}
+      <style>{`
+        /* ── Page Header ─────────────────────────── */
+        .wd-page-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-bottom: 18px;
+          padding-bottom: 14px;
+          border-bottom: 0.5px solid #d0dce9;
+        }
+        .wd-page-title-group {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .wd-page-icon {
+          width: 42px;
+          height: 42px;
+          border-radius: 10px;
+          background: #e6f1fb;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #185fa5;
+          flex-shrink: 0;
+        }
+        .wd-page-title {
+          font-size: 17px;
+          font-weight: 600;
+          color: #0c447c;
+          margin: 0;
+        }
+        .wd-page-sub {
+          font-size: 12px;
+          color: #6b7280;
+          margin: 0;
+        }
+
+        /* ── Header right cluster ────────────────── */
+        .wd-header-right {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+        .wd-divider {
+          width: 1px;
+          height: 22px;
+          background: #d0dce9;
+          margin: 0 4px;
+        }
+
+
+        /* ── Nav buttons (Search Patients / Doctors) ─ */
+        .wd-nav-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: #f0f5fb;
+          color: #374151;
+          border: 0.5px solid #d0dce9;
+          border-radius: 6px;
+          padding: 5px 13px;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: background 0.15s;
+        }
+        .wd-nav-btn:hover { background: #e6f1fb; color: #185fa5; }
+
+        .wd-count-badge {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          background: #e6f1fb;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          color: #185fa5;
+          font-size: 11px;
+          flex-shrink: 0;
+        }
+
+        /* ── Table wrapper ───────────────────────── */
+        .wd-table-wrapper {
+          border: 0.5px solid #d0dce9;
+          border-radius: 10px;
+          overflow: visible;
+          margin-bottom: 12px;
+        }
+        /* Restore rounded corners on first/last rows since overflow:visible removes clip */
+        .wd-table thead tr:first-child th:first-child { border-top-left-radius: 10px; }
+        .wd-table thead tr:first-child th:last-child  { border-top-right-radius: 10px; }
+        .wd-table { margin-bottom: 0 !important; font-size: 13px; }
+
+        /* ── Table header ────────────────────────── */
+        .wd-th {
+          background: #185fa5 !important;
+          color: #fff !important;
+          font-size: 12px !important;
+          font-weight: 600 !important;
+          padding: 11px 14px !important;
+          white-space: nowrap;
+          border: none !important;
+          vertical-align: middle !important;
+        }
+
+        /* ── Table rows ──────────────────────────── */
+        .wd-tr { transition: background 0.12s; }
+        .wd-tr:hover { background: #f0f5fb !important; }
+        .wd-td {
+          padding: 11px 14px !important;
+          vertical-align: middle !important;
+          font-size: 13px;
+          color: #374151;
+          border-bottom: 0.5px solid #eef2f7 !important;
+          border-top: none !important;
+        }
+        .wd-td-num { color: #9ca3af; font-size: 12px; }
+
+        /* ── Booking ID chip ─────────────────────── */
+        .wd-booking-id {
+          background: #e6f1fb;
+          color: #185fa5;
+          border: 0.5px solid #b5d4f4;
+          border-radius: 20px;
+          font-size: 11px;
+          font-weight: 600;
+          padding: 2px 9px;
+          white-space: nowrap;
+        }
+
+        /* ── Patient name ────────────────────────── */
+        .wd-name {
+          font-weight: 600;
+          color: #0c447c;
+          font-size: 13px;
+        }
+
+        /* ── Status badge ────────────────────────── */
+        .wd-status-badge {
+          border-radius: 20px;
+          font-size: 11px;
+          font-weight: 600;
+          padding: 3px 10px;
+          white-space: nowrap;
+          display: inline-block;
+        }
+
+        /* ── Action buttons ──────────────────────── */
+        .wd-actions {
+          display: flex;
+          gap: 6px;
+          align-items: center;
+        }
+        .wd-action-btn {
+          width: 30px;
+          height: 30px;
+          border-radius: 7px;
+          border: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: filter 0.12s, transform 0.1s;
+          flex-shrink: 0;
+        }
+        .wd-action-btn.view  { background: #e6f1fb; color: #185fa5; }
+        .wd-action-btn.print { background: #eaf3de; color: #3b6d11; }
+        .wd-action-btn:hover  { filter: brightness(0.9); transform: scale(1.07); }
+        .wd-action-btn:active { transform: scale(0.94); }
+
+        /* ── Custom payment dropdown ─────────────── */
+        .wd-pay-dropdown {
+          position: relative;
+          display: inline-block;
+        }
+        .wd-pay-trigger {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 5px 11px;
+          border-radius: 20px;
+          border: 1px solid #f0d080;
+          background: #fffbea;
+          color: #92680a;
+          font-size: 11.5px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: all 0.15s;
+          outline: none;
+        }
+        .wd-pay-trigger:hover {
+          background: #fff3c4;
+          border-color: #e6b800;
+          box-shadow: 0 2px 8px rgba(230,184,0,0.2);
+        }
+        .wd-pay-dot {
+          width: 7px; height: 7px;
+          border-radius: 50%;
+          background: #f59e0b;
+          flex-shrink: 0;
+          animation: pulse-dot 1.5s infinite;
+        }
+        @keyframes pulse-dot {
+          0%,100% { opacity:1; transform:scale(1); }
+          50%      { opacity:0.5; transform:scale(1.4); }
+        }
+        .wd-pay-chevron {
+          width: 13px; height: 13px;
+          transition: transform 0.2s;
+          flex-shrink: 0;
+        }
+        .wd-pay-chevron.open { transform: rotate(180deg); }
+
+        .wd-pay-menu {
+          position: absolute;
+          top: calc(100% + 6px);
+          left: 0;
+          z-index: 999;
+          background: #fff;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+          min-width: 190px;
+          padding: 6px;
+          animation: wd-dropdown-in 0.15s ease;
+        }
+        @keyframes wd-dropdown-in {
+          from { opacity:0; transform:translateY(-6px); }
+          to   { opacity:1; transform:translateY(0); }
+        }
+        .wd-pay-option {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          width: 100%;
+          padding: 8px 10px;
+          border: none;
+          background: transparent;
+          border-radius: 8px;
+          cursor: pointer;
+          text-align: left;
+          transition: background 0.12s;
+        }
+        .wd-pay-option:hover { background: #f0f5fb; }
+        .wd-pay-opt-icon {
+          font-size: 18px;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #f0f5fb;
+          border-radius: 8px;
+          flex-shrink: 0;
+        }
+        .wd-pay-opt-text {
+          display: flex;
+          flex-direction: column;
+          gap: 1px;
+        }
+        .wd-pay-opt-label {
+          font-size: 12.5px;
+          font-weight: 600;
+          color: #1a2e44;
+        }
+        .wd-pay-opt-desc {
+          font-size: 10.5px;
+          color: #9ca3af;
+        }
+      `}</style>
     </>
   )
 }

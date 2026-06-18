@@ -1,6 +1,7 @@
 package com.clinicadmin.feignclient;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.ResponseEntity;
@@ -67,7 +68,7 @@ public interface BookingFeign {
 	public ResponseEntity<ResponseStructure<List<BookingResponse>>> getAllBookedServicesByBranchId(@PathVariable String branchId);
 	
 	@GetMapping("/api/v1/getBookedServicesByClinicIdWithBranchId/{clinicId}/{branchId}")
-	public ResponseEntity<ResponseStructure<List<BookingResponse>>> getBookedServicesByClinicIdWithBranchId(
+	public ResponseEntity<ResponseStructure<List<Map<String,Object>>>> getBookedServicesByClinicIdWithBranchId(
 	        @PathVariable String clinicId,
 	        @PathVariable String branchId);
 	
@@ -78,7 +79,7 @@ public interface BookingFeign {
 	public ResponseEntity<?> retrieveAppointnmentsByServiceDate(@PathVariable String clinicId,@PathVariable String branchId,@PathVariable String date);
 	
 	@PutMapping("/api/v1/update/bookingId")
-	public ResponseEntity<?> updateAppointmentBasedOnBookingId(@RequestBody BookingResponse bookingResponse );
+	public ResponseEntity<ResponseStructure<BookingResponse>>  updateAppointmentBasedOnBookingId(@RequestBody BookingResponse bookingResponse );
 	
 	@PostMapping("/api/v1/appointments/serviceDate/serviceTime/DoctorId")
 	public BookingResponse blockingSlot(@RequestBody TempBlockingSlot temp);
@@ -90,7 +91,7 @@ public interface BookingFeign {
 	public ResponseEntity<ResponseStructure<List<BookingResponse>>> getBookingByPatientId(@PathVariable String patientId);
 	
 	@PostMapping("/api/v1/bookService")
-	public ResponseEntity<ResponseStructure<BookingResponse>> bookService(@RequestBody BookingRequset req);
+	public ResponseEntity<ResponseStructure<BookingResponse>> bookService(@RequestBody BookingResponse req);
 	
 	@GetMapping("/api/v1/appointments/Inprogress/patientId/{patientId}")
 	public ResponseEntity<?> getInprogressAppointmentsByPatientId(@PathVariable String patientId);
@@ -98,4 +99,59 @@ public interface BookingFeign {
 	@GetMapping("/api/v1/appointments/Inprogress/patientId/{patientId}/{clinicId}")
 	public ResponseEntity<?> getInprogressAppointmentsByPatientIdAndClinicId(@PathVariable String patientId,@PathVariable String clinicId );
 	
+	
+	@GetMapping("/api/v1/report/{clinicId}/{branchId}/{number}/{startDate}/{endDate}")
+	public ResponseEntity<Response> getReport(
+			@PathVariable String clinicId,
+			@PathVariable String branchId,
+			@PathVariable Integer number,
+			@PathVariable String startDate,
+			@PathVariable String endDate);
+	
+	@PostMapping("/api/v1/bookPhysioAppointment")
+	public  ResponseEntity<Response> bookPhysioAppointment(@RequestBody BookingRequset req);
+	
+	  @GetMapping("/api/v1/today/{clinicId}/{branchId}")
+	    public ResponseEntity<Response> getTodayPhysioBookings(
+	            @PathVariable String clinicId,
+	            @PathVariable String branchId);
+	  
+	  @GetMapping("/api/v1/upcoming/{clinicId}/{branchId}/{option}")
+	    public ResponseEntity<Response> getUpcomingBookings(
+	    		  @PathVariable String clinicId,
+	    		  @PathVariable String branchId,
+	    		  @PathVariable int option);
+	  
+	  @GetMapping("/api/v1//basedOnDate/{clinicId}/{branchId}/{date}")
+	    public ResponseEntity<Response> getPhysioBookingBasedOnDate(
+	            @PathVariable String clinicId,
+	            @PathVariable String branchId,
+	            @PathVariable String date);
+	  
+	  @GetMapping("/api/v1/customeRange/{clinicId}/{branchId}/{start}/{end}")
+	    public ResponseEntity<Response> getPhysioBookingsByCustomeRange(
+	            @PathVariable String clinicId,
+	            @PathVariable String branchId,
+	            @PathVariable String start,
+	            @PathVariable String end);
+	  
+	  @GetMapping("/api/v1/getBookingById/{bookingId}")
+	    public ResponseEntity<Response> getBookingById(@PathVariable String bookingId);
+	    
+	  
+	  @GetMapping("/api/v1/getTodayBookings/{clincId}/{branchId}")
+		public ResponseEntity<ResponseStructure<List<Map<String,Object>>>> getTodayBookings(@PathVariable String clincId,@PathVariable String branchId);
+		
+	  
+	  @GetMapping("/api/v1/in-progress/appointments/{patientId}/{bookingId}")
+		public ResponseEntity<?> getInProgressAppointmentByPatientIdAndBookingId(@PathVariable String patientId,@PathVariable String bookingId);
+		
+	  @GetMapping("/api/v1/reports/patientId/{patientId}")
+	    public ResponseEntity<Response> getReportsByPatientId(@PathVariable String patientId);
+	 
+	  @GetMapping("/api/v1/deleteReport/{bookingId}/{index}")
+	    public void deleteReport(@PathVariable String bookingId,@PathVariable String index);
+	  
+	  
+	   	  
 }

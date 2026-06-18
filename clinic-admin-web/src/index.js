@@ -14,7 +14,7 @@ import { attachInterceptors } from './Utils/Interceptors' // <-- interceptor fil
 import './views/Style/toastify.css'
 import { NavigationProvider } from './views/Usecontext/NavigationProvider'
 import { BrowserRouter } from 'react-router-dom'
-import { MedicineProvider } from './Context/MedicineContext'
+// import { MedicineProvider } from './Context/MedicineContext'
 import EmployeeList from './views/pages/attendance/EmployeeList'
 import AttendanceMenu from './views/pages/attendance/AttendanceMenu'
 import 'bootstrap/dist/css/bootstrap.min.css'
@@ -23,13 +23,15 @@ import BodyAssessment from './views/AppointmentManagement/BodyAssessment'
 import TherapistDashboard from './views/EmployeeManagement/Therapist/TherapistDashboard'
 import TherapyExercisesForm from './views/EmployeeManagement/Therapist/TherapyExercise'
 import ExerciseTable from './views/EmployeeManagement/Therapist/TherapyExercise'
+import { COLORS } from './Constant/Themes'
+import EquipmentManagement from './views/EquipmentManagement/EquipmentManagement'
 function Root() {
   // attach interceptors once when app mounts
   // useEffect(() => {
   //   const detach = attachInterceptors(() => localStorage.getItem('token'))
   //   return () => detach()
   // }, [])
-  
+
   useEffect(() => {
     const detach = attachInterceptors()
     return () => detach()
@@ -42,31 +44,31 @@ function Root() {
           <GlobalSearchProvider>
             <HospitalProvider>
               {/* ✅ Toast container globally */}
-              <MedicineProvider>
-                <ToastContainer
-                  position="top-right"
-                  limit={3}
-                  theme="dark" // base dark theme
-                  toastStyle={{
-                    backgroundColor: 'var(--color-black)',
-                    color: 'white',
-                  }}
-                />
-                <App />
-                
-                
-                      {/* <BodyAssessment   /> */}
-                
-                     
-                
-                {/* <ExerciseTable /> */}
-                {/* <TherapistDashboard /> */}
-              </MedicineProvider>
+              {/* <MedicineProvider> */}
+              <ToastContainer
+                position="top-right"
+                limit={3}
+                theme="dark" // base dark theme
+                toastStyle={{
+                  backgroundColor: COLORS.primary,
+                  color: 'white',
+                }}
+              />
+              <App />
+
+
+              {/* <EquipmentManagement /> */}
+
+
+
+              {/* <ExerciseTable /> */}
+              {/* <TherapistDashboard /> */}
+              {/* </MedicineProvider> */}
             </HospitalProvider>
           </GlobalSearchProvider>
         </NavigationProvider>
       </BrowserRouter>
-    </Provider>
+    </Provider >
   )
 }
 

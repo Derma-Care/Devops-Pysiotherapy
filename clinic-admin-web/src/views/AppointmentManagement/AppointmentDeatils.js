@@ -15,21 +15,162 @@ import {
   CAccordion,
   CAccordionHeader,
   CAccordionBody,
+  CFormCheck,
 } from '@coreui/react'
 import axios from 'axios'
 import jsPDF from 'jspdf'
 import { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
-import { AppointmentData, deleteBookingData, GetBookingByClinicIdData } from './appointmentAPI' // adjust this path as per your project
+import { getBookingsForFollowUps } from '../../APIs/GetFollowUpApi'
+import { AppointmentData, deleteBookingData, GetBookingByClinicIdData } from './appointmentAPI'
 import { GetdoctorsByClinicIdData } from './appointmentAPI'
 import { FaEye, FaDownload } from 'react-icons/fa'
 import { deleteVitalsData, postVitalsData, updateVitalsData, VitalsDataById } from './VitalsAPI'
-import { Download, Eye } from 'lucide-react'
+import { Download, Eye, ArrowLeft, Activity, FileText, User, Stethoscope, CreditCard, ChevronRight, Pencil, Search } from 'lucide-react'
+import BookAppointmentModal from './BookAppointmentModal'
 import { useHospital } from '../Usecontext/HospitalContext'
-import { GetProcedureFormData } from '../ConsentForms/ConsentFormsAPI'
+// import { GetProcedureFormData } from '../ConsentForms/ConsentFormsAPI'
 import ConsentFormHandler from '../ConsentForms/ConsentFormHandler'
 import { showCustomToast } from '../../Utils/Toaster'
+import PaymentAccordion from './PaymentProgram'
+import ProgramPayment from './PaymentProgram'
+import PhysioConsentForm from './PhysioConsentForm'
+import { COLORS } from '../../Constant/Themes'
+import LoadingIndicator from '../../Utils/loader'
+import { BASE_URL } from '../../baseUrl'
 
+/* ─────────────────────────────────────────────
+   Inline styles – scoped design tokens
+───────────────────────────────────────────── */
+const tokens = {
+  primary: 'var(--color-bgcolor)',
+  white: '#ffffff',
+  black: '#1e293b',
+  surface: '#f8fafc',
+  border: '#e2e8f0',
+  muted: '#64748b',
+  success: '#16a34a',
+  successBg: '#dcfce7',
+  warning: '#d97706',
+  warningBg: '#fef3c7',
+  danger: '#dc2626',
+  dangerBg: '#fee2e2',
+  radius: '10px',
+  radiusSm: '6px',
+  shadow: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)',
+  shadowMd: '0 4px 12px rgba(0,0,0,0.08)',
+}
+
+/* Status badge config */
+const statusConfig = {
+  confirmed: { bg: '#dbeafe', color: '#1d4ed8', label: 'Confirmed' },
+  active: { bg: '#dcfce7', color: '#15803d', label: 'Active' },
+  completed: { bg: '#f3f4f6', color: '#374151', label: 'Completed' },
+  pending: { bg: '#fef3c7', color: '#92400e', label: 'Pending' },
+  rejected: { bg: '#fee2e2', color: '#991b1b', label: 'Rejected' },
+}
+
+const StatusBadge = ({ status }) => {
+  const cfg = statusConfig[status?.toLowerCase()] || statusConfig.pending
+  return (
+    <span style={{
+      backgroundColor: cfg.bg,
+      color: cfg.color,
+      fontSize: '11px',
+      fontWeight: '700',
+      letterSpacing: '0.06em',
+      textTransform: 'uppercase',
+      padding: '4px 12px',
+      borderRadius: '20px',
+      border: `1px solid ${cfg.color}30`,
+    }}>
+      {cfg.label}
+    </span>
+  )
+}
+
+const ActionBtn = ({ children, onClick, style, color = 'primary' }) => {
+  const isSuccess = color === 'success'
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '8px 16px',
+        borderRadius: tokens.radiusSm,
+        fontSize: '12px',
+        fontWeight: '600',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        border: isSuccess ? 'none' : `1px solid ${tokens.border}`,
+        backgroundColor: isSuccess ? tokens.success : COLORS.primary,
+        color: '#fff',
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+/* Section header */
+const SectionHeading = ({ icon: Icon, title }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+    {Icon && (
+      <span style={{
+        width: '28px', height: '28px', borderRadius: '6px',
+        backgroundColor: COLORS.primary, display: 'flex',
+        alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      }}>
+        <Icon size={14} color="#fff" />
+      </span>
+    )}
+    <h6 style={{ margin: 0, fontWeight: '700', fontSize: '13px', color: COLORS.primary }}>
+      {title}
+    </h6>
+  </div>
+)
+
+/* Info grid item */
+const InfoItem = ({ label, value }) => (
+  <div style={{ marginBottom: '12px' }}>
+    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+      {label}
+    </div>
+    <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: '500' }}>
+      {value || '—'}
+    </div>
+  </div>
+)
+
+/* Vitals chip */
+const VitalChip = ({ label, value, unit }) => (
+  <div style={{
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '6px',
+    padding: '10px 14px',
+    minWidth: '120px',
+    textAlign: 'center',
+  }}>
+    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '500', marginBottom: '4px' }}>{label}</div>
+    <div style={{ fontSize: '16px', fontWeight: '700', color: COLORS.primary }}>
+      {value || '—'}
+    </div>
+    {unit && <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>{unit}</div>}
+  </div>
+)
+
+/* Divider */
+const Divider = () => (
+  <hr style={{ border: 'none', borderTop: `1px solid ${tokens.border}`, margin: '20px 0' }} />
+)
+
+/* ─────────────────────────────────────────────
+   Main Component
+───────────────────────────────────────────── */
 const AppointmentDetails = () => {
   const { id } = useParams()
   const location = useLocation()
@@ -38,47 +179,72 @@ const AppointmentDetails = () => {
   const [doctor, setDoctor] = useState(null)
   const [vitals, setVitals] = useState(null)
   const [showModal, setShowModal] = useState(false)
-    const [loading, setLoading] = useState(false)
-  
-  const [formData, setFormData] = useState({
-    height: '',
-    weight: '',
-    bloodPressure: '',
-    temperature: '',
-    bmi: '',
-  })
-  const appointment = location.state?.appointment
-  const { hospitalId, selectedHospital } = useHospital()
-  if (!appointment) {
-    return (
-      <div className="text-center mt-4">
-        <h3 className="mb-3">No Appointment Data Found for ID: {id}</h3>
-        <CButton color="primary" onClick={() => navigate(-1)}>
-          Back
-        </CButton>
-      </div>
-    )
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [appointment, setAppointment] = useState(null)
+  const [loadingAppt, setLoadingAppt] = useState(true)
+  const [enableVitals, setEnableVitals] = useState(false)
+
+
+  useEffect(() => {
+    if (id) {
+      const fetchAppt = async () => {
+        setLoadingAppt(true)
+        try {
+          const res = await getBookingsForFollowUps(id)
+          let dataPayload = res?.data?.data || res?.data || res
+          if (Array.isArray(dataPayload)) {
+            dataPayload = dataPayload[0]
+          }
+          if (dataPayload) {
+            setAppointment(dataPayload)
+          }
+        } catch (error) {
+          console.error('Failed to fetch appointment:', error)
+        } finally {
+          setLoadingAppt(false)
+        }
+      }
+      fetchAppt()
+    }
+  }, [id])
+
+  const calculateBMI = (height, weight) => {
+    const h = Number(height) / 100
+    const w = Number(weight)
+    if (!h || !w) return ''
+    return (w / (h * h)).toFixed(2)
   }
-  const appointmentStatus = appointment?.status?.trim()?.toLowerCase()
-  // Normalize status and map "in-progress" to "active"
+
+  const [formData, setFormData] = useState({
+    height: '', weight: '', bloodPressure: '', temperature: '', bmi: '',
+  })
+
+  useEffect(() => {
+    if (formData.height && formData.weight) {
+      const bmi = calculateBMI(formData.height, formData.weight)
+      setFormData(prev => ({ ...prev, bmi }))
+      if (bmi) {
+        setValidationErrors(prev => ({
+          ...prev,
+          bmi: !regexRules.bmi?.test(bmi) ? errorMap.bmi : '',
+        }))
+      }
+    }
+  }, [formData.height, formData.weight])
+
+  const { hospitalId, selectedHospital } = useHospital()
+
   const normalizedStatus = (() => {
-    const status = appointment?.status?.trim()?.toLowerCase()
-    if (status === 'in-progress') return 'active'
-    return status
+    const s = appointment?.status?.trim()?.toLowerCase()
+    return s === 'in-progress' ? 'active' : s
   })()
-  const showConfirmed = normalizedStatus === 'confirmed'
-  const showCompletedOrActive = ['completed', 'active'].includes(normalizedStatus)
-  const showVitalsCard = ['completed', 'active', 'confirmed'].includes(normalizedStatus) && vitals
-  const showConfirmedOrCompleted = ['confirmed', 'completed', 'active'].includes(normalizedStatus)
 
   const [validationErrors, setValidationErrors] = useState({})
 
   useEffect(() => {
     const fetchDoctorDetails = async () => {
-      if (
-        ['confirmed', 'completed', 'active'].includes(normalizedStatus) &&
-        appointment?.doctorId
-      ) {
+      if (['confirmed', 'completed', 'active'].includes(normalizedStatus) && appointment?.doctorId) {
         try {
           const res = await GetdoctorsByClinicIdData(appointment.doctorId)
           setDoctor(res.data || {})
@@ -90,702 +256,698 @@ const AppointmentDetails = () => {
     fetchDoctorDetails()
   }, [normalizedStatus, appointment?.doctorId])
 
-  useEffect(() => {
-    if (['confirmed', 'active', 'completed'].includes(normalizedStatus)) {
-      fetchVitals()
+  const fetchVitals = async () => {
+    if (!appointment) return
+    try {
+      const data = await VitalsDataById(appointment.bookingId, appointment.patientId)
+      setVitals(Array.isArray(data) && data.length === 0 ? null : data[0])
+    } catch (error) {
+      console.error('Error fetching vitals:', error)
     }
+  }
+
+  useEffect(() => {
+    if (['confirmed', 'active', 'completed'].includes(normalizedStatus)) fetchVitals()
   }, [appointment?.bookingId, appointment?.patientId, normalizedStatus])
+
+  if (loadingAppt) {
+    return (
+      <div style={{ textAlign: 'center', marginTop: '60px' }}>
+        <LoadingIndicator message='Loading Appointment Details...' />
+      </div>
+    )
+  }
+
+  if (!appointment) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        minHeight: '60vh', padding: '40px', textAlign: 'center'
+      }}>
+        <div style={{
+          backgroundColor: '#fff', padding: '40px', borderRadius: tokens.radius,
+          boxShadow: tokens.shadow, border: `1px solid ${tokens.border}`,
+          maxWidth: '400px', width: '100%'
+        }}>
+          <div style={{
+            width: '60px', height: '60px', borderRadius: '50%', backgroundColor: '#f1f5f9',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px'
+          }}>
+            <Search size={30} color={tokens.muted} />
+          </div>
+          <h5 style={{ marginBottom: '12px', color: tokens.black, fontWeight: '700' }}>No Appointment Data Found</h5>
+          <p style={{ color: tokens.muted, fontSize: '13px', marginBottom: '24px' }}>
+            We couldn't find any details for this appointment. It might have been deleted or the ID is incorrect.
+          </p>
+          <CButton color="primary" style={{ backgroundColor: COLORS.primary, border: 'none', padding: '8px 24px' }}
+            onClick={() => navigate(-1)}>
+            <ArrowLeft size={14} className="me-2" /> Go Back
+          </CButton>
+        </div>
+      </div>
+    )
+  }
+
+  const showConfirmed = ['active', 'confirmed', 'in-progress', 'follow-up'].includes(normalizedStatus)
+  const showCompletedOrActive = ['completed', 'active'].includes(normalizedStatus)
+  const showVitalsCard = ['completed', 'active', 'confirmed'].includes(normalizedStatus) && vitals
+  const showPayment = ['active', 'follow-up', 'completed'].includes(normalizedStatus)
+  const showConfirmedOrCompleted = ['confirmed', 'completed', 'active'].includes(normalizedStatus)
+  const showPrescription = ['active', 'completed'].includes(normalizedStatus) && appointment?.prescriptionPdf
+  const showAccordion = ['confirmed', 'active', 'completed'].includes(normalizedStatus)
 
   const getDoctorImage = (picture) => {
     if (!picture) return '/default-doctor.png'
     return picture.startsWith('data:image') ? picture : `data:image/jpeg;base64,${picture}`
   }
 
-  // useEffect(() => {
-  //   if (
-  //     appointment?.status &&
-  //     ['completed', 'in-progress', 'confirmed'].includes(appointment.status.toLowerCase())
-  //   ) {
-  //     fetchVitals()
-  //   }
-  // }, [appointment?.bookingId, appointment?.patientId, appointment?.status])
-
-  const fetchVitals = async () => {
-    try {
-      const data = await VitalsDataById(appointment.bookingId, appointment.patientId)
-      if (Array.isArray(data) && data.length === 0) {
-        setVitals(null)
-      } else {
-        setVitals(data)
-      }
-    } catch (error) {
-      console.error('Error fetching vitals:', error)
-    }
-    
+  const regexRules = {
+    height: /^(?:[1-9][0-9]{1,2})$/,
+    weight: /^(?:[1-9][0-9]{0,2})$/,
+    bloodPressure: /^\d{2,3}\/\d{2,3}$/,
+    temperature: /^(?:\d{2,3})(?:\.\d{1,2})?$/,
+    bmi: /^\d{1,2}(?:\.\d{1,2})?$/,
   }
 
-  // Handle vitals form input
+  const errorMap = {
+    height: 'Height must be a number between 10 and 999 cm',
+    weight: 'Weight must be a number between 1 and 999 kg',
+    bloodPressure: 'Blood Pressure must be in format: 120/80',
+    temperature: 'Temperature must be a valid number (e.g., 98.6)',
+    bmi: 'BMI must be a valid number (e.g., 24.5)',
+  }
+
+  // ── onChange updates state and performs real-time validation ──
   const handleChange = (e) => {
     const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
 
-    // update form data
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-
-    // validate this specific field immediately
-    let error = ''
-
-    if (!regexRules[name].test(value)) {
-      switch (name) {
-        case 'height':
-          error = 'Height must be a number between 10 and 999 cm'
-          break
-        case 'weight':
-          error = 'Weight must be a number between 1 and 999 kg'
-          break
-        case 'bloodPressure':
-          error = 'Blood Pressure must be in format: 120/80'
-          break
-        case 'temperature':
-          error = 'Temperature must be a valid number (e.g., 98.6)'
-          break
-        case 'bmi':
-          error = 'BMI must be a valid number (e.g., 24.5)'
-          break
-        default:
-          error = ''
-      }
+    if (!value) {
+      setValidationErrors(prev => ({ ...prev, [name]: '' }))
+    } else {
+      setValidationErrors(prev => ({
+        ...prev,
+        [name]: !regexRules[name]?.test(value) ? errorMap[name] : '',
+      }))
     }
-
-    // update validation errors state dynamically
-    setValidationErrors((prev) => ({
-      ...prev,
-      [name]: error,
-    }))
   }
 
-  const handleSubmitVitals = async () => {
-    if (!validateVitals()) {
-      showCustomToast('Please fix validation errors before submitting.','error')
+  const handleBlur = (e) => {
+    const { name, value } = e.target
+    if (!value) {
+      setValidationErrors(prev => ({ ...prev, [name]: '' }))
       return
     }
-    console.log('Submitting vitals data:', formData)
-    try {
-      setLoading(true)
-      await postVitalsData({ ...formData, patientId: appointment.patientId }, appointment.bookingId)
-
-      showCustomToast('Vitals added successfully! ', 'success')
-
-      setShowModal(false)
-      setFormData({ height: '', weight: '', bloodPressure: '', temperature: '', bmi: '' })
-      fetchVitals()
-    } catch (error) {
-      // showCustomToast('Failed to add vitals','error')
-    }
-    finally{
-      setLoading(false)
-    }
+    setValidationErrors(prev => ({
+      ...prev,
+      [name]: !regexRules[name]?.test(value) ? errorMap[name] : '',
+    }))
   }
-  const handleUpdateVitals = async () => {
-    try {
-      await updateVitalsData(formData, appointment.bookingId, appointment.patientId)
-      showCustomToast('Vitals updated successfully!', 'success')
 
-      setShowModal(false)
-      fetchVitals()
-    } catch (error) {
-      // showCustomToast('Failed to update vitals','error')
-    }
-  }
-  const handleDeleteVitals = async () => {
-    try {
-      await deleteVitalsData(appointment.bookingId, appointment.patientId)
-      showCustomToast('Vitals deleted successfully!', 'success')
-
-      setVitals(null)
-    } catch (error) {
-      // showCustomToast('Failed to delete vitals','error')
-    }
-  }
-  const regexRules = {
-    height: /^(?:[1-9][0-9]{1,2})$/, // 10 - 999 cm
-    weight: /^(?:[1-9][0-9]{0,2})$/, // 1 - 999 kg
-    bloodPressure: /^\d{2,3}\/\d{2,3}$/, // format: 120/80
-    temperature: /^(?:\d{2,3})(?:\.\d{1,2})?$/, // 2-3 digits with optional decimals
-    bmi: /^\d{1,2}(?:\.\d{1,2})?$/, // 0-99 with optional decimals
-  }
   const validateVitals = () => {
-    let errors = {}
-    Object.keys(formData).forEach((field) => {
-      if (!regexRules[field].test(formData[field])) {
-        switch (field) {
-          case 'height':
-            errors.height = 'Height must be a number between 10 and 999 cm'
-            break
-          case 'weight':
-            errors.weight = 'Weight must be a number between 1 and 999 kg'
-            break
-          case 'bloodPressure':
-            errors.bloodPressure = 'Blood Pressure must be in format: 120/80'
-            break
-          case 'temperature':
-            errors.temperature = 'Temperature must be a valid number (e.g., 98.6)'
-            break
-          case 'bmi':
-            errors.bmi = 'BMI must be a valid number (e.g., 24.5)'
-            break
-          default:
-            break
-        }
-      }
+    const errors = {}
+    Object.keys(formData).forEach(field => {
+      if (!regexRules[field]?.test(formData[field])) errors[field] = errorMap[field]
     })
-
     setValidationErrors(errors)
     return Object.keys(errors).length === 0
   }
 
+  const handleSubmitVitals = async () => {
+    // if (!validateVitals()) { showCustomToast('Please fix validation errors before submitting.', 'error'); return }
+    try {
+      setLoading(true)
+      const payload = {
+        patientId: appointment.patientId, bookingId: appointment.bookingId,
+        height: formData.height, weight: Number(formData.weight) || 0,
+        bloodPressure: formData.bloodPressure, temperature: formData.temperature,
+        bmi: formData.bmi, date: new Date().toISOString(),
+      }
+      await postVitalsData(payload, payload.bookingId)
+      showCustomToast('Vitals added successfully!', 'success')
+      setShowModal(false)
+      setFormData({ height: '', weight: '', bloodPressure: '', temperature: '', bmi: '' })
+      setValidationErrors({})
+      fetchVitals()
+    } catch (error) {
+      showCustomToast('Failed to add vitals', 'error')
+    } finally { setLoading(false) }
+  }
+
+  const handleUpdateVitals = async () => {
+    try {
+      await updateVitalsData(formData, appointment.bookingId, appointment.patientId)
+      showCustomToast('Vitals updated successfully!', 'success')
+      setShowModal(false); fetchVitals()
+    } catch (error) { }
+  }
+
+  const handleDeleteVitals = async () => {
+    try {
+      await deleteVitalsData(appointment.bookingId, appointment.patientId)
+      showCustomToast('Vitals deleted successfully!', 'success')
+      setVitals(null)
+    } catch (error) { }
+  }
+
+  const getMimeTypeFromBase64 = (b64) => {
+    if (b64.startsWith('JVBERi0')) return 'application/pdf'
+    if (b64.startsWith('/9j/')) return 'image/jpeg'
+    if (b64.startsWith('iVBORw0')) return 'image/png'
+    return 'application/octet-stream'
+  }
+
   const base64toBlob = (base64, mimeType) => {
     try {
-      const byteCharacters = atob(base64)
-      const byteNumbers = new Array(byteCharacters.length)
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i)
-      }
-      const byteArray = new Uint8Array(byteNumbers)
-      return new Blob([byteArray], { type: mimeType })
-    } catch (e) {
-      console.error('Base64 decoding failed:', e)
-      // You can use a more user-friendly alert here
-      alert('Failed to decode file data. It may be corrupted or in an invalid format.')
-      return null
-    }
+      const bytes = atob(base64)
+      const arr = new Uint8Array(bytes.length)
+      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+      return new Blob([arr], { type: mimeType })
+    } catch (e) { alert('Failed to decode file data.'); return null }
   }
-  // const getMimeTypeFromBase64 = (base64String) => {
-  //   if (base64String.startsWith('JVBERi0')) {
-  //     return 'application/pdf' // PDF
-  //   }
-  //   if (base64String.startsWith('/9j/')) {
-  //     return 'image/jpeg' // JPEG
-  //   }
-  //   if (base64String.startsWith('iVBORw0KGgo')) {
-  //     return 'image/png' // PNG
-  //   }
-  //   if (base64String.startsWith('data:')) {
-  //     // If it's already a data URL, extract the MIME type
-  //     const mimeMatch = base64String.match(/^data:(.*?);base64/)
-  //     return mimeMatch ? mimeMatch[1] : 'application/octet-stream'
-  //   }
-  //   // Default to a generic binary type if the type cannot be determined
-  //   return 'application/octet-stream'
-  // }
 
-  const getMimeTypeFromBase64 = (base64String) => {
-    if (base64String.startsWith('JVBERi0')) return 'application/pdf' // PDF
-    if (base64String.startsWith('/9j/')) return 'image/jpeg' // JPG
-    if (base64String.startsWith('iVBORw0')) return 'image/png' // PNG
-    if (base64String.startsWith('R0lGOD')) return 'image/gif' // GIF
-    return 'application/octet-stream' // fallback
+  const getFileUrl = (str) => {
+    if (!str) return ''
+    if (str.startsWith('http://') || str.startsWith('https://') || str.startsWith('/')) {
+      return str
+    }
+    const isBase64 = str.includes(';base64,') || (str.length > 100 && !str.includes('/') && !str.includes('.'));
+    if (!isBase64) {
+      return `${BASE_URL}/viewFile/${str}`
+    }
+    return ''
   }
 
   const handlePreview = (base64String) => {
-    console.log(base64String)
-    if (!base64String || typeof base64String !== 'string') {
-      alert('No valid file data available for preview.')
+    if (!base64String || typeof base64String !== 'string') { alert('No valid file data.'); return }
+    const fileUrl = getFileUrl(base64String)
+    if (fileUrl) {
+      window.open(fileUrl, '_blank')
       return
     }
-
-    const mimeType = getMimeTypeFromBase64(base64String)
-    const blob = base64toBlob(base64String, mimeType)
-    const url = URL.createObjectURL(blob)
-    window.open(url, '_blank')
+    const blob = base64toBlob(base64String, getMimeTypeFromBase64(base64String))
+    if (blob) {
+      window.open(URL.createObjectURL(blob), '_blank')
+    }
   }
 
   const handleDownload = (base64String, fileName) => {
-    if (!base64String || typeof base64String !== 'string') {
-      alert('No valid file data available for download.')
+    if (!base64String || typeof base64String !== 'string') { alert('No valid file data.'); return }
+    const fileUrl = getFileUrl(base64String)
+    if (fileUrl) {
+      const link = document.createElement('a')
+      link.href = fileUrl
+      link.download = fileName || 'file'
+      link.target = '_blank'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
       return
     }
-
-    const mimeType = getMimeTypeFromBase64(base64String)
-    const blob = base64toBlob(base64String, mimeType)
-    const url = URL.createObjectURL(blob)
-
-    const link = document.createElement('a')
-    link.href = url
-    link.download = fileName || 'file.pdf'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    const blob = base64toBlob(base64String, getMimeTypeFromBase64(base64String))
+    if (blob) {
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url; link.download = fileName || 'file.pdf'
+      document.body.appendChild(link); link.click()
+      document.body.removeChild(link); URL.revokeObjectURL(url)
+    }
   }
 
-  // const handleDownload = (base64String, fileName) => {
-  //   if (!base64String) {
-  //     alert('No file data available for download.')
-  //     return
-  //   }
+  const handlePaymentClick = () => {
+    if (showPayment && normalizedStatus === 'active' || appointment?.status === 'in-progress' || normalizedStatus === 'follow-up' || normalizedStatus === 'completed') {
+      navigate('/program-payment' + `/${id}`, {
+        state: {
+          bookingId: appointment.bookingId, doctorId: appointment.doctorId,
+          clinicId: appointment.clinicId, branchId: appointment.branchId,
+          patientId: appointment.patientId,
+        }
+      })
+    } else { showCustomToast('Payment allowed only for active status') }
+  }
 
-  //   const mimeType = getMimeTypeFromBase64(base64String)
-  //   const blob = base64toBlob(base64String, mimeType)
-
-  //   if (blob) {
-  //     const url = URL.createObjectURL(blob)
-  //     const link = document.createElement('a')
-  //     link.href = url
-  //     link.download = fileName
-  //     document.body.appendChild(link)
-  //     link.click()
-  //     document.body.removeChild(link)
-  //     URL.revokeObjectURL(url)
-  //   }
-  // }
-  const showAccordion = ['confirmed', 'active', 'completed'].includes(normalizedStatus)
-  const showPrescription =
-    ['active', 'completed'].includes(normalizedStatus) && appointment?.prescriptionPdf
+  /* ── shared action button ── */
+  const ActionBtn = ({ onClick, children, color = 'primary', style = {} }) => (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: '5px',
+        padding: '5px 12px', borderRadius: tokens.radiusSm,
+        fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+        border: 'none', color: '#fff',
+        backgroundColor: color === 'success' ? tokens.success : 'var(--color-bgcolor)',
+        boxShadow: tokens.shadow, transition: 'opacity .15s',
+        ...style,
+      }}
+      onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+      onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+    >
+      {children}
+    </button>
+  )
+  const isAnyFieldFilled =
+    formData.height ||
+    formData.weight ||
+    formData.bloodPressure ||
+    formData.temperature ||
+    formData.bmi
+  /* ── form field ── FIX: added onBlur prop ── */
+  const renderField = (label, name, placeholder) => (
+    <div style={{ marginBottom: '14px' }} key={name}>
+      <label style={{ fontSize: '12px', fontWeight: '600', color: tokens.muted, display: 'block', marginBottom: '4px' }}>
+        {label}
+      </label>
+      <CFormInput
+        name={name}
+        placeholder={placeholder}
+        value={formData[name]}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        invalid={!!validationErrors[name]}
+        style={{ fontSize: '13px', borderRadius: tokens.radiusSm }}
+      />
+      {validationErrors[name] && (
+        <small style={{ color: tokens.danger, fontSize: '11px' }}>{validationErrors[name]}</small>
+      )}
+    </div>
+  )
 
   return (
-    <div className="container mt-4">
-      {/* Header */}
-      <div
-        className="p-3 d-flex justify-content-between align-items-center rounded"
-        style={{ backgroundColor: 'var(--color-bgcolor)' }}
-      >
-        <h5 className="mb-0">Patient File Name: {appointment.patientId}</h5>
-        <div className="d-flex gap-2">
-          {showConfirmed && !vitals && (
-            <CButton
-              style={{ backgroundColor: 'var(--color-black)', color: 'white' }}
-              onClick={() => {
-                setFormData({ height: '', weight: '', bloodPressure: '', temperature: '', bmi: '' })
-                setShowModal(true)
-              }}
-            >
-              Add Vitals
-            </CButton>
-          )}
-          {/* <CButton
-            color="secondary"
-            size="sm"
+    <div style={{ backgroundColor: '#f1f5f9', minHeight: '100vh', padding: '20px', color: '#1e293b' }}>
+
+      {/* ── TOP HEADER BAR ─────────────────────────────── */}
+      <div style={{
+        backgroundColor: COLORS.primary,
+        borderRadius: tokens.radius,
+        padding: '14px 20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '16px',
+        boxShadow: tokens.shadowMd,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
             onClick={() => navigate(-1)}
-            style={{ backgroundColor: 'var(--color-black)' }}
+            style={{
+              background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '6px',
+              width: '28px', height: '28px', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', cursor: 'pointer', color: '#fff',
+            }}
           >
-            Back
-          </CButton> */}
+            <ArrowLeft size={15} />
+          </button>
+          <div>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', fontWeight: '500' }}>PATIENT FILE ID</div>
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>{appointment.patientId}</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <StatusBadge status={normalizedStatus} />
+
+          {showConfirmed && (
+            <ActionBtn style={{ backgroundColor: COLORS.white, color: COLORS.primary }} onClick={() => {
+              setFormData({ height: '', weight: '', bloodPressure: '', temperature: '', bmi: '' })
+              setValidationErrors({})
+              setShowModal(true)
+            }}>
+              <Activity size={13} /> Add Vitals
+            </ActionBtn>
+          )}
+          {showPayment && (
+            <ActionBtn color="success" onClick={handlePaymentClick}>
+              <CreditCard size={13} /> Payment
+            </ActionBtn>
+          )}
+          {!appointment?.consentFormPdf && (
+            <ActionBtn style={{ backgroundColor: COLORS.white, color: COLORS.primary }} onClick={() => navigate('/physio-consent-form', { state: { bookingDetails: appointment, vitals, doctorsign: doctor?.doctorSignature } })}>
+              <FileText size={13} /> Consent Form
+            </ActionBtn>
+          )}
+          <ActionBtn style={{ backgroundColor: COLORS.white, color: COLORS.primary }} onClick={() => setShowEditModal(true)}>
+            <Pencil size={13} /> Edit
+          </ActionBtn>
         </div>
       </div>
 
-      <div
-        className="mt-4 p-4 border rounded shadow-sm bg-white"
-        style={{ color: 'var(--color-black)' }}
-      >
-        <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-          <h5 className="fw-bold mb-0" style={{ color: 'var(--color-black)' }}>
-            Patient Details
-          </h5>
-          <div className="d-flex align-items-center gap-2">
-            <span
-              className="badge text-uppercase px-3 py-2"
-              style={{ backgroundColor: 'var(--color-black)' }}
-            >
-              {normalizedStatus}
-            </span>
-          </div>
-        </div>
+      {/* ── MAIN CONTENT CARD ─────────────────────────── */}
+      <div style={{
+        backgroundColor: '#ffffff',
+        color: '#1e293b',
+        borderRadius: tokens.radius,
+        boxShadow: tokens.shadow,
+        border: `1px solid ${tokens.border}`,
+        overflow: 'hidden',
+      }}>
 
-        {/* Patient Vitals handled only in Modal now */}
+        {/* ── PATIENT DETAILS ── */}
+        <div style={{ padding: '20px 24px' }}>
+          <SectionHeading icon={User} title="Patient Details" />
 
-        <CModal visible={showModal} onClose={() => setShowModal(false)} backdrop="static">
-          <CModalHeader>
-            <CModalTitle>Add Vitals</CModalTitle>
-          </CModalHeader>
-          <CModalBody>
-            <CForm style={{ color: 'var(--color-black)' }}>
-              <CFormInput
-                label="Height"
-                name="height"
-                value={formData.height}
-                onChange={handleChange}
-                className="mb-2"
-                invalid={!!validationErrors.height}
-              />
-              {validationErrors.height && (
-                <small className="text-danger">{validationErrors.height}</small>
-              )}
-              <CFormInput
-                label="Weight"
-                name="weight"
-                value={formData.weight}
-                onChange={handleChange}
-                className="mb-2"
-                invalid={!!validationErrors.weight}
-              />
-              {validationErrors.weight && (
-                <small className="text-danger">{validationErrors.weight}</small>
-              )}
-              <CFormInput
-                label="Blood Pressure"
-                name="bloodPressure"
-                value={formData.bloodPressure}
-                onChange={handleChange}
-                className="mb-2"
-                invalid={!!validationErrors.bloodPressure}
-              />
-              {validationErrors.bloodPressure && (
-                <small className="text-danger">{validationErrors.bloodPressure}</small>
-              )}
-              <CFormInput
-                label="Temperature"
-                name="temperature"
-                value={formData.temperature}
-                onChange={handleChange}
-                className="mb-2"
-                invalid={!!validationErrors.temperature}
-              />
-              {validationErrors.temperature && (
-                <small className="text-danger">{validationErrors.temperature}</small>
-              )}
-              <CFormInput
-                label="BMI"
-                name="bmi"
-                value={formData.bmi}
-                onChange={handleChange}
-                className="mb-2"
-                invalid={!!validationErrors.bmi}
-              />
-              {validationErrors.bmi && (
-                <small className="text-danger">{validationErrors.bmi}</small>
-              )}
-            </CForm>
-          </CModalBody>
-          <CModalFooter>
-            <CButton color="secondary" onClick={() => setShowModal(false)}>
-              Close
-            </CButton>
-          <CButton
-  style={{ backgroundColor: 'var(--color-black)', color: 'white' }}
-  onClick={handleSubmitVitals}
-  disabled={loading} // disable while loading
->
-  {loading ? (
-    <>
-      <span
-        className="spinner-border spinner-border-sm me-2 text-white"
-        role="status"
-      />
-      Saving...
-    </>
-  ) : (
-    'Save'
-  )}
-</CButton>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0 24px' }}>
+            <InfoItem label="Patient Name" value={appointment?.name} />
+            <InfoItem label="Mobile Number" value={appointment?.patientMobileNumber} />
+            <InfoItem label="Booking ID" value={appointment?.bookingId} />
+            <InfoItem label="Age" value={appointment?.age ? `${appointment.age} Yrs` : null} />
+            <InfoItem label="Gender" value={appointment?.gender} />
+            <InfoItem label="Visit Type" value={appointment?.visitType} />
+            <InfoItem label="Symptoms Duration" value={appointment?.symptomsDuration} />
+            <InfoItem label="Free Follow-ups" value={appointment?.freeFollowUpsLeft !== null ? `${appointment.freeFollowUpsLeft} of ${appointment.freeFollowUps}` : null} />
+            <InfoItem label="Payment Type" value={appointment?.foc == "FOC" ? `FOC` : 'Paid'} />
+            {
+              appointment?.foc == "FOC" && (
+                <InfoItem label="FOC Reason" value={appointment?.focReason} />
 
-          </CModalFooter>
-        </CModal>
-
-        {/* Patient Info */}
-        <div className="row mb-3">
-          <div className="col-md-4">
-            <strong>Patient Name:</strong> {appointment?.name}
-          </div>
-          <div className="col-md-4">
-            <strong>Mobile Number:</strong> {appointment?.mobileNumber}
-          </div>
-          <div className="col-md-4">
-            <strong>Booking For:</strong> {appointment?.bookingFor}
-          </div>
-          <div className="col-md-4">
-            <strong>Age:</strong> {appointment?.age} Yrs
-          </div>
-          <div className="col-md-4">
-            <strong>Gender:</strong> {appointment?.gender}
-          </div>
-          <div className="col-12">
-            <strong>Problem:</strong>{' '}
-            <p style={{ color: 'var(--color-black)' }}>{appointment?.problem}</p>
-          </div>
-        </div>
-
-        <hr />
-
-        {/* Slot & Payment */}
-        <h6 className="fw-bold mb-3" style={{ color: 'var(--color-black)' }}>
-          Slot & Payment Details
-        </h6>
-        <div className="row">
-          <div className="col-md-4">
-            <strong>Date:</strong> {appointment?.serviceDate}
-          </div>
-          <div className="col-md-4">
-            <strong>Time:</strong> {appointment?.servicetime}
-          </div>
-          <div className="col-md-4">
-            <strong>Paid Amount:</strong> ₹{appointment?.totalFee}
-          </div>
-          <div className="col-md-4">
-            <strong>Consultation Fee:</strong> ₹{appointment?.consultationFee}
-          </div>
-        </div>
-
-        <hr />
-
-        {/* Doctor & Service Details */}
-        <h6 className="fw-bold mb-3" style={{ color: 'var(--color-black)' }}>
-          Doctor & Service Details
-        </h6>
-        <div className="row">
-          <div className="col-md-4">
-            <strong>Doctor ID:</strong> {appointment?.doctorId}
-          </div>
-          <div className="col-md-4">
-            <strong>Consultation Type:</strong> {appointment?.consultationType}
-          </div>
-          <div className="col-md-4">
-            <strong>Service Name:</strong> {appointment?.subServiceName}
-          </div>
-          <div className="col-md-4">
-            <strong>Service ID:</strong> {appointment?.subServiceId}
-          </div>
-        </div>
-
-        {/* vitals */}
-        {/* Vitals Card */}
-        {/* Vitals Card */}
-        {showVitalsCard && (
-          <div className="card shadow-sm p-3 mb-3 mt-4" style={{ color: 'var(--color-black)' }}>
-            <div className="d-flex justify-content-between align-items-center">
-              <h5>Vitals Card</h5>
-              {showConfirmed && !vitals && (
-                <CButton
-                  style={{ backgroundColor: 'var(--color-black)', color: 'white' }}
-                  onClick={() => setShowModal(true)}
-                >
-                  Add Vitals
-                </CButton>
-              )}
-            </div>
-            {vitals ? (
-              <div className="row mt-3">
-                <div className="col-md-4">
-                  <strong>Height:</strong> {vitals.height} cm
-                </div>
-                <div className="col-md-4">
-                  <strong>Weight:</strong> {vitals.weight} kg
-                </div>
-                <div className="col-md-4">
-                  <strong>Blood Pressure:</strong> {vitals.bloodPressure}
-                </div>
-                <div className="col-md-4">
-                  <strong>Temperature:</strong> {vitals.temperature} °C
-                </div>
-                <div className="col-md-4">
-                  <strong>BMI:</strong> {vitals.bmi}
-                </div>
-              </div>
-            ) : (
-              !showConfirmed && (
-                <div className="row mt-3">
-                  <div className="col-12">No vitals data available.</div>
-                </div>
               )
-            )}
+            }
           </div>
+
+          {appointment?.problem && (
+            <div style={{
+              backgroundColor: tokens.surface,
+              border: `1px solid ${tokens.border}`,
+              borderRadius: tokens.radiusSm,
+              padding: '10px 14px',
+              marginTop: '4px',
+            }}>
+              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '500', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Chief Complaint / Problem  </div>
+              <div style={{ fontSize: '13px', color: '#1e293b' }}>{appointment.problem}</div>
+            </div>
+          )}
+
+          {appointment?.parts?.length > 0 && (
+            <div style={{
+              backgroundColor: tokens.surface,
+              border: `1px solid ${tokens.border}`,
+              borderRadius: tokens.radiusSm,
+              padding: '10px 14px',
+              marginTop: '4px',
+            }}>
+              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '500', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Selected Body Parts</div>
+              <div style={{ fontSize: '13px', color: '#1e293b' }}>{appointment?.parts?.join(', ')}</div>
+            </div>
+          )}
+
+
+
+          {(appointment?.partImage || (appointment?.theraphyAnswers && Object.keys(appointment.theraphyAnswers).length > 0)) && (
+            <div style={{ marginTop: '24px' }}>
+              <SectionHeading icon={Activity} title="Pain Assessment / Area Mapping" />
+              <div style={{
+                border: `1px solid ${tokens.border}`,
+                borderRadius: tokens.radius,
+                padding: '16px',
+                backgroundColor: '#fff',
+                boxShadow: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.05)'
+              }}>
+                {appointment?.partImage && (
+                  <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                    <img
+                      src={getFileUrl(appointment.partImage) || `data:image/png;base64,${appointment.partImage}`}
+                      alt="Pain Area Mapping"
+                      style={{ maxWidth: '100%', height: 'auto', maxHeight: '400px', borderRadius: '8px' }}
+                    />
+                    <div style={{ marginTop: '12px', fontSize: '12px', color: tokens.muted }}>
+                      Visual representation of reported pain areas and assessment markings.
+                    </div>
+                  </div>
+                )}
+
+                {appointment?.theraphyAnswers && Object.entries(appointment.theraphyAnswers).length > 0 && (
+                  <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: tokens.primary, marginBottom: '8px' }}>Therapy Q&A</div>
+                    <CAccordion alwaysOpen>
+                      {Object.entries(appointment.theraphyAnswers).map(([part, questions], index) => (
+                        <CAccordionItem itemKey={index + 1} key={part} style={{ marginBottom: '8px', border: `1px solid ${tokens.border}`, borderRadius: tokens.radiusSm }}>
+                          <CAccordionHeader>
+                            <span style={{ fontSize: '12px', fontWeight: '600', textTransform: 'capitalize', color: tokens.black }}>{part} ({questions?.length || 0})</span>
+                          </CAccordionHeader>
+                          <CAccordionBody style={{ padding: '12px', backgroundColor: '#fff' }}>
+                            {questions?.map((q, i) => (
+                              <div key={i} style={{ backgroundColor: tokens.surface, padding: '8px 12px', borderRadius: tokens.radiusSm, marginBottom: '6px', border: `1px solid ${tokens.border}` }}>
+                                <div style={{ fontSize: '12px', fontWeight: '600', color: tokens.black, marginBottom: '4px' }}>Q: {q?.question || 'N/A'}</div>
+                                <div style={{ fontSize: '12px', color: tokens.black }}>A: {q?.answer || 'N/A'}</div>
+                              </div>
+                            ))}
+                          </CAccordionBody>
+                        </CAccordionItem>
+                      ))}
+                    </CAccordion>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <Divider />
+
+        {/* ── SLOT & PAYMENT ── */}
+        <div style={{ padding: '0 24px 20px' }}>
+          <SectionHeading icon={CreditCard} title="Slot & Payment Details" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0 24px' }}>
+            <InfoItem label="Date" value={appointment?.serviceDate} />
+            <InfoItem label="Time" value={appointment?.servicetime} />
+            {/* <InfoItem label="Paid Amount" value={appointment?.totalFee ? `₹${appointment.totalFee}` : null} /> */}
+            <InfoItem label="Consultation Fee" value={appointment?.listOfConsultationFee?.[0]?.consulationFee ? `₹${appointment.listOfConsultationFee[0].consulationFee}` : 'N/A'} />
+          </div>
+        </div>
+
+        {/* ── VITALS CARD ── */}
+        {showVitalsCard && (
+          <>
+            <Divider />
+            <div style={{ padding: '0 24px 20px' }}>
+              <SectionHeading icon={Activity} title="Vitals" />
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                <VitalChip label="Height" value={vitals?.height} unit="cm" />
+                <VitalChip label="Weight" value={vitals?.weight} unit="kg" />
+                <VitalChip label="Blood Pressure" value={vitals?.bloodPressure} unit="mmHg" />
+                <VitalChip label="Temperature" value={vitals?.temperature} unit="°C" />
+                <VitalChip label="BMI" value={vitals?.bmi} unit="kg/m²" />
+              </div>
+            </div>
+          </>
         )}
 
+        {/* ── ACCORDION: Reports / Prescription ── */}
         {showConfirmedOrCompleted && doctor && (
           <>
-            <div className="mt-4">
-              <CAccordion activeItemKey={1}>
-                {/* Consent Form Accordion */}
-                {/* {appointment?.consentFormPdf != '' && ( */}
+            <Divider />
+            <div style={{ padding: '0 24px 20px' }}>
+              <SectionHeading icon={FileText} title="Documents" />
 
-                {appointment?.consultationType?.toLowerCase() === 'services & treatments' &&
-                  appointment?.consultationType?.toLowerCase() === 'services & treatments' &&
-                  new Date(appointment?.serviceDate) <= new Date() &&
-                  (appointment?.consentFormPdf ? (
-                    <CAccordionItem itemKey={1}>
-                      <CAccordionHeader>Consent Form</CAccordionHeader>
-                      <CAccordionBody>
-                        <div className="d-flex gap-1 align-items-start justify-content-between">
-                          <div>{appointment?.subServiceName}</div>
-                          <div className="d-flex gap-2">
-                            <div>
-                              <CButton
-                                style={{
-                                  backgroundColor: 'var(--color-bgcolor)',
-                                  color: 'var(--color-black)',
-                                }}
-                                onClick={() => handlePreview(appointment?.consentFormPdf)}
-                                className="d-flex align-items-center gap-1"
-                              >
-                                <Eye size={16} />
-                              </CButton>
-                            </div>
-                            <div>
-                              <CButton
-                                style={{
-                                  backgroundColor: 'var(--color-bgcolor)',
-                                  color: 'var(--color-black)',
-                                }}
-                                onClick={() =>
-                                  handleDownload(appointment?.consentFormPdf, 'consent_form.pdf')
-                                }
-                                className="d-flex align-items-center gap-1 "
-                              >
-                                <Download size={16} />
-                              </CButton>
-                            </div>
-                          </div>
-                        </div>
-                      </CAccordionBody>
-                    </CAccordionItem>
-                  ) : (
-                    <ConsentFormHandler
-                      appointment={appointment}
-                      doctor={doctor}
-                      selectedHospital={selectedHospital}
-                      hospitalId={hospitalId}
-                    />
-                  ))}
+              <CAccordion flush style={{ border: `1px solid ${tokens.border}`, borderRadius: tokens.radius, overflow: 'hidden' }}>
 
-                {/* Web-specific Consent Form (always visible for confirmed appointments) */}
-                {/* Web-specific Consent Form */}
-
-                {/* Past Reports Accordion */}
+                {/* Past Reports */}
                 <CAccordionItem itemKey={2}>
-                  <CAccordionHeader>Past Reports</CAccordionHeader>
+                  <CAccordionHeader>Previous Medical Records</CAccordionHeader>
                   <CAccordionBody>
-                    {appointment?.attachments && appointment.attachments.length > 0 ? (
+                    {appointment?.attachments?.length > 0 ? (
                       appointment.attachments.map((attachment, index) => (
-                        // <div key={index} className="d-flex gap-2 mb-2">
-                        <div
-                          key={index}
-                          className="d-flex gap-2 align-items-strat justify-content-between"
-                        >
+                        <div key={index} style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          padding: '8px 0', borderBottom: index < appointment.attachments.length - 1 ? `1px solid ${tokens.border}` : 'none',
+                        }}>
                           <div>
-                            <h6>Attachment_{index + 1}</h6>
-                            <small style={{ color: 'GrayText' }}>{appointment?.serviceDate}</small>
+                            <div style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>Attachment_{index + 1}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>{appointment?.serviceDate}</div>
                           </div>
-
-                        <div className="d-flex gap-2 ">
-                            <CButton
-                              style={{
-                                color: 'var(--color-black)',
-                                backgroundColor: 'var(--color-bgcolor)',
-                              }}
-                              onClick={() =>
-                                handlePreview(attachment, `attachment_${index + 1}.pdf`)
-                              }
-                              className="d-flex align-items-center gap-1"
-                            >
-                              <Eye size={16} />
-                            </CButton>
-
-                            <CButton
-                              style={{
-                                color: 'var(--color-black)',
-                                backgroundColor: 'var(--color-bgcolor)',
-                              }}
-                              onClick={() =>
-                                handleDownload(attachment, `attachment_${index + 1}.pdf`)
-                              }
-                              className="d-flex align-items-center gap-1"
-                            >
-                              <Download size={16} />
-                            </CButton>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <ActionBtn onClick={() => handlePreview(attachment)}><Eye size={13} /></ActionBtn>
+                            <ActionBtn onClick={() => handleDownload(attachment, `attachment_${index + 1}.pdf`)}><Download size={13} /></ActionBtn>
                           </div>
                         </div>
-                        // </div>
                       ))
                     ) : (
-                      <p>No past reports available.</p>
+                      <p style={{ fontSize: '13px', color: tokens.muted, margin: 0 }}>No past reports available.</p>
                     )}
                   </CAccordionBody>
                 </CAccordionItem>
 
-                {/* Prescription Accordion - only for in-progress and completed */}
+                {/* Prescription */}
                 {showPrescription && (
                   <CAccordionItem itemKey={3}>
                     <CAccordionHeader>Prescription</CAccordionHeader>
                     <CAccordionBody>
                       {appointment.prescriptionPdf.map((pdf, index) => (
-                        <div
-                          key={index}
-                          className="d-flex gap-2 align-items-start justify-content-between mb-2"
-                        >
-                          <div>Prescription {index + 1}</div>
-                          <div className="row">
-                            <div className="col-6">
-                              <CButton
-                                color="primary"
-                                onClick={() => handlePreview(pdf)}
-                                className="d-flex align-items-center gap-1"
-                              >
-                                <Eye size={16} />
-                              </CButton>
-                            </div>
-                            <div className="col-6">
-                              <CButton
-                                color="success"
-                                onClick={() => handleDownload(pdf, `prescription_${index + 1}.pdf`)}
-                                className="d-flex align-items-center gap-1 text-white"
-                              >
-                                <Download size={16} />
-                              </CButton>
-                            </div>
+                        <div key={index} style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          padding: '8px 0', borderBottom: index < appointment.prescriptionPdf.length - 1 ? `1px solid ${tokens.border}` : 'none',
+                        }}>
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>Prescription {index + 1}</div>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <ActionBtn onClick={() => handlePreview(pdf)}><Eye size={13} /></ActionBtn>
+                            <ActionBtn onClick={() => handleDownload(pdf, `prescription_${index + 1}.pdf`)}><Download size={13} /></ActionBtn>
                           </div>
                         </div>
                       ))}
                     </CAccordionBody>
                   </CAccordionItem>
                 )}
+
+                {/* Consent Form */}
+                {appointment?.consentFormPdf ? (
+                  <CAccordionItem itemKey={4}>
+                    <CAccordionHeader>Patient Consent Form</CAccordionHeader>
+                    <CAccordionBody>
+                      <div style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '8px 0',
+                      }}>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>Consent Form File</div>
+                          {/* <div style={{ fontSize: '11px', color: '#64748b' }}>Uploaded during booking</div> */}
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <ActionBtn onClick={() => handlePreview(appointment.consentFormPdf)}><Eye size={13} /></ActionBtn>
+                          <ActionBtn onClick={() => handleDownload(appointment.consentFormPdf, `consent_form.pdf`)}><Download size={13} /></ActionBtn>
+                        </div>
+                      </div>
+                    </CAccordionBody>
+                  </CAccordionItem>
+                ) : null}
               </CAccordion>
             </div>
-            <h6 className="fw-bold mt-4">Doctor Details</h6>{' '}
-            <div className="d-flex align-items-center gap-3 border rounded ps-2 shadow-sm">
-              {' '}
-              <img
-                src={getDoctorImage(doctor.doctorPicture)}
-                alt={doctor.doctorName}
-                width={80}
-                height={80}
-                className="rounded-circle border"
-              />{' '}
-              <div className="p-3  ">
-                <h4 className="fw-bold mb-2">{doctor.doctorName}</h4>
 
-                <p className="mb-1 text-muted">{doctor.specialization}</p>
-                <p className="mb-1">
-                  <strong>Qualification:</strong> {doctor.qualification}
-                </p>
-                <p className="mb-1">
-                  <strong>Experience:</strong> {doctor.experience} years
-                </p>
+            {/* ── DOCTOR CARD ── */}
+            <Divider />
+            <div style={{ padding: '0 24px 24px' }}>
+              <SectionHeading icon={Stethoscope} title="Doctor Details" />
 
-                <p className="mb-0">
-                  <strong>Languages:</strong> {doctor.languages?.join(', ')}
-                </p>
-              </div>
-              <div className="ms-auto  px-2">
-                <CButton
-                  style={{ backgroundColor: 'var(--color-black)', color: 'white' }}
-                  size="sm"
-                  className="px-3 text-white text-center"
-                  onClick={() =>
-                    navigate(`/doctor/${doctor.doctorId}`, {
-                      state: { doctor },
-                    })
-                  }
-                >
-                    View Details
-                </CButton>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '16px',
+                border: `1px solid ${tokens.border}`, borderRadius: tokens.radius,
+                padding: '16px', backgroundColor: tokens.surface,
+              }}>
+                <img
+                  src={doctor.doctorPicture}
+                  alt={doctor.doctorName}
+                  style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: `2px solid var(--color-bgcolor)` }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: COLORS.primary, marginBottom: '2px' }}>{doctor.doctorName}</div>
+                  <div style={{ fontSize: '12px', color: COLORS.primary, fontWeight: '600', marginBottom: '6px' }}>{doctor.specialization}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}><strong style={{ color: COLORS.primary }}>Qualification:</strong> {doctor.qualification}</span>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}><strong style={{ color: COLORS.primary }}>Experience:</strong> {doctor.experience} yrs</span>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}><strong style={{ color: COLORS.primary }}>Languages:</strong> {doctor.languages?.join(', ')}</span>
+                  </div>
+                </div>
+                <ActionBtn style={{ backgroundColor: COLORS.primary, color: COLORS.white, alignSelf: 'center', flexShrink: 0 }} onClick={() => navigate(`/doctor/${doctor.doctorId}`, { state: { doctor } })}  >
+                  View <ChevronRight size={13} />
+                </ActionBtn>
               </div>
             </div>
           </>
         )}
       </div>
+
+      {/* ── ADD VITALS MODAL ──────────────────────────── */}
+      <CModal
+        visible={showModal}
+        onClose={() => {
+          setShowModal(false)
+          setValidationErrors({})
+        }}
+        backdrop="static"
+      >
+        <CModalHeader style={{ borderBottom: '1px solid #e2e8f0', padding: '16px 20px' }}>
+          <CModalTitle style={{ fontSize: '15px', fontWeight: '700', color: '#1e293b' }}>
+            <Activity size={16} style={{ marginRight: '8px', color: 'var(--color-bgcolor)', verticalAlign: 'middle' }} />
+            Add Patient Vitals
+          </CModalTitle>
+        </CModalHeader>
+
+        <CModalBody style={{ padding: '20px' }}>
+          <CForm>
+
+
+
+
+            {/* Fields */}
+
+            <>
+              {renderField("Height (cm)", "height", "e.g. 170")}
+              {renderField("Weight (kg)", "weight", "e.g. 65")}
+              {renderField("Blood Pressure", "bloodPressure", "e.g. 120/80")}
+              {renderField("Temperature (°F / °C)", "temperature", "e.g. 98.6")}
+
+              <div style={{ marginBottom: '14px' }}>
+                <label
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: tokens.muted,
+                    display: 'block',
+                    marginBottom: '4px',
+                  }}
+                >
+                  BMI (auto-calculated)
+                </label>
+
+                <CFormInput
+                  name="bmi"
+                  value={formData.bmi}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  placeholder="e.g. 22.5"
+                  invalid={!!validationErrors.bmi}
+                  style={{
+                    fontSize: '13px',
+                    borderRadius: tokens.radiusSm,
+                    backgroundColor: '#f8fafc',
+                  }}
+                  readOnly={!!(formData.height && formData.weight)}
+                />
+
+                {validationErrors.bmi && (
+                  <small style={{ color: tokens.danger, fontSize: '11px' }}>
+                    {validationErrors.bmi}
+                  </small>
+                )}
+              </div>
+            </>
+
+          </CForm>
+        </CModalBody>
+
+        <CModalFooter style={{ borderTop: `1px solid ${tokens.border}`, padding: '12px 20px', gap: '8px' }}>
+          <button
+            onClick={() => {
+              setShowModal(false)
+              setValidationErrors({})
+            }}
+            style={{
+              padding: '6px 16px', borderRadius: tokens.radiusSm, fontSize: '13px',
+              fontWeight: '600', cursor: 'pointer', border: `1px solid ${tokens.border}`,
+              backgroundColor: '#fff', color: '#1e293b',
+            }}
+          >
+            Cancel
+          </button>
+          {
+            (enableVitals || isAnyFieldFilled) && (
+
+              <ActionBtn onClick={handleSubmitVitals} style={{ padding: '6px 20px', backgroundColor: COLORS.primary }}>
+                {loading ? (
+                  <><span className="spinner-border spinner-border-sm me-1" style={{ width: '12px', height: '12px' }} /> Saving...</>
+                ) : 'Save Vitals'}
+              </ActionBtn>
+            )
+          }
+
+        </CModalFooter>
+      </CModal>
+      {/* ── Edit Appointment Modal ──────────────────── */}
+      <BookAppointmentModal
+        visible={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        editData={appointment}
+      />
     </div>
   )
 }
+
 export default AppointmentDetails

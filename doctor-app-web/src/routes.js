@@ -7,6 +7,8 @@ const Dashboard = React.lazy(() => import('./views/dashboard/Dashboard'))
 const Appointments = React.lazy(() => import('./Screens/Appointments/Appointments'))
 const Settings = React.lazy(() => import('./Prescription/Settings'))
 const Login = React.lazy(() => import('./views/pages/login/Login'))
+const AttendanceTracker = React.lazy(() => import('./views/attendance/AttendanceTracker'))
+const PatientFeedback = React.lazy(() => import('./views/feedback/PatientFeedback'))
 
 const routes = [
   { path: '/dashboard', name: 'Dashboard', element: Dashboard },
@@ -14,6 +16,8 @@ const routes = [
   { path: '/doctorprofile', name: 'DoctorProfile', element: DoctorProfile },
   { path: '/notifications', name: 'Notifications', element: NotificationDemo },
   { path: '/helpCentre', name: 'HelpCenter', element: HelpCenter },
+  { path: '/attendance', name: 'Attendance Tracker', element: AttendanceTracker },
+  { path: '/feedback', name: 'Patient Feedback', element: PatientFeedback },
 ]
 
 export default routes

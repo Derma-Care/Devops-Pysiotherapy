@@ -1,4 +1,3 @@
-/* eslint-disable prettier/prettier */
 importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js')
 
@@ -9,7 +8,7 @@ firebase.initializeApp({
   messagingSenderId: '386304374153',
   appId: '1:386304374153:web:a38254c2401db7bafd9d58',
 })
-  const messaging = firebase.messaging()
+const messaging = firebase.messaging()
 
 messaging.onBackgroundMessage((payload) => {
   console.log('Background message:', payload)

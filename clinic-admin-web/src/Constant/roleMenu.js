@@ -8,7 +8,7 @@ export const roleMenu = {
     'Disease-Management': ['create', 'read', 'update', 'delete'],
     Tests: ['create', 'read', 'update', 'delete'],
     Treatments: ['create', 'read', 'update', 'delete'],
-    'Procedure Management': ['create', 'read', 'update', 'delete'],
+    'Therapy Management': ['create', 'read', 'update', 'delete'],
     Reports: ['read'],
     Payouts: ['create', 'read', 'update', 'delete'],
     Help: ['read'],
@@ -45,6 +45,7 @@ export const roleMenu = {
     Dashboard: ['read'],
     Appointments: ['create', 'read', 'update'],
     Payouts: ['read'],
+    Billing: ['create', 'read', 'update', 'delete'],
     Help: ['read'],
   },
   //Nurse Permissions
@@ -52,10 +53,11 @@ export const roleMenu = {
     'Disease-Management': ['create', 'read', 'update', 'delete'],
     Appointments: ['create', 'read', 'update'],
     Payouts: ['read'],
+    Billing: ['create', 'read', 'update', 'delete'],
     Help: ['read'],
     Test: ['read'],
     Treatments: ['read'],
-    'Procedure Management': ['create', 'read', 'update', 'delete'],
+    'Therapy Management': ['create', 'read', 'update', 'delete'],
     ConsentForms: ['create', 'read', 'update', 'delete'],
   },
   //Pharmacist Permissions
@@ -66,7 +68,7 @@ export const roleMenu = {
     Help: ['read'],
     Test: ['read'],
     Treatments: ['read'],
-    'Procedure Management': ['create', 'read', 'update', 'delete'],
+    'Therapy Management': ['create', 'read', 'update', 'delete'],
     ConsentForms: ['create', 'read', 'update', 'delete'],
   },
 }

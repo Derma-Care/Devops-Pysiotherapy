@@ -1,770 +1,1845 @@
-import React, { useEffect, useRef, useState } from 'react'
+// ─── KEY FIXES IN THIS FILE ───────────────────────────────────────────────
+// 1. record resolution: handles BOTH API response shape AND internal formData shape
+// 2. symptomsObj: reads from record.complaints (API) OR record.symptoms (internal)
+// 3. diagnosisRows: reads diagnosisObj.diagnosisRows array first, falls back to flat
+// 4. effectivePain: reads from complaints.patientPain OR symptoms.patientPain
+// 5. investigationTests: reads selectedTests first then tests
+// 6. therapyAnswers: handles both flat array (API) and object-keyed (internal) forms
+// 7. buildPayload: always sends the exact shape the API expects
+// ─────────────────────────────────────────────────────────────────────────────
+
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  CContainer,
-  CRow,
-  CCol,
-  CCard,
-  CCardHeader,
-  CCardBody,
-  CTable,
-  CTableHead,
-  CTableRow,
-  CTableHeaderCell,
-  CTableBody,
-  CTableDataCell,
-  CBadge,
-} from '@coreui/react'
+import { CContainer, CSpinner, CFormInput } from '@coreui/react'
 import Button from '../components/CustomButton/CustomButton'
 import Snackbar from '../components/Snackbar'
 import { COLORS } from '../Themes'
-import './Summary.css'
 import { useToast } from '../utils/Toaster'
 import FileUploader from './FileUploader'
-import { createDoctorSaveDetails, getClinicDetails, getDoctorDetails } from '../Auth/Auth'
+import { uploadPrescriptionPdf } from '../utils/S3UploadServices'
+import { createDoctorSaveDetails, getClinicDetails, getDoctorDetails, SavePatientPrescription, UpdatePatientPrescription, updateAppointmentBasedOnBookingId } from '../Auth/Auth'
 import { useDoctorContext } from '../Context/DoctorContext'
 import PrescriptionPDF from '../utils/PdfGenerator'
 import { pdf } from '@react-pdf/renderer'
-import { capitalizeEachWord, capitalizeFirst } from '../utils/CaptalZeWord'
+import { capitalizeEachWord } from '../utils/CaptalZeWord'
+const T = {
+  bgcolor: '#1B4F8A',
+  orange: '#f9c571',
+  orangeLight: '#fff8ec',
+  orangeMid: '#fde2a3',
+  white: '#FFFFFF',
+  bgLight: '#F0F6FF',
+  border: '#c2d8f0',
+  borderLight: '#deeaf7',
+  text: '#1B4F8A',
+  textMid: '#4a6fa5',
+  textLight: '#7a9ec2',
+  teal: '#0d9488',
+  tealLight: '#ccfbf1',
+  purple: '#7c3aed',
+  purpleLight: '#ede9fe',
+  rose: '#e11d48',
+  roseLight: '#ffe4e6',
+  amber: '#d97706',
+  amberLight: '#fef3c7',
+  green: '#16a34a',
+  greenLight: '#dcfce7',
+}
 
-/**
- * Props:
- * - patientData
- * - formData: {
- *    symptoms: { symptomDetails, doctorObs, diagnosis, duration, attachments? }
- *    tests: { selectedTests: string[], testReason?: string }
- *    prescription: { medicines: [{ id?, name, dose, remindWhen, note, duration, times }] }
- *    treatments: { selectedTestTreatments: string[], treatmentReason?, generatedData? }
- *    followUp: { durationValue, durationUnit, nextFollowUpDate, followUpNote }
- *   }
- */
+const isValid = (v) =>
+  v !== undefined && v !== null && v !== '' && v !== 'NA' &&
+  !(typeof v === 'string' && v.trim().toLowerCase() === 'undefined') &&
+  !(typeof v === 'string' && v.trim() === '—')
 
+const dash = (v) => (v && v !== 'NA' && String(v).trim() !== '' ? v : '—')
+
+const toImageSrc = (raw) => {
+  if (!raw) return null
+
+  const toDataUrl = (input) => {
+    let bytes
+    if (input instanceof Uint8Array) {
+      bytes = input
+    } else if (input instanceof ArrayBuffer) {
+      bytes = new Uint8Array(input)
+    } else if (typeof input === 'string') {
+      const s = input.trim().replace(/^'+|'+$/g, '')
+      try {
+        const decoded = atob(s)
+        if (btoa(decoded).replace(/=+$/, '') === s.replace(/=+$/, '')) {
+          bytes = new Uint8Array(decoded.length)
+          for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i)
+        }
+      } catch (e) { }
+      if (!bytes) {
+        bytes = new Uint8Array(s.length)
+        for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i) & 0xff
+      }
+    } else {
+      return null
+    }
+
+    let mime = 'image/*'
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) mime = 'image/png'
+    else if (bytes[0] === 0xff && bytes[1] === 0xd8) mime = 'image/jpeg'
+    else if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) mime = 'image/gif'
+    else if (bytes[0] === 0x42 && bytes[1] === 0x4d) mime = 'image/bmp'
+    else if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+      bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) mime = 'image/webp'
+
+    let bin = ''
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
+    return `data:${mime};base64,${btoa(bin)}`
+  }
+
+  if (typeof raw !== 'string') {
+    try {
+      return toDataUrl(raw)
+    } catch (e) {
+      return null
+    }
+  }
+
+  const trimmed = raw.trim()
+  if (trimmed.startsWith('data:')) return trimmed
+  if (trimmed.startsWith('blob:')) return trimmed
+  if (trimmed.includes('X-Amz-Signature=') || trimmed.includes('X-Amz-Algorithm=') || trimmed.includes('amazonaws.com')) return trimmed
+
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    let urlWithoutQuery = trimmed
+    const queryIdx = trimmed.indexOf('?')
+    if (queryIdx !== -1) {
+      urlWithoutQuery = trimmed.substring(0, queryIdx)
+    }
+
+    let base64Part = ''
+    const awsIndex = urlWithoutQuery.lastIndexOf('amazonaws.com')
+    if (awsIndex !== -1) {
+      const remaining = urlWithoutQuery.substring(awsIndex + 'amazonaws.com'.length)
+      let extracted = ''
+      if (remaining.startsWith('/')) {
+        extracted = remaining.substring(1)
+      } else if (remaining.startsWith('%2F') || remaining.startsWith('%2f')) {
+        extracted = remaining.substring(3)
+      } else {
+        const slashIdx = remaining.indexOf('/')
+        const pctSlashIdx = remaining.toLowerCase().indexOf('%2f')
+        if (slashIdx !== -1 && (pctSlashIdx === -1 || slashIdx < pctSlashIdx)) {
+          extracted = remaining.substring(slashIdx + 1)
+        } else if (pctSlashIdx !== -1) {
+          extracted = remaining.substring(pctSlashIdx + 3)
+        } else {
+          extracted = remaining
+        }
+      }
+
+      const upperExtracted = extracted.toUpperCase()
+      const signatures = ['IVBOR', '/9J/', '9J/', 'R0LGO', 'JVBER', '%2F9J%2F']
+      let signatureIndex = -1
+      for (const sig of signatures) {
+        const idx = upperExtracted.indexOf(sig)
+        if (idx !== -1) {
+          signatureIndex = idx
+          break
+        }
+      }
+
+      if (signatureIndex !== -1) {
+        base64Part = extracted.substring(signatureIndex)
+      } else if (extracted.length > 500) {
+        base64Part = extracted
+      } else {
+        return trimmed // Normal short S3 URL
+      }
+    } else {
+      return trimmed // Not an amazonaws URL
+    }
+
+    if (base64Part) {
+      let decodedPart = base64Part
+      // Multi-pass percent decoding to handle single or double percent-encoding
+      for (let pass = 0; pass < 3; pass++) {
+        if (!decodedPart.includes('%')) break;
+        try {
+          decodedPart = decodeURIComponent(decodedPart)
+        } catch (e) {
+          const prev = decodedPart
+          decodedPart = decodedPart
+            .replace(/%2[bB]/g, '+')
+            .replace(/%2[fF]/g, '/')
+            .replace(/%3[dD]/g, '=')
+            .replace(/%25/g, '%')
+          if (decodedPart === prev) break
+        }
+      }
+
+      // Final cleanup of base64 characters
+      const cleanDecoded = decodedPart.trim()
+        .replace(/%2[bB]/g, '+')
+        .replace(/%2[fF]/g, '/')
+        .replace(/%3[dD]/g, '=')
+
+      const upperDecoded = cleanDecoded.toUpperCase()
+
+      // Direct base64 data URL assembly for known signatures
+      if (upperDecoded.startsWith('IVBOR')) {
+        return `data:image/png;base64,${cleanDecoded}`
+      }
+      if (upperDecoded.startsWith('/9J/') || upperDecoded.startsWith('9J/')) {
+        const fullBase64 = cleanDecoded.startsWith('9J') ? '/' + cleanDecoded : cleanDecoded
+        return `data:image/jpeg;base64,${fullBase64}`
+      }
+      if (upperDecoded.startsWith('R0LGO')) {
+        return `data:image/gif;base64,${cleanDecoded}`
+      }
+      if (upperDecoded.startsWith('JVBER')) {
+        return `data:application/pdf;base64,${cleanDecoded}`
+      }
+
+      if (cleanDecoded.length > 500 && !/\s/.test(cleanDecoded)) {
+        try {
+          return toDataUrl(cleanDecoded)
+        } catch (e) {
+          return `data:image/jpeg;base64,${cleanDecoded}`
+        }
+      }
+    }
+    return trimmed
+  }
+
+  if (trimmed.startsWith('/')) {
+    const upperTrimmed = trimmed.toUpperCase()
+    if (upperTrimmed.startsWith('/9J/')) {
+      return `data:image/jpeg;base64,${trimmed}`
+    }
+    return trimmed
+  }
+
+  // Pure Base64 strings: check signatures directly to prevent double-encoding bugs in toDataUrl
+  const upperTrimmed = trimmed.toUpperCase()
+  if (upperTrimmed.startsWith('IVBOR')) {
+    return `data:image/png;base64,${trimmed}`
+  }
+  if (upperTrimmed.startsWith('/9J/') || upperTrimmed.startsWith('9J/')) {
+    const fullBase64 = trimmed.startsWith('9J') ? '/' + trimmed : trimmed
+    return `data:image/jpeg;base64,${fullBase64}`
+  }
+  if (upperTrimmed.startsWith('R0LGO')) {
+    return `data:image/gif;base64,${trimmed}`
+  }
+  if (upperTrimmed.startsWith('JVBER')) {
+    return `data:application/pdf;base64,${trimmed}`
+  }
+
+  try {
+    return toDataUrl(trimmed)
+  } catch (e) {
+    if (trimmed.length > 100 && !/\s/.test(trimmed)) {
+      return `data:image/jpeg;base64,${trimmed}`
+    }
+    return trimmed
+  }
+}
+
+const PAIN_LABEL_MAP = {
+  chronicPain: 'Chronic Pain',
+  sportsRehab: 'Sports Rehab',
+  neuroRehab: 'Neuro Rehab',
+  acutePain: 'Acute Pain',
+  neuropathicPain: 'Neuropathic Pain',
+  referredPain: 'Referred Pain',
+  inflammatoryPain: 'Inflammatory Pain',
+}
+
+const getVisitUrgency = (dateStr) => {
+  if (!dateStr) return null
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const visit = new Date(dateStr); visit.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((visit - today) / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return { label: 'Overdue', bg: '#fff5f5', color: '#c53030', border: '#fc8181', icon: '⚠️' }
+  if (diffDays === 0) return { label: 'Today', bg: '#f0fff4', color: '#276749', border: '#68d391', icon: '📍' }
+  if (diffDays <= 3) return { label: 'Very Soon', bg: '#fffbeb', color: '#7b341e', border: '#f6ad55', icon: '🔔' }
+  if (diffDays <= 7) return { label: 'This Week', bg: '#ebf8ff', color: '#2a4365', border: '#63b3ed', icon: '📅' }
+  return { label: 'Upcoming', bg: '#f5f0ff', color: '#44337a', border: '#b794f4', icon: '🗓️' }
+}
+
+// ─── UI primitives ────────────────────────────────────────────────────────────
+const Section = ({ icon, title, children, badge = null }) => (
+  <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, marginBottom: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(27,79,138,0.07), 0 4px 16px rgba(27,79,138,0.06)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: T.bgcolor, borderBottom: `2px solid ${T.orange}` }}>
+      <span style={{ width: 26, height: 26, borderRadius: 8, background: 'rgba(249,197,113,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{icon}</span>
+      <span style={{ color: T.white, fontWeight: 700, fontSize: '0.82rem', letterSpacing: '0.01em', flex: 1 }}>{title}</span>
+      {badge && <span style={{ background: T.orange, color: T.bgcolor, borderRadius: 20, padding: '2px 10px', fontSize: 10, fontWeight: 700 }}>{badge}</span>}
+    </div>
+    <div style={{ padding: '12px 16px' }}>{children}</div>
+  </div>
+)
+
+const Row = ({ label, value, full = false, highlight = false }) => {
+  if (!isValid(value) && value !== 0) return null
+  return (
+    <div style={{ display: 'flex', flexDirection: full ? 'column' : 'row', gap: full ? 2 : 6, marginBottom: 7, padding: highlight ? '5px 10px' : 0, background: highlight ? T.orangeLight : 'transparent', borderRadius: highlight ? 6 : 0, borderLeft: highlight ? `3px solid ${T.orange}` : 'none', paddingLeft: highlight ? 10 : 0, alignItems: 'flex-start' }}>
+      <span style={{ fontWeight: 700, fontSize: '0.72rem', color: T.textLight, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap', flexShrink: 0, lineHeight: 1.5, minWidth: full ? 'auto' : 110 }}>{label}:</span>
+      <span style={{ fontSize: '0.82rem', color: T.text, wordBreak: 'break-word', lineHeight: 1.5, flex: 1 }}>{dash(value)}</span>
+    </div>
+  )
+}
+
+const Grid = ({ children, cols = 2 }) => {
+  const validChildren = React.Children.toArray(children).filter(Boolean)
+  if (validChildren.length === 0) return null
+  return <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '6px 20px' }}>{validChildren}</div>
+}
+
+const Chip = ({ label, color = T.bgcolor, bg = T.bgLight }) => (
+  <span style={{ background: bg, color, borderRadius: 20, padding: '2px 10px', fontSize: '0.72rem', fontWeight: 700, border: `1px solid ${color}33`, display: 'inline-block', margin: '2px 3px 2px 0' }}>{label}</span>
+)
+
+const CheckChip = ({ label, checked }) => (
+  <span style={{ background: checked ? T.orangeLight : '#f3f4f6', color: checked ? T.bgcolor : '#94a3b8', borderRadius: 20, padding: '2px 10px', fontSize: '0.72rem', fontWeight: 700, border: `1px solid ${checked ? T.orange : '#e2e8f0'}`, display: 'inline-flex', alignItems: 'center', gap: 4, margin: '2px 3px 2px 0', opacity: checked ? 1 : 0.5 }}>
+    {checked ? '✓' : '○'} {label}
+  </span>
+)
+
+const StatusDot = ({ status }) => {
+  const map = {
+    Confirmed: ['#d1fae5', '#065f46', '#6ee7b7'],
+    Completed: ['#d1fae5', '#065f46', '#6ee7b7'],
+    Pending: ['#fef3c7', '#92400e', '#fcd34d'],
+    Cancelled: ['#fee2e2', '#991b1b', '#fecaca'],
+    'In Progress': [T.bgLight, T.bgcolor, T.border],
+    'in-progress': [T.bgLight, T.bgcolor, T.border],
+  }
+  const [bg, fg, border] = map[status] || ['#f3f4f6', '#374151', '#d1d5db']
+  return <span style={{ background: bg, color: fg, border: `1px solid ${border}`, borderRadius: 20, padding: '3px 12px', fontSize: '0.75rem', fontWeight: 700 }}>{status}</span>
+}
+
+const AnswerBadge = ({ answer }) => {
+  const display = String(answer ?? '').trim()
+  if (!display || display.toLowerCase() === 'undefined' || display.toLowerCase() === 'na') {
+    return <span style={{ color: T.textLight, fontSize: 11, fontStyle: 'italic' }}>Not answered</span>
+  }
+  const up = display.toUpperCase()
+  const [bg, color, border] = up === 'YES' ? ['#d1fae5', '#065f46', '#6ee7b7'] : up === 'NO' ? ['#fee2e2', '#991b1b', '#fecaca'] : [T.bgLight, T.bgcolor, T.border]
+  return <span style={{ background: bg, color, border: `1px solid ${border}`, borderRadius: 20, padding: '2px 10px', fontSize: '0.72rem', fontWeight: 700 }}>{display}</span>
+}
+
+// ─── Therapy Tables ───────────────────────────────────────────────────────────
+const tableStyle = { width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', color: T.text }
+const thStyle = { padding: '6px 10px', textAlign: 'left', whiteSpace: 'nowrap', fontWeight: 600, fontSize: '0.72rem', background: T.bgcolor, color: T.white }
+const tdStyle = (i) => ({ padding: '5px 10px', borderBottom: `1px solid ${T.border}`, background: i % 2 === 0 ? T.bgLight : T.white })
+
+const renderAvailableDetails = (ex) => {
+  const details = []
+
+  if (ex.sets !== undefined && ex.sets !== null && String(ex.sets).trim() !== '' && String(ex.sets).trim() !== '0') {
+    details.push(
+      <div key="sets" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <strong>Sets:</strong>
+        <Chip label={`🔁 ${ex.sets}`} color={T.bgcolor} bg="#fff" />
+      </div>
+    )
+  }
+
+  const repsVal = ex.repetitions ?? ex.reps
+  if (repsVal !== undefined && repsVal !== null && String(repsVal).trim() !== '' && String(repsVal).trim() !== '0') {
+    details.push(
+      <div key="reps" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <strong>Reps:</strong>
+        <Chip label={`🔄 ${repsVal}`} color={T.teal} bg="#fff" />
+      </div>
+    )
+  }
+
+  if (ex.bodyPart && String(ex.bodyPart).trim() !== '') {
+    details.push(
+      <div key="bodyPart" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <strong>Body Part:</strong>
+        <Chip label={`🦴 ${ex.bodyPart}`} color={T.bgcolor} bg="#fff" />
+      </div>
+    )
+  }
+
+  if (ex.intensity && String(ex.intensity).trim() !== '') {
+    details.push(
+      <div key="intensity" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <strong>Intensity:</strong>
+        <span style={{ background: '#fef3c7', color: '#d97706', border: '1px solid #fde68a', borderRadius: 20, padding: '2px 8px', fontSize: '0.7rem', fontWeight: 700 }}>⚡ {ex.intensity}</span>
+      </div>
+    )
+  }
+
+  if (ex.assistanceLevel && String(ex.assistanceLevel).trim() !== '') {
+    details.push(
+      <div key="assistance" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <strong>Assistance Level:</strong>
+        <span style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: 20, padding: '2px 8px', fontSize: '0.7rem', fontWeight: 700 }}>🤝 {ex.assistanceLevel}</span>
+      </div>
+    )
+  }
+
+  if (ex.machine && String(ex.machine).trim() !== '') {
+    details.push(
+      <div key="machine" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <strong>Machine/Equipment:</strong>
+        <span style={{ color: '#374151', fontWeight: 600 }}>🛠️ {ex.machine}</span>
+      </div>
+    )
+  }
+
+  if (ex.technique && String(ex.technique).trim() !== '') {
+    details.push(
+      <div key="technique" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <strong>Technique:</strong>
+        <span style={{ color: '#374151' }}>{ex.technique}</span>
+      </div>
+    )
+  }
+
+  if (ex.area && String(ex.area).trim() !== '') {
+    details.push(
+      <div key="area" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <strong>Area:</strong>
+        <span style={{ color: '#374151' }}>📍 {ex.area}</span>
+      </div>
+    )
+  }
+
+  const metricVal = ex.metric
+  const valVal = ex.value
+  const unitVal = ex.unit
+  if (metricVal && String(metricVal).trim() !== '') {
+    details.push(
+      <div key="metric" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <strong>{metricVal}:</strong>
+        <span style={{ color: '#111827', fontWeight: 600 }}>{valVal} {unitVal}</span>
+      </div>
+    )
+  }
+
+  const notesVal = ex.notes || ex.instructions
+  const notesElement = (notesVal && String(notesVal).trim() !== '') ? (
+    <div key="notes" style={{ width: '100%', marginTop: 4, borderTop: `1px dashed ${T.border}`, paddingTop: 4 }}>
+      <strong>Notes / Instructions:</strong>{' '}
+      <span style={{ color: '#4b5563', fontStyle: 'italic' }}>{notesVal}</span>
+    </div>
+  ) : null
+
+  if (details.length === 0 && !notesElement) {
+    return <span style={{ color: T.textLight, fontStyle: 'italic' }}>No additional details available</span>
+  }
+
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 20px', fontSize: '0.75rem', alignItems: 'center' }}>
+      {details}
+      {notesElement}
+    </div>
+  )
+}
+
+const ExerciseTableDisplay = ({ exercises }) => {
+  const [expandedRows, setExpandedRows] = useState({})
+
+  if (!exercises || exercises.length === 0) return <div style={{ padding: '8px 12px', color: T.textLight, fontStyle: 'italic', fontSize: '0.78rem' }}>No exercises</div>
+
+  const toggleRow = (idx) => {
+    setExpandedRows(prev => ({
+      ...prev,
+      [idx]: !prev[idx]
+    }))
+  }
+
+  const hasSessions = exercises.some(ex => {
+    const s = ex.noOfSessions ?? ex.session ?? ex.sessions
+    return s !== undefined && s !== null && String(s).trim() !== ''
+  })
+  const hasDuration = exercises.some(ex => {
+    const d = ex.duration ?? ex.activityDuration ?? ex.activityduration
+    return d !== undefined && d !== null && String(d).trim() !== ''
+  })
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={tableStyle}>
+        <thead>
+          <tr>
+            <th style={thStyle}>#</th>
+            <th style={thStyle}>Exercise Name</th>
+            {hasSessions && <th style={{ ...thStyle, textAlign: 'center' }}>Sessions</th>}
+            {hasDuration && <th style={{ ...thStyle, textAlign: 'center' }}>Duration</th>}
+            <th style={{ ...thStyle, textAlign: 'center' }}>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {exercises.map((ex, i) => {
+            const isExpanded = !!expandedRows[i]
+            const sessions = ex.noOfSessions ?? ex.session ?? ex.sessions
+            const duration = ex.duration ?? ex.activityDuration ?? ex.activityduration
+
+            return (
+              <React.Fragment key={i}>
+                <tr>
+                  <td style={{ ...tdStyle(i), fontWeight: 700, color: T.bgcolor }}>{i + 1}</td>
+                  <td style={{ ...tdStyle(i), fontWeight: 600 }}>{ex.exerciseName || ex.name || '—'}</td>
+                  {hasSessions && <td style={{ ...tdStyle(i), textAlign: 'center' }}>{dash(sessions)}</td>}
+                  {hasDuration && <td style={{ ...tdStyle(i), textAlign: 'center' }}>{dash(duration)}</td>}
+                  <td style={{ ...tdStyle(i), textAlign: 'center' }}>
+                    <button
+                      onClick={() => toggleRow(i)}
+                      style={{
+                        background: T.bgcolor,
+                        color: T.white,
+                        border: 'none',
+                        borderRadius: 4,
+                        padding: '3px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                      }}
+                    >
+                      {isExpanded ? 'Hide' : 'View'}
+                    </button>
+                  </td>
+                </tr>
+                {isExpanded && (
+                  <tr>
+                    <td colSpan={3 + (hasSessions ? 1 : 0) + (hasDuration ? 1 : 0)} style={{ padding: '8px 12px', background: T.bgLight, borderBottom: `1px solid ${T.border}` }}>
+                      {renderAvailableDetails(ex)}
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+const TherapyBlock = ({ therapyName, exercises }) => (
+  <div style={{ marginBottom: 10, borderRadius: 8, overflow: 'hidden', border: `1px solid ${T.border}` }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 12px', background: T.bgLight, borderBottom: `1px solid ${T.border}` }}>
+      <span style={{ fontWeight: 700, color: T.bgcolor, fontSize: '0.8rem' }}>💊 {therapyName || 'Therapy'}</span>
+    </div>
+    <ExerciseTableDisplay exercises={exercises} />
+  </div>
+)
+
+const SessionMetaBar = ({ sess, therapistId, therapistName }) => {
+  const tName = sess.therapistName || therapistName || ''
+  const tId = sess.therapistId || therapistId || ''
+  if (!sess.serviceType && !tName && !tId) return null
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10, padding: '8px 12px', background: T.bgLight, borderRadius: 8, border: `1px solid ${T.border}`, alignItems: 'center' }}>
+      {sess.serviceType && <Chip label={`📋 ${sess.serviceType}`} color={T.bgcolor} bg={T.bgLight} />}
+      {tName && <Chip label={`👤 ${tName}`} color={T.bgcolor} bg={T.orangeLight} />}
+      {tId && <Chip label={`ID: ${tId}`} color={T.textMid} bg="#f3f4f6" />}
+    </div>
+  )
+}
+
+const TherapySessionsDisplay = ({ sessionsList, therapistId, therapistName }) => {
+  const [expandedRows, setExpandedRows] = useState({})
+
+  if (!sessionsList || sessionsList.length === 0) return <div style={{ padding: '12px', textAlign: 'center', color: T.textLight, fontSize: '0.8rem' }}>No therapy session data found.</div>
+
+  const allExercises = []
+  sessionsList.forEach((sess) => {
+    const serviceType = (sess.serviceType || '').toLowerCase()
+
+    const addExercises = (exercisesList, typeName) => {
+      if (Array.isArray(exercisesList)) {
+        exercisesList.forEach(ex => {
+          allExercises.push({
+            ...ex,
+            activityType: ex.activityType || typeName || sess.packageName || sess.programName || sess.therapyName || sess.serviceType || '—'
+          })
+        })
+      }
+    }
+
+    if (serviceType === 'package') {
+      const programs = sess.programs || sess.programList || []
+      programs.forEach(prog => {
+        const therapies = prog.therapyData || prog.therophyData || prog.activities || []
+        therapies.forEach(therapy => {
+          addExercises(therapy.exercises, therapy.therapyName)
+        })
+      })
+    } else if (serviceType === 'program') {
+      const therapies = sess.therapyData ?? sess.therophyData ?? sess.activities ?? sess.programActivities ?? []
+      therapies.forEach(t => {
+        addExercises(t.exercises, t.therapyName)
+      })
+    } else if (serviceType === 'therapy') {
+      addExercises(sess.exercises, sess.therapyName)
+    } else if (serviceType === 'exercise') {
+      addExercises(sess.exercises, 'Exercise')
+    } else {
+      const therapies = sess.therapyData || []
+      therapies.forEach(t => {
+        addExercises(t.exercises, t.therapyName)
+      })
+      if (sess.exercises) {
+        addExercises(sess.exercises, sess.serviceType)
+      }
+    }
+  })
+
+  if (allExercises.length === 0) return <div style={{ padding: '12px', textAlign: 'center', color: T.textLight, fontSize: '0.8rem' }}>No exercises/activities found.</div>
+
+  const toggleRow = (idx) => {
+    setExpandedRows(prev => ({
+      ...prev,
+      [idx]: !prev[idx]
+    }))
+  }
+
+  const uniqueTherapistNames = Array.from(new Set(
+    sessionsList
+      .map(s => s.therapistName || therapistName)
+      .filter(name => name !== undefined && name !== null && name.trim() !== '')
+  ))
+  const uniqueTherapistIds = Array.from(new Set(
+    sessionsList
+      .map(s => s.therapistId || therapistId)
+      .filter(id => id !== undefined && id !== null && String(id).trim() !== '')
+  ))
+
+  return (
+    <div style={{ border: `1.5px solid ${T.border}`, borderRadius: 10, overflow: 'hidden' }}>
+      {/* Session Header Info if available */}
+      {(uniqueTherapistNames.length > 0 || uniqueTherapistIds.length > 0) && (
+        <div style={{ padding: '10px 14px', background: T.bgLight, borderBottom: `1px solid ${T.border}`, fontSize: '0.78rem', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          {uniqueTherapistNames.length > 0 && (
+            <div>
+              <strong>Therapist Name(s):</strong>{' '}
+              <span style={{ color: T.textMid }}>{uniqueTherapistNames.join(', ')}</span>
+            </div>
+          )}
+          {uniqueTherapistIds.length > 0 && (
+            <div>
+              <strong>Therapist ID(s):</strong>{' '}
+              <span style={{ color: T.textMid }}>{uniqueTherapistIds.join(', ')}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={tableStyle}>
+          <thead>
+            <tr>
+              <th style={thStyle}>#</th>
+              <th style={thStyle}>Activity Name</th>
+              <th style={thStyle}>Type</th>
+              <th style={{ ...thStyle, textAlign: 'center' }}>Sessions</th>
+              <th style={{ ...thStyle, textAlign: 'center' }}>Duration</th>
+              <th style={{ ...thStyle, textAlign: 'center' }}>Frequency</th>
+              <th style={{ ...thStyle, textAlign: 'center' }}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {allExercises.map((ex, i) => {
+              const isExpanded = !!expandedRows[i]
+              const sessions = ex.noOfSessions ?? ex.session ?? ex.sessions
+              const duration = ex.duration ?? ex.activityDuration ?? ex.activityduration
+
+              return (
+                <React.Fragment key={i}>
+                  <tr>
+                    <td style={{ ...tdStyle(i), fontWeight: 700, color: T.bgcolor }}>{i + 1}</td>
+                    <td style={{ ...tdStyle(i), fontWeight: 600 }}>{ex.exerciseName || ex.name || '—'}</td>
+                    <td style={{ ...tdStyle(i), fontWeight: 500 }}>{ex.activityType || '—'}</td>
+                    <td style={{ ...tdStyle(i), textAlign: 'center' }}>{dash(sessions)}</td>
+                    <td style={{ ...tdStyle(i), textAlign: 'center' }}>{dash(duration)}</td>
+                    <td style={{ ...tdStyle(i), textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      {ex.frequency ? <span style={{ fontSize: '0.72rem', fontWeight: 600, color: T.bgcolor }}>📆 {ex.frequency}</span> : '—'}
+                    </td>
+                    <td style={{ ...tdStyle(i), textAlign: 'center' }}>
+                      <button
+                        onClick={() => toggleRow(i)}
+                        style={{
+                          background: T.bgcolor,
+                          color: T.white,
+                          border: 'none',
+                          borderRadius: 4,
+                          padding: '3px 8px',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                        }}
+                      >
+                        {isExpanded ? 'Hide' : 'View'}
+                      </button>
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr>
+                      <td colSpan={7} style={{ padding: '8px 12px', background: T.bgLight, borderBottom: `1px solid ${T.border}` }}>
+                        {renderAvailableDetails(ex)}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ─── Questionnaire Section ────────────────────────────────────────────────────
+const QuestionnaireSection = ({ therapyGroups }) => {
+  const [activeTab, setActiveTab] = useState(0)
+  const validGroups = therapyGroups.filter(({ questions }) => questions.filter(q => isValid(q.question)).length > 0)
+  if (validGroups.length === 0) return null
+
+  const { questions } = validGroups[activeTab] ?? validGroups[0]
+  const validQs = questions.filter(q => isValid(q.question))
+
+  return (
+    <Section icon="📝" title="Therapy Questionnaire" badge={`${validGroups.length} categories`}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+        {validGroups.map(({ category, questions: qs }, idx) => {
+          const vqs = qs.filter(q => isValid(q.question))
+          const ans = vqs.filter(q => isValid(q.answer) && q.answer.toLowerCase() !== 'undefined').length
+          const isAct = activeTab === idx
+          return (
+            <button key={category} onClick={() => setActiveTab(idx)} style={{ border: `2px solid ${isAct ? T.orange : T.border}`, borderRadius: 10, padding: '5px 12px', cursor: 'pointer', background: isAct ? T.bgcolor : T.white, color: isAct ? T.white : T.textMid, fontWeight: 700, fontSize: 11, transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 6, textTransform: 'capitalize' }}>
+              {category}
+              <span style={{ background: isAct ? T.orange : T.bgLight, color: T.bgcolor, borderRadius: 10, padding: '1px 6px', fontSize: 10, fontWeight: 800 }}>{ans}/{vqs.length}</span>
+            </button>
+          )
+        })}
+      </div>
+      <div style={{ borderRadius: 10, overflow: 'hidden', border: `1px solid ${T.border}` }}>
+        {validQs.map((q, idx) => {
+          const hasAns = isValid(q.answer) && q.answer.toLowerCase() !== 'undefined'
+          return (
+            <div key={q.questionId ?? idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, padding: '9px 14px', borderBottom: idx < validQs.length - 1 ? `1px solid ${T.borderLight}` : 'none', background: idx % 2 === 0 ? T.bgLight : T.white }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flex: 1 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, height: 20, borderRadius: '50%', background: hasAns ? T.bgcolor : T.border, color: hasAns ? T.white : T.textLight, fontSize: 9, fontWeight: 800, flexShrink: 0, marginTop: 1 }}>{idx + 1}</span>
+                <span style={{ fontSize: 12, color: T.text, fontWeight: 500, lineHeight: 1.4 }}>{q.question || `Question ${q.questionId}`}</span>
+              </div>
+              <div style={{ flexShrink: 0 }}><AnswerBadge answer={q.answer} /></div>
+            </div>
+          )
+        })}
+      </div>
+    </Section>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  MAIN SUMMARY COMPONENT
+// ══════════════════════════════════════════════════════════════════════════════
 const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formData = {}, fromPage }) => {
-  const { doctorDetails, setDoctorDetails, setClinicDetails, clinicDetails, updateTemplate } =
-    useDoctorContext()
-
+  const { doctorDetails, setDoctorDetails, setClinicDetails, clinicDetails, updateTemplate } = useDoctorContext()
   const [snackbar, setSnackbar] = useState({ show: false, message: '', type: '' })
-  const navigate = useNavigate()
-  const navigatingRef = useRef(false)
+  const [saving, setSaving] = useState(false)
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [pendingAction, setPendingAction] = useState(null)
   const [clickedSaveTemplate, setClickedSaveTemplate] = useState(false)
 
+  const record = formData?.physiotherapyRecord ?? formData ?? {}
+  const patientInfo = record.patientInfo ?? {}
+
+  const [manualMobile, setManualMobile] = useState(
+    patientInfo?.mobileNumber ??
+    patientData?.patientMobileNumber ??
+    patientData?.mobileNumber ??
+    patientData?.contactNumber ??
+    patientData?.phone ??
+    patientData?.phoneNumber ??
+    ''
+  )
+
+  useEffect(() => {
+    const fallbackMobile = patientInfo?.mobileNumber ??
+      patientData?.patientMobileNumber ??
+      patientData?.mobileNumber ??
+      patientData?.contactNumber ??
+      patientData?.phone ??
+      patientData?.phoneNumber ??
+      '';
+    if (fallbackMobile && !manualMobile) {
+      setManualMobile(fallbackMobile);
+    }
+  }, [patientInfo, patientData])
+
+  const navigate = useNavigate()
   const { success, error, info, warning } = useToast()
+  const ACTIONS = { SAVE: 'save', SAVE_PRINT: 'savePrint' }
 
-  // ----------- Safe mapping from props -----------
-  const symptomsDetails = formData?.symptoms?.symptomDetails ?? formData?.symptoms?.doctorObs ?? '—'
-  const symptomsDuration = formData?.symptoms?.duration ?? patientData?.duration ?? '—'
-  const doctorObs = formData?.symptoms?.doctorObs ?? patientData?.doctorObs ?? '—'
-  const attachments = Array.isArray(formData?.symptoms?.attachments)
-    ? formData.symptoms.attachments
-    : Array.isArray(patientData?.attachments)
-      ? patientData.attachments
-      : []
+  // ─── FIX: Unified record resolution ───────────────────────────────────────
+  // The API response has a flat shape: { bookingId, complaints, assessment, ... }
+  // The internal formData has: { symptoms, assessment, diagnosis, ... }
+  // We need to handle BOTH so the summary and payload always work correctly.
 
-  const diagnosis = formData?.symptoms?.diagnosis ?? formData?.summary?.diagnosis ?? ''
+  // Top-level IDs — same in both shapes
+  const bookingId = record.bookingId ?? patientData?.bookingId ?? ''
+  let clinicId = ''
+  try {
+    clinicId = localStorage.getItem(JSON.parse(localStorage.getItem('doctorData'))?.hospitalId)
+  } catch (e) {
+    console.warn('Failed to get clinicId from localStorage doctorData:', e)
+  }
+  if (!clinicId) {
+    clinicId = record.clinicId ?? patientData?.clinicId ?? clinicDetails?.hospitalId ?? localStorage.getItem('hospitalId') ?? localStorage.getItem('clinicId') ?? ''
+  }
+  const branchId = record.branchId ?? patientData?.branchId ?? ''
+  const clinicName = clinicDetails?.name ?? patientData?.clinicName ?? ''
+  const doctorId = doctorDetails?.doctorId ?? patientData?.doctorId ?? ''
+  const doctorName = doctorDetails?.name ?? doctorDetails?.fullName ?? patientData?.doctorName ?? ''
 
-  const tests = Array.isArray(formData?.tests?.selectedTests) ? formData.tests.selectedTests : []
-  const testsReason = formData?.tests?.testReason ? formData.tests.testReason : ''
+  // ─── patientInfo ──────────────────────────────────────────────────────────
+  const patientId = patientInfo.patientId ?? patientData?.patientId ?? ''
+  const patientName = patientInfo.patientName ?? patientData?.patientName ?? patientData?.name ?? patientData?.fullName ?? ''
+  const patientMobile = manualMobile
+  const patientAge = patientInfo.age ?? patientData?.age ?? ''
+  const patientSex = patientInfo.sex ?? patientData?.sex ?? patientData?.gender ?? ''
 
+  // ─── FIX: Complaints / Symptoms resolution ────────────────────────────────
+  // API shape  : record.complaints  → { complaintDetails, duration, selectedTherapy, selectedTherapyId, painAssessmentImage, reportImages, therapyAnswers[] }
+  // Internal   : record.symptoms    → { symptomDetails, duration, selectedTherapy, selectedTherapyID, partImage, attachmentImages, theraphyAnswers{} }
+  const complaintsAPI = record.complaints ?? {}   // from API response
+  const symptomsInternal = record.symptoms ?? {}  // from internal formData
 
-  const treatmentReason = formData?.treatments?.treatmentReason
-    ? formData.treatments.treatmentReason
-    : ''
+  // Merge: UI fields take priority when present; fall back to API keys
+  const complaintDetails =
+    symptomsInternal.symptomDetails ||
+    complaintsAPI.complaintDetails ||
+    patientData?.problem || ''
 
-  const treatments = Array.isArray(formData?.treatments?.selectedTestTreatments)
-    ? formData.treatments.selectedTestTreatments
-    : []
+  const complaintDuration =
+    symptomsInternal.duration ||
+    complaintsAPI.duration ||
+    patientData?.symptomsDuration || ''
 
-  const treatmentSchedules = formData?.treatments?.generatedData || {}
+  const selectedTherapy =
+    symptomsInternal.selectedTherapy ||
+    complaintsAPI.selectedTherapy ||
+    patientData?.subServiceName || ''
 
-  const medicines = Array.isArray(formData?.prescription?.medicines)
-    ? formData.prescription.medicines
-    : []
+  const selectedTherapyID =
+    symptomsInternal.selectedTherapyID ||
+    complaintsAPI.selectedTherapyId ||   // API key (no capital D)
+    complaintsAPI.selectedTherapyID ||   // just in case
+    patientData?.subServiceId || ''
 
-  const followUp = {
-    durationValue: formData?.followUp?.durationValue ?? 'NA',
-    durationUnit: formData?.followUp?.durationUnit ?? 'NA',
-    date: formData?.followUp?.nextFollowUpDate ?? 'NA',
-    note: formData?.followUp?.followUpNote ?? 'NA',
+  const partImage =
+    symptomsInternal.partImage ||
+    complaintsAPI.painAssessmentImage || ''
+
+  const reportImages = (() => {
+    const apiImgs = complaintsAPI.reportImages
+    const intImgs = symptomsInternal.attachmentImages
+    if (Array.isArray(intImgs) && intImgs.length) return intImgs
+    if (Array.isArray(apiImgs) && apiImgs.length) return apiImgs
+    return []
+  })()
+
+  // ─── FIX: therapyAnswers — handle both shapes ─────────────────────────────
+  // API shape    : therapyAnswers is a flat ARRAY → [{ questionId, question, answer, questionKey }]
+  // Internal     : theraphyAnswers is an OBJECT  → { category: [{ questionId, question, answer }] }
+  const rawApiAnswers = complaintsAPI.therapyAnswers    // flat array or undefined
+  const rawInternalAnswers = symptomsInternal.theraphyAnswers ?? symptomsInternal.therapyAnswers  // object or undefined
+
+  // Build therapyGroups for display in QuestionnaireSection
+  // and flatTherapyAnswers for the payload
+  let therapyGroups = []
+  let flatTherapyAnswers = []
+
+  if (Array.isArray(rawApiAnswers) && rawApiAnswers.length) {
+    // API shape: flat array — group by questionKey for display (or show as single group)
+    flatTherapyAnswers = rawApiAnswers.map(q => ({
+      questionKey: q.questionKey ?? '',
+      questionId: String(q.questionId ?? ''),
+      question: q.question ?? '',
+      answer: q.answer ?? '',
+    }))
+    // Group by questionKey for display; if no key, put all in one group
+    const grouped = {}
+    rawApiAnswers.forEach(q => {
+      const cat = q.questionKey || 'General'
+      if (!grouped[cat]) grouped[cat] = []
+      grouped[cat].push(q)
+    })
+    therapyGroups = Object.entries(grouped).map(([category, questions]) => ({ category, questions }))
+  } else if (rawInternalAnswers && typeof rawInternalAnswers === 'object' && !Array.isArray(rawInternalAnswers)) {
+    // Internal shape: object keyed by category
+    therapyGroups = Object.entries(rawInternalAnswers).map(([cat, qs]) => ({
+      category: cat,
+      questions: Array.isArray(qs) ? qs : [],
+    }))
+    // Flatten for payload
+    flatTherapyAnswers = Object.values(rawInternalAnswers)
+      .flat()
+      .map(q => ({
+        questionKey: q.questionKey ?? '',
+        questionId: String(q.questionId ?? ''),
+        question: q.question ?? '',
+        answer: q.answer ?? '',
+      }))
   }
 
-  const ACTIONS = { SAVE: 'save', SAVE_PRINT: 'savePrint' }
-  const freqLabel = (f) =>
-    f === 'day' ? 'Daily' : f === 'week' ? 'Weekly' : f === 'month' ? 'Monthly' : f || '—'
+  const attachments = [
+    ...(partImage ? [{ url: toImageSrc(partImage), name: 'Pain Assessment' }] : []),
+    ...reportImages.map((img, i) => ({ url: toImageSrc(img), name: `Report ${i + 1}` })),
+  ]
 
-  const toInitials = (input, sep = ', ') => {
-    if (!input) return ''
-    let tokens = []
-    if (Array.isArray(input)) {
-      tokens = input
-    } else {
-      const s = String(input).trim()
-      if (s.includes(',') || s.includes('|') || /\s/.test(s)) {
-        tokens = s.split(/[,|\s]+/)
-      } else {
-        tokens = s.match(/morning|afternoon|evening|night/gi) || [s]
+  // ─── Background patient fields ────────────────────────────────────────────
+  const previousInjuries =
+    isValid(symptomsInternal.previousInjuries) ? symptomsInternal.previousInjuries :
+      isValid(complaintsAPI.previousInjuries) ? complaintsAPI.previousInjuries :
+        isValid(record.previousInjuries) ? record.previousInjuries :
+          isValid(formData?.previousInjuries) ? formData.previousInjuries :
+            isValid(patientData?.previousInjuries) ? patientData.previousInjuries : ''
+
+  const currentMedications =
+    symptomsInternal.currentMedications ??
+    complaintsAPI.currentMedications ??
+    record.currentMedications ??
+    formData?.currentMedications ??
+    patientData?.currentMedications ?? ''
+
+  const allergies =
+    symptomsInternal.allergies ??
+    complaintsAPI.allergies ??
+    record.allergies ??
+    formData?.allergies ??
+    patientData?.allergies ?? ''
+
+  const occupation =
+    symptomsInternal.occupation ??
+    complaintsAPI.occupation ??
+    record.occupation ??
+    formData?.occupation ??
+    patientData?.occupation ?? ''
+
+  const insuranceProvider =
+    symptomsInternal.insuranceProvider ??
+    complaintsAPI.insuranceProvider ??
+    record.insuranceProvider ??
+    formData?.insuranceProvider ??
+    patientData?.insuranceProvider ?? ''
+
+  const activityLevels = (() => {
+    const candidates = [
+      symptomsInternal.activityLevels,
+      complaintsAPI.activityLevels,
+      record.activityLevels,
+      formData?.activityLevels,
+    ]
+    for (const c of candidates) {
+      if (Array.isArray(c) && c.length) return c
+    }
+    return []
+  })()
+
+  // ─── FIX: effectivePain — check all possible locations ───────────────────
+  const effectivePain =
+    symptomsInternal.patientPain ||
+    symptomsInternal.reasonforVisit ||
+    complaintsAPI.patientPain ||
+    record.patientPain ||
+    formData?.patientPain ||
+    patientData?.patientPain || ''
+
+  // ─── FIX: Investigation ───────────────────────────────────────────────────
+  // API shape  : record.investigation → { tests[], reason }
+  // Internal   : formData.investigation → { selectedTests[], tests[], notes, reason }
+  const investigationObj =
+    record.investigation ??
+    formData?.investigation ?? {}
+
+  const investigationTests =
+    investigationObj.selectedTests ??  // internal key
+    investigationObj.tests ?? []  // API key
+
+  const investigationReason =
+    investigationObj.notes ??
+    investigationObj.reason ?? ''
+
+  const investigationTestsArray = Array.isArray(investigationTests)
+    ? investigationTests
+    : investigationTests ? [investigationTests] : []
+
+  // ─── FIX: Assessment ─────────────────────────────────────────────────────
+  // API shape  : record.assessment → { subjectiveAssessment{}, functionalAssessment{}, physicalExamination{} }
+  // Internal   : formData.assessment → flat object with all fields
+  const assessmentRaw = record.assessment ?? formData?.assessment ?? {}
+
+  // Support both nested (API) and flat (internal) shapes
+  const subjectiveAssessment = assessmentRaw.subjectiveAssessment ?? assessmentRaw
+  const functionalAssessment = assessmentRaw.functionalAssessment ?? assessmentRaw
+  const physicalExamination = assessmentRaw.physicalExamination ?? assessmentRaw
+
+  const assessment = {
+    chiefComplaint: subjectiveAssessment.chiefComplaint ?? assessmentRaw.chiefComplaint ?? '',
+    painScale: subjectiveAssessment.painScale ?? assessmentRaw.painScale ?? 0,
+    painType: subjectiveAssessment.painType ?? assessmentRaw.painType ?? '',
+    duration: subjectiveAssessment.duration ?? assessmentRaw.duration ?? '',
+    onset: subjectiveAssessment.onset ?? assessmentRaw.onset ?? '',
+    aggravatingFactors: subjectiveAssessment.aggravatingFactors ?? assessmentRaw.aggravatingFactors ?? '',
+    relievingFactors: subjectiveAssessment.relievingFactors ?? assessmentRaw.relievingFactors ?? '',
+    observations: subjectiveAssessment.observations ?? assessmentRaw.observations ?? '',
+    posture: assessmentRaw.posture ?? '',
+    rangeOfMotion: assessmentRaw.rangeOfMotion ?? '',
+    specialTests: assessmentRaw.specialTests ?? '',
+    difficultiesIn: Array.isArray(functionalAssessment.difficultiesIn) ? functionalAssessment.difficultiesIn : Array.isArray(assessmentRaw.difficultiesIn) ? assessmentRaw.difficultiesIn : [],
+    otherDifficulty: functionalAssessment.otherDifficulty ?? assessmentRaw.otherDifficulty ?? '',
+    dailyLivingAffected: functionalAssessment.dailyLivingAffected ?? assessmentRaw.dailyLivingAffected ?? '',
+    postureAssessment: Array.isArray(physicalExamination.postureAssessment) ? physicalExamination.postureAssessment : Array.isArray(assessmentRaw.postureAssessment) ? assessmentRaw.postureAssessment : [],
+    postureDeviations: physicalExamination.postureDeviations ?? assessmentRaw.postureDeviations ?? '',
+    romStatus: Array.isArray(physicalExamination.rangeOfMotion) ? physicalExamination.rangeOfMotion : Array.isArray(physicalExamination.romStatus) ? physicalExamination.romStatus : Array.isArray(assessmentRaw.romStatus) ? assessmentRaw.romStatus : [],
+    romRestricted: physicalExamination.romRestricted ?? assessmentRaw.romRestricted ?? '',
+    romJoints: physicalExamination.romJoints ?? assessmentRaw.romJoints ?? '',
+    muscleStrength: Array.isArray(physicalExamination.muscleStrength) ? physicalExamination.muscleStrength : Array.isArray(assessmentRaw.muscleStrength) ? assessmentRaw.muscleStrength : [],
+    muscleWeakness: physicalExamination.muscleWeakness ?? assessmentRaw.muscleWeakness ?? '',
+    neurologicalSigns: Array.isArray(physicalExamination.neurologicalSigns) ? physicalExamination.neurologicalSigns : Array.isArray(assessmentRaw.neurologicalSigns) ? assessmentRaw.neurologicalSigns : [],
+    patientPain: assessmentRaw.patientPain ?? complaintsAPI.patientPain ?? '',
+    painTriggers: assessmentRaw.chronicPainPatients?.painDuration ?? assessmentRaw.painTriggers ?? '',
+    chronicRelieving: assessmentRaw.chronicPainPatients?.sleepDisturbance ? 'Sleep Disturbance: Yes' : (assessmentRaw.chronicRelieving ?? ''),
+    typeOfSport: assessmentRaw.sportsRehabPatients?.sportName ?? assessmentRaw.typeOfSport ?? '',
+    recurringInjuries: assessmentRaw.sportsRehabPatients?.injuryType ?? assessmentRaw.recurringInjuries ?? '',
+    returnToSportGoals: assessmentRaw.returnToSportGoals ?? '',
+    neuroDiagnosis: assessmentRaw.neuroRehabPatients?.balanceIssue ? 'Balance Issues' : (assessmentRaw.neuroDiagnosis ?? ''),
+    neuroOnset: assessmentRaw.neuroOnset ?? '',
+    mobilityStatus: assessmentRaw.neuroRehabPatients?.walkingSupport ?? assessmentRaw.mobilityStatus ?? '',
+    cognitiveStatus: assessmentRaw.cognitiveStatus ?? '',
+  }
+
+  const {
+    difficultiesIn, otherDifficulty, dailyLivingAffected,
+    postureAssessment, postureDeviations,
+    romStatus, romRestricted, romJoints,
+    muscleStrength, muscleWeakness, neurologicalSigns,
+    posture, rangeOfMotion, specialTests,
+    painTriggers, chronicRelieving,
+    typeOfSport, recurringInjuries, returnToSportGoals,
+    neuroDiagnosis, neuroOnset, mobilityStatus, cognitiveStatus,
+  } = assessment
+
+  // ─── FIX: Diagnosis ───────────────────────────────────────────────────────
+  // API shape  : record.diagnosis → { physioDiagnosis, affectedArea, severity, stage, notes }
+  // Internal   : formData.diagnosis → { diagnosisRows[] } OR flat
+  const diagnosisObj = record.diagnosis ?? formData?.diagnosis ?? {}
+
+  const diagnosisRows = (() => {
+    // If the UI flat fields are set and not empty, use them
+    if (isValid(diagnosisObj.physioDiagnosis)) {
+      return [{
+        physioDiagnosis: diagnosisObj.physioDiagnosis ?? '',
+        affectedArea: diagnosisObj.affectedArea ?? '',
+        severity: diagnosisObj.severity ?? '',
+        stage: diagnosisObj.stage ?? '',
+        differentialDiagnosis: diagnosisObj.differentialDiagnosis ?? '',
+        notes: diagnosisObj.notes ?? '',
+      }]
+    }
+    // Otherwise, check if we have a valid non-empty array of rows
+    if (Array.isArray(diagnosisObj.diagnosisRows) && diagnosisObj.diagnosisRows.length) {
+      const first = diagnosisObj.diagnosisRows[0] || {};
+      if (isValid(first.physioDiagnosis) || isValid(first.affectedArea)) {
+        return diagnosisObj.diagnosisRows;
       }
     }
-    const map = {
-      morning: 'M',
-      m: 'M',
-      afternoon: 'A',
-      a: 'A',
-      evening: 'E',
-      e: 'E',
-      night: 'N',
-      n: 'N',
-    }
-    return tokens
-      .map((t) => map[t.toLowerCase()] ?? (t[0]?.toUpperCase() || ''))
-      .filter(Boolean)
-      .join(sep)
+    return []
+  })()
+
+  // ─── FIX: Treatment Plan ─────────────────────────────────────────────────
+  // API shape  : record.treatmentPlan → { doctorId, doctorName, therapistId, therapistName, manualTherapy, modalitiesUsed[], patientResponse, precautions[] }
+  const treatmentPlanObj = record.treatmentPlan ?? {}
+
+  const topTherapistId = formData?.therapySessions?.therapistId || treatmentPlanObj.therapistId || ''
+  const topTherapistName = formData?.therapySessions?.therapistName || treatmentPlanObj.therapistName || ''
+  const manualTherapy = formData?.therapySessions?.manualTherapy || treatmentPlanObj.manualTherapy || ''
+  const precautionsArr = Array.isArray(formData?.therapySessions?.precautions) && formData.therapySessions.precautions.length > 0 ? formData.therapySessions.precautions : Array.isArray(treatmentPlanObj.precautions) ? treatmentPlanObj.precautions : []
+  const modalitiesArr = Array.isArray(formData?.therapySessions?.modalitiesUsed) && formData.therapySessions.modalitiesUsed.length > 0 ? formData.therapySessions.modalitiesUsed : Array.isArray(treatmentPlanObj.modalitiesUsed) ? treatmentPlanObj.modalitiesUsed : []
+  const patientResponse = formData?.therapySessions?.patientResponse || treatmentPlanObj.patientResponse || ''
+
+  const treatmentPlanDisplay = {
+    doctorId, doctorName,
+    therapistId: topTherapistId,
+    therapistName: topTherapistName,
+    manualTherapy,
   }
 
-  // Inside useEffect (after fetching doctor & clinic details)
+  // ─── Therapy Sessions ─────────────────────────────────────────────────────
+  // API shape  : record.therapySessions → array of package/program/therapy objects
+  // Internal   : formData.therapySessions → { sessions[], therapistId, ... }
+  const therapySessionsRaw = record.therapySessions ?? formData?.therapySessions ?? {}
+  const overallStatus = record.overallStatus ?? ((!Array.isArray(therapySessionsRaw) && therapySessionsRaw?.overallStatus) ? therapySessionsRaw.overallStatus : '') ?? ''
+
+  let sessionsList = []
+  if (Array.isArray(therapySessionsRaw)) sessionsList = therapySessionsRaw
+  else if (Array.isArray(therapySessionsRaw?.sessions)) sessionsList = therapySessionsRaw.sessions
+  if (sessionsList.length === 1 && Array.isArray(sessionsList[0])) sessionsList = sessionsList[0]
+
+  const exercisePlanObj = record.exercisePlan ?? formData?.exercisePlan ?? {}
+  const homeExercises = (() => {
+    if (Array.isArray(formData?.exercisePlan?.exercises) && formData.exercisePlan.exercises.length) return formData.exercisePlan.exercises
+    if (Array.isArray(exercisePlanObj.homeExercises) && exercisePlanObj.homeExercises.length) return exercisePlanObj.homeExercises
+    if (Array.isArray(exercisePlanObj.exercises) && exercisePlanObj.exercises.length) return exercisePlanObj.exercises
+    return []
+  })()
+  const homeAdvice = formData?.exercisePlan?.homeAdvice ?? exercisePlanObj.homeAdvice ?? ''
+
+  // ─── Follow Up ────────────────────────────────────────────────────────────
+  // API shape  : record.followUp → { nextVisitDate, reviewNotes, modifications }
+  // Internal   : formData.followUp → array OR object
+  const followUpRaw = record.followUp ?? formData?.followUp ?? {}
+  const followUpEntry = Array.isArray(followUpRaw)
+    ? (followUpRaw[0] ?? {})
+    : (typeof followUpRaw === 'object' ? followUpRaw : {})
+
+  const parts = formData?.parts ?? symptomsInternal?.parts ?? patientData?.parts ?? []
+  const treatmentTemplates = Array.isArray(record.treatmentTemplates) ? record.treatmentTemplates : []
+  const todayStr = () => new Date().toISOString().split('T')[0]
+
   useEffect(() => {
     const fetchDetails = async () => {
       try {
         const doctor = await getDoctorDetails()
         const clinic = await getClinicDetails()
-        console.log("Fetched Doctor Details:", doctor)
-        console.log("Fetched Clinic Details:", clinic)
-
         if (doctor) setDoctorDetails(doctor)
         if (clinic) setClinicDetails(clinic)
-      } catch (e) {
-        console.error('Failed to load doctor/clinic details', e)
-      }
+      } catch (e) { console.error('Failed to load doctor/clinic details', e) }
     }
     fetchDetails()
   }, [])
 
-  // ---------------- PDF helpers ----------------
-  // PDF Render
-  const renderPrescriptionPdfBlob = async () => {
-    console.log("Rendering Prescription PDF with:", { doctorDetails, clinicDetails, formData, patientData })
-    return await pdf(
-      <PrescriptionPDF
-        doctorData={doctorDetails}
-        clicniData={clinicDetails}
-        formData={formData}
-        patientData={patientData}
-      />,
-    ).toBlob()
-  }
-
-
-  const blobToBase64 = (blob) =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const res = reader.result
-        const base64 = typeof res === 'string' ? res.split(',')[1] : ''
-        resolve(base64)
-      }
-      reader.onerror = reject
-      reader.readAsDataURL(blob)
-    })
-
+  const renderPdfBlob = async () => await pdf(<PrescriptionPDF doctorData={doctorDetails} clicniData={clinicDetails} formData={formData} patientData={patientData} />).toBlob()
+  const blobToBase64 = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => { const r = reader.result || ''; resolve(String(r).split(',')[1] || '') }
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
   const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    URL.revokeObjectURL(url)
+    const a = document.createElement('a'); a.href = url; a.download = filename
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
   }
+  console.log('Summary component initialized with record:', record, 'formData:', formData, 'patientData:', patientData)
 
-  // Package all data + pdf (base64) and send it
-  // Upload prescription
-  const uploadPrescription = async ({ downloadAfter = false } = {}) => {
+  // ─── FIX: buildPayload — always sends the correct API-expected shape ──────
+  const buildPayload = (prescriptionPdf = '', isPrint = false) => {
+    const firstDiag = diagnosisRows[0] ?? {}
+    const followUpPayload = Array.isArray(followUpRaw) ? (followUpRaw[0] ?? {}) : (followUpRaw ?? {})
+    const existingRecordId = record.id || record._id || record.therapyRecordId || record.therapyrecordid || (record.therapistRecordId !== 'TR001' ? record.therapistRecordId : null)
+
+    return {
+      // 🏥 Top-level IDs 🏥
+      therapistRecordId: existingRecordId || undefined,
+      therapyRecordId: existingRecordId || undefined,
+      bookingId,
+      clinicId,
+      branchId,
+      // status: isPrint ? 'Due for Investigation' : (overallStatus || 'Completed'),
+      // uptoInvestigation: isPrint || !!(record.uptoInvestigation || formData?.uptoInvestigation || patientData?.uptoInvestigation),
+
+      // ── Patient Info ───────────────────────────────────────────────────
+      patientInfo: {
+        patientId,
+        patientName,
+        mobileNumber: patientMobile,
+        age: Number(patientAge) || 0,
+        sex: patientSex,
+      },
+
+      // ── Complaints ─────────────────────────────────────────────────────
+      complaints: {
+        complaintDetails: complaintDetails || '',
+        painAssessmentImage: partImage || '',
+        reportImages: reportImages || [],
+        selectedTherapy: selectedTherapy || '',
+        selectedTherapyId: selectedTherapyID || '',
+        duration: complaintDuration || '',
+        previousInjuries: previousInjuries || '',
+        currentMedications: currentMedications || '',
+        allergies: allergies || '',
+        occupation: occupation || '',
+        activityLevels: activityLevels || [],
+        patientPain: effectivePain || '',
+        therapyAnswers: flatTherapyAnswers,
+      },
+
+      // ── Investigation ──────────────────────────────────────────────────
+      investigation: {
+        tests: investigationTestsArray,
+        reason: investigationReason || '',
+      },
+
+      // ── Assessment ─────────────────────────────────────────────────────
+      assessment: {
+        subjectiveAssessment: {
+          chiefComplaint: assessment.chiefComplaint ?? '',
+          painScale: Number(assessment.painScale) || 0,
+          painType: assessment.painType ?? '',
+          duration: assessment.duration ?? '',
+          onset: assessment.onset ?? '',
+          aggravatingFactors: assessment.aggravatingFactors ?? '',
+          relievingFactors: assessment.relievingFactors ?? '',
+          observations: assessment.observations ?? '',
+        },
+        functionalAssessment: {
+          difficultiesIn: difficultiesIn
+        },
+        physicalExamination: {
+          postureAssessment: postureAssessment,
+          rangeOfMotion: romStatus,
+          muscleStrength: muscleStrength,
+          neurologicalSigns: neurologicalSigns
+        },
+        chronicPainPatients: effectivePain === 'chronicPain' ? {
+          painDuration: painTriggers || '',
+          sleepDisturbance: !!(chronicRelieving && chronicRelieving.toLowerCase().includes('yes'))
+        } : null,
+        sportsRehabPatients: effectivePain === 'sportsRehab' ? {
+          sportName: typeOfSport || '',
+          injuryType: recurringInjuries || ''
+        } : null,
+        neuroRehabPatients: effectivePain === 'neuroRehab' ? {
+          balanceIssue: !!(neuroDiagnosis && neuroDiagnosis.toLowerCase().includes('balance')),
+          walkingSupport: mobilityStatus || ''
+        } : null,
+        redFlags: {
+          trauma: (formData?.assessment?.redFlags || formData?.redFlags)?.trauma ?? false,
+          weightLoss: (formData?.assessment?.redFlags || formData?.redFlags)?.weightLoss ?? false,
+          fever: (formData?.assessment?.redFlags || formData?.redFlags)?.fever ?? false,
+          cancer: (formData?.assessment?.redFlags || formData?.redFlags)?.cancer ?? false,
+          nightPain: (formData?.assessment?.redFlags || formData?.redFlags)?.nightPain ?? false,
+          swallowing: (formData?.assessment?.redFlags || formData?.redFlags)?.swallowing ?? false,
+        },
+        radiationNeuro: {
+          radiating: (formData?.assessment?.radiationNeuro || formData?.radiationNeuro)?.radiating ?? false,
+          numbness: (formData?.assessment?.radiationNeuro || formData?.radiationNeuro)?.numbness ?? false,
+          weakness: (formData?.assessment?.radiationNeuro || formData?.radiationNeuro)?.weakness ?? false,
+          gripDifficulty: (formData?.assessment?.radiationNeuro || formData?.radiationNeuro)?.gripDifficulty ?? false,
+        },
+        psychosocial: {
+          stressLevel: (formData?.assessment?.psychosocial || formData?.psychosocial)?.stressLevel ?? 'Low',
+          workSatisfaction: (formData?.assessment?.psychosocial || formData?.psychosocial)?.workSatisfaction ?? false,
+          fearOfMovement: (formData?.assessment?.psychosocial || formData?.psychosocial)?.fearOfMovement ?? false,
+        },
+        specialSymptoms: {
+          headache: (formData?.assessment?.specialSymptoms || formData?.specialSymptoms)?.headache ?? false,
+          dizziness: (formData?.assessment?.specialSymptoms || formData?.specialSymptoms)?.dizziness ?? false,
+        },
+      },
+
+      // ── Diagnosis ──────────────────────────────────────────────────────
+      diagnosis: {
+        physioDiagnosis: firstDiag.physioDiagnosis ?? '',
+        differentialDiagnosis: firstDiag.differentialDiagnosis ?? '',
+        affectedArea: firstDiag.affectedArea ?? '',
+        severity: firstDiag.severity ?? '',
+        stage: firstDiag.stage ?? '',
+        notes: firstDiag.notes ?? '',
+      },
+
+      // ── Treatment Plan ─────────────────────────────────────────────────
+      treatmentPlan: {
+        doctorId,
+        doctorName,
+        therapistId: topTherapistId,
+        therapistName: topTherapistName,
+        manualTherapy: manualTherapy || '',
+        modalitiesUsed: modalitiesArr,
+        patientResponse: patientResponse || '',
+        precautions: precautionsArr,
+      },
+
+      // ── Therapy Sessions ───────────────────────────────────────────────
+      therapySessions: sessionsList,
+
+      // ── Exercise Plan ──────────────────────────────────────────────────
+      exercisePlan: {
+        homeAdvice,
+        homeExercises: homeExercises.map(ex => ({
+          id: ex.therapyExercisesId || ex.id || '',
+          therapyExercisesId: ex.therapyExercisesId || ex.id || '',
+          name: ex.name ?? ex.exerciseName ?? '',
+          sets: String(ex.sets ?? ''),
+          reps: String(ex.reps ?? ex.repetitions ?? ''),
+          duration: ex.activityDuration || ex.activityduration || ex.duration || '',
+          // activityDuration: ex.activityDuration || ex.activityduration || ex.duration || '',
+          frequency: ex.frequency ?? null,
+          instructions: ex.instructions ?? ex.notes ?? '',
+          videoUrl: ex.videoUrl ?? ex.youtubeUrl ?? '',
+          // thumbnail: ex.thumbnail ?? '',
+          // sessions: ex.sessions || ex.session || '',
+          session: ex.sessions || ex.session || '',
+        })),
+      },
+
+      // ── Follow Up ──────────────────────────────────────────────────────
+      followUp: {
+        nextVisitDate: followUpPayload.nextVisitDate ?? '',
+        reviewNotes: followUpPayload.reviewNotes ?? '',
+        modifications: followUpPayload.modifications ?? '',
+      },
+
+      prescription: record.prescription ?? formData?.prescription ?? {},
+      prescriptionPdf: prescriptionPdf || record.prescriptionPdf || formData?.prescriptionPdf || '',
+    }
+  } 
+
+  const doSave = async ({ downloadAfter = false } = {}) => {
+    setSaving(true)
     try {
-      // ✅ 1️⃣ Check diagnosis first
-      const diagnosis = formData?.symptoms?.diagnosis?.trim() || '';
-      if (!diagnosis) {
-        warning('"Diagnosis" is missing. Cannot save or upload the prescription.', { title: 'Warning' });
-        return false;
+      const safeName = (patientName || 'Record').replace(/[^\w\-]+/g, '_')
+      const blob = await renderPdfBlob()
+
+      // ── Upload PDF to S3 and get fileKey ──────────────────────────────────
+      const pdfFile = new File([blob], `${safeName}.pdf`, { type: 'application/pdf' })
+      const prescriptionPdfKey = await uploadPrescriptionPdf(pdfFile)
+
+      const payload = buildPayload(prescriptionPdfKey, downloadAfter)
+
+      const isUptoInvestigation = downloadAfter || !!(record.uptoInvestigation || formData?.uptoInvestigation || patientData?.uptoInvestigation)
+      console.log(isUptoInvestigation);
+      const existingRecordId = record.id || record._id || record.therapyRecordId || record.therapyrecordid || (record.therapistRecordId !== 'TR001' ? record.therapistRecordId : null)
+      // if (bookingId) {
+      //   try {
+      //     const currentStatus = patientData?.status || ''
+      //     const currentStatusNorm = currentStatus.toLowerCase().replace(/[\s_]/g, '')
+      //     const isDueOrDone = ['dueforinvestigation', 'duetoinvestigation', 'investigationdone', 'doneforinvestigation'].includes(currentStatusNorm)
+      //     const nextStatus = downloadAfter ? 'Due for Investigation' : (isDueOrDone ? currentStatus : 'In-progress')
+      //     console.log(`Updating appointment status to ${nextStatus}...`, bookingId)
+      //     await updateAppointmentBasedOnBookingId({ data: { bookingId, status: nextStatus } })
+      //   } catch (statusErr) {
+      //     console.error(`Failed to update appointment status to ${nextStatus}:`, statusErr)
+      //   }
+      // }
+
+      const shouldUpdate = !!existingRecordId&&isUptoInvestigation
+
+      let resp
+      if (shouldUpdate) {
+        console.log('Calling Update API on Save...', payload)
+        const createPayload = { ...payload }
+
+       resp = await UpdatePatientPrescription(createPayload)
+       console.log(resp)
+      if (resp) {
+  try {
+    await updateAppointmentBasedOnBookingId({
+      data: { bookingId, status: 'In-progress' }
+    })
+  } catch (err) {
+    console.error('Status update failed:', err)
+  }}
+
+
+
+      } else {
+        console.log('Calling Create API on Save...', payload)
+        const createPayload = { ...payload }
+
+        delete createPayload.therapyRecordId
+        delete createPayload.status
+        delete createPayload.therapistRecordId
+        resp = await SavePatientPrescription(createPayload)
       }
-
-      // ✅ 2️⃣ Validate treatment dates (no past dates allowed)
-      const treatmentSchedules = formData?.treatments || {};
-      let hasPastDate = false;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // normalize for date-only comparison
-
-      Object.values(treatmentSchedules).forEach((meta) => {
-        (meta?.dates || []).forEach((d) => {
-          if (d?.date && new Date(d.date) < today) {
-            hasPastDate = true;
-          }
-        });
-      });
-
-      if (hasPastDate) {
-        warning('Please change the date — past dates are not allowed.', { title: 'Warning' });
-        return false; // stop saving
-      }
-
-      console.log("Preparing to upload prescription...");
-      const blob = await renderPrescriptionPdfBlob();
-      console.log("PDF Blob Generated:", blob);
-
-      const base64 = await blobToBase64(blob);
-      console.log("Base64 PDF length:", base64.length);
-
-      const safeName = (patientData?.name || 'Prescription').replace(/[^\w\-]+/g, '_');
-      const filename = `${safeName}.pdf`;
-
-      const payload = {
-        bookingId: patientData?.bookingId,
-        clinicName: clinicDetails?.name,
-        customerId: patientData?.customerId,
-        clinicId: clinicDetails?.hospitalId,
-        patientId: patientData?.patientId,
-        doctorId: doctorDetails?.doctorId,
-        symptoms: formData?.symptoms,
-        tests: formData?.tests,
-        treatments: formData?.treatments,
-        followUp: formData?.followUp,
-        prescription: formData?.prescription,
-        prescriptionPdf: [base64],
-        subServiceId: patientData?.subServiceId
-      };
-
-      console.log("Final Payload to Upload:", payload);
-
-      const resp = await createDoctorSaveDetails(payload);
-      console.log("API Response:", resp);
 
       if (resp) {
-        success('Prescription saved successfully!', { title: 'Success' });
-      } else {
-        warning('Saved, but got an unexpected response.');
-      }
-
-      if (downloadAfter) {
-        console.log("Downloading PDF file:", filename);
-        downloadBlob(blob, filename);
-      }
-
-      return true;
-    } catch (e) {
-      console.error("Upload Prescription Error:", e);
-      error('Failed to generate or send the PDF.', { title: 'Error' });
-      return false;
-    }
-  };
-
-
-
-  // ---------------- Actions ----------------
-  // Actions
-  const onClickSave = () => {
-    console.log("Save button clicked")
-    setPendingAction(ACTIONS.SAVE)
-    setShowTemplateModal(true)
-  }
-
-  const onClickSavePrint = () => {
-    console.log("Save & Print button clicked")
-    setPendingAction(ACTIONS.SAVE_PRINT)
-    setShowTemplateModal(true)
-  }
-
-  const confirmSaveAsTemplate = async () => {
-    const action = pendingAction
-    console.log("Confirm Save As Template Action:", action)
-    setShowTemplateModal(false)
-    try {
-      await onSaveTemplate?.()
-      console.log("Template Saved Successfully")
-      const ok = await uploadPrescription({ downloadAfter: action === ACTIONS.SAVE_PRINT })
-      if (ok) {
-        console.log("Navigation to Dashboard")
+        success('Record saved successfully!', { title: 'Success' })
+        if (downloadAfter) downloadBlob(blob, `${safeName}.pdf`)
         navigate('/dashboard', { replace: true })
-      }
-    } finally {
-      setPendingAction(null)
-    }
-  }
-
-  const skipTemplate = async () => {
-    try {
-      console.log("Preparing to upload prescription...")
-      const blob = await renderPrescriptionPdfBlob()
-      console.log("PDF Blob Generated:", blob)
-
-      const base64 = await blobToBase64(blob)
-      console.log("Base64 PDF length:", base64.length)
-
-      const safeName = (patientData?.name || 'Prescription').replace(/[^\w\-]+/g, '_')
-      const filename = `${safeName}.pdf`
-
-      const payload = {
-        bookingId: patientData?.bookingId,
-        clinicName: clinicDetails?.name,
-        customerId: patientData?.customerId,
-        clinicId: clinicDetails?.hospitalId,
-        patientId: patientData?.patientId,
-        doctorId: doctorDetails?.doctorId,
-        symptoms: formData?.symptoms,
-        tests: formData?.tests,
-        treatments: formData?.treatments,
-        followUp: formData?.followUp,
-        prescription: formData?.prescription,
-        prescriptionPdf: [base64],
-        visitType: patientData?.visitType || "OFFLINE",
-        subServiceId: patientData?.subServiceId
-      }
-      console.log("Final Payload to Upload:", payload)
-
-      const resp = await createDoctorSaveDetails(payload)
-      console.log("API Response:", resp)
-
-      if (resp) {
-        success('Prescription saved successfully!', { title: 'Success' })
-        navigate('/dashboard', { replace: true })
-      } else {
-        warning('Saved, but got an unexpected response.')
-      }
-
-      return true
+        return true
+      } else { warning('Saved, but got an unexpected response.'); return false }
     } catch (e) {
-      console.error("Upload Prescription Error:", e)
-      error('Failed to generate or send the PDF.', { title: 'Error' })
-      return false
-    }
+      error('Failed to save record.', { title: 'Error' }); return false
+    } finally { setSaving(false) }
   }
 
-  // ---------------- Render ----------------
+  const confirmSaveAsTemplate = async () => { setShowTemplateModal(false); await doSave({ downloadAfter: pendingAction === ACTIONS.SAVE_PRINT }); setPendingAction(null) }
+  const skipTemplate = async () => { setShowTemplateModal(false); await doSave({ downloadAfter: pendingAction === ACTIONS.SAVE_PRINT }); setPendingAction(null) }
+
+  const hasAssessmentData = (
+    assessment.chiefComplaint || assessment.painScale || assessment.painType ||
+    difficultiesIn.length > 0 || postureAssessment.length > 0 || romStatus.length > 0 ||
+    isValid(posture) || isValid(rangeOfMotion) || isValid(specialTests) ||
+    isValid(painTriggers) || isValid(typeOfSport) || isValid(neuroDiagnosis) ||
+    Object.values(record.assessment?.redFlags || record.redFlags || {}).some(v => v === true) ||
+    Object.values(record.assessment?.radiationNeuro || record.radiationNeuro || {}).some(v => v === true) ||
+    Object.values(record.assessment?.specialSymptoms || record.specialSymptoms || {}).some(v => v === true) ||
+    Object.values(record.assessment?.psychosocial || record.psychosocial || {}).some(v => v === true)
+  )
+
+  const hasBackgroundData =
+    isValid(previousInjuries) || isValid(currentMedications) ||
+    isValid(allergies) || isValid(occupation) || isValid(insuranceProvider) ||
+    isValid(effectivePain) || activityLevels.length > 0
+
+  const displayName = patientName ? capitalizeEachWord(patientName) : ''
+  const displayAge = patientAge ? `${patientAge}yr` : ''
+  const displaySex = patientSex ? patientSex.charAt(0).toUpperCase() : ''
+  const patientTag = [displayName, [displayAge, displaySex].filter(Boolean).join(' ')].filter(Boolean).join(' · ')
+
   return (
-    <div className="pb-5" style={{ backgroundColor: COLORS.theme }}>
-      <CContainer fluid className="p-0" id="print-area">
-        {/* Patient Info */}
-        <CCard className="shadow-sm mb-3">
-          <CCardHeader className="py-2">
-            <strong style={{ color: COLORS.black }}>Patient Information</strong>
-          </CCardHeader>
-          <CCardBody>
-            <CRow className="g-3">
-              <CCol xs={12} md={4}>
-                <div>
-                  <span className="fw-semibold">Name:</span> {capitalizeEachWord(patientData?.name || '—')}
+    <div style={{ background: T.bgLight, minHeight: '100vh', paddingBottom: 100 }}>
 
-                </div>
-              </CCol>
-              <CCol xs={12} md={3}>
-                <div>
-                  <span className="fw-semibold">Age / Gender:</span>{' '}
-                  {patientData?.age
-                    ? (patientData.age.toString().toLowerCase().includes("yr") ||
-                      patientData.age.toString().toLowerCase().includes("year")
-                      ? patientData.age
-                      : `${patientData.age} yrs`)
-                    : "—"}
-                  {patientData?.gender ? ` / ${patientData.gender}` : ''}
-                </div>
-              </CCol>
-              <CCol xs={12} md={4}>
-                <div>
-                  <span className="fw-semibold">Mobile Number:</span>{' '}
-                  {patientData?.mobileNumber || '—'}
-                </div>
-              </CCol>
-            </CRow>
-          </CCardBody>
-        </CCard>
+      {/* ── Page Header ── */}
+      <div style={{ background: T.bgcolor, padding: '8px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 12px rgba(27,79,138,0.18)', marginBottom: 16, borderBottom: `2px solid ${T.orange}`, minHeight: 48 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(249,197,113,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, border: '1px solid rgba(249,197,113,0.3)' }}>📋</div>
+          <div>
+            <div style={{ color: T.white, fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.3 }}>Physiotherapy Summary</div>
+            <div style={{ fontSize: 9, color: T.orange, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', lineHeight: 1.2 }}>Review Before Saving</div>
+          </div>
+        </div>
+        {patientName && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ background: T.white, borderRadius: 20, padding: '4px 14px', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 1px 6px rgba(0,0,0,0.12)', maxWidth: 320 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: T.orange, flexShrink: 0 }} />
+              <span style={{ color: T.bgcolor, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 260 }}>{patientTag}</span>
+            </div>
+            <StatusDot status={overallStatus || patientData?.status || 'Pending'} />
+          </div>
+        )}
+      </div>
 
-        {/* Symptoms & Duration */}
-        {(symptomsDetails !== '—' || symptomsDuration !== '—') && (
-          <CCard className="shadow-sm mb-4">
-            <CCardHeader className="py-2">
-              <strong style={{ color: COLORS.black }}>Symptoms & Duration</strong>
-            </CCardHeader>
-            <CCardBody>
-              <CRow className="g-3">
-                <CCol xs={12} md={8}>
-                  <h6 className="mb-2">Symptoms Complaints</h6>
-                  <div style={{ whiteSpace: 'pre-wrap' }}>{symptomsDetails}</div>
-                  <h6 className="mb-2 mt-2">
-                    Doctor Observations <span className="text-body-secondary">(if any)</span>
-                  </h6>
-                  <div style={{ whiteSpace: 'pre-wrap' }}>{doctorObs}</div>
-                </CCol>
-                <CCol xs={12} md={4}>
-                  <h6 className="mb-2">Duration of Symptoms</h6>
-                  <CBadge color="info" className="px-3 py-2">
-                    {symptomsDuration}
-                  </CBadge>
-                </CCol>
-              </CRow>
+      <CContainer fluid style={{ maxWidth: 1100, padding: '0 16px' }}>
 
-              {Array.isArray(attachments) && attachments.length > 0 && (
-                <>
-                  <h6 className="mb-2 mt-4">Previous Reports & Prescriptions</h6>
-                  <FileUploader attachments={attachments} accept=".pdf,image/*" />
-                </>
-              )}
-            </CCardBody>
-          </CCard>
+        {/* 1. Patient Info */}
+        <Section icon="👤" title="Patient & Booking Information">
+          <Grid cols={3}>
+            {isValid(patientId) && <Row label="Patient ID" value={patientId} />}
+            {isValid(bookingId) && <Row label="Booking ID" value={bookingId} />}
+            {isValid(patientName) && <Row label="Name" value={capitalizeEachWord(patientName)} />}
+            {isValid(patientAge) && <Row label="Age / Gender" value={`${patientAge} yrs / ${patientSex}`} />}
+            {isValid(manualMobile) && <Row label="Mobile" value={manualMobile} />}
+            {isValid(clinicId) && <Row label="Clinic ID" value={clinicId} />}
+            {isValid(clinicName) && <Row label="Clinic" value={clinicName} />}
+            {isValid(branchId) && <Row label="Branch ID" value={branchId} />}
+            {isValid(doctorName) && <Row label="Doctor" value={doctorName} />}
+            {isValid(doctorId) && <Row label="Doctor ID" value={doctorId} />}
+            {isValid(patientData?.subServiceName) && <Row label="Therapy Type" value={patientData?.subServiceName} />}
+            {isValid(overallStatus) && <Row label="Overall Status" value={overallStatus} />}
+          </Grid>
+        </Section>
+
+        {/* 2. Complaints */}
+        {isValid(complaintDetails) && (
+          <Section icon="🩺" title="Complaints & Symptoms">
+            <Grid cols={2}>
+              <Row label="Complaint Details" value={complaintDetails} highlight />
+              {isValid(complaintDuration) && <Row label="Duration" value={complaintDuration} highlight />}
+              {isValid(selectedTherapy) && <Row label="Selected Therapy" value={selectedTherapy} />}
+              {reportImages.length > 0 && <Row label="Report Images" value={`${reportImages.length} image(s)`} />}
+            </Grid>
+            {parts.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: '0.72rem', color: T.textLight, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Affected Parts: </span>
+                {parts.map(p => <Chip key={p} label={p} color={T.bgcolor} bg={T.bgLight} />)}
+              </div>
+            )}
+            {toImageSrc(partImage) && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.72rem', color: T.textLight, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Body Part Diagram</div>
+                <div style={{ background: T.bgLight, borderRadius: 8, overflow: 'hidden', display: 'flex', justifyContent: 'center', border: `1px solid ${T.border}`, padding: 6, maxWidth: 320 }}>
+                  <img src={toImageSrc(partImage)} alt="Body Part Diagram" style={{ maxHeight: 180, maxWidth: '100%', objectFit: 'contain', display: 'block', borderRadius: 6 }} />
+                </div>
+              </div>
+            )}
+            {attachments.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.72rem', color: T.textLight, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Attachments</div>
+                <FileUploader attachments={attachments} accept=".pdf,image/*" />
+              </div>
+            )}
+          </Section>
         )}
 
-        {/* Diagnosis */}
-        {diagnosis && (
-          <CCard className="shadow-sm mb-3">
-            <CCardHeader className="py-2">
-              <strong style={{ color: COLORS.black }}>Probable Disease</strong>
-            </CCardHeader>
-            <CCardBody>
-              <div className="fs-6">{diagnosis}</div>
-            </CCardBody>
-          </CCard>
+        {/* 3. Patient Background */}
+        {hasBackgroundData && (
+          <Section icon="📋" title="Patient Background">
+            <Grid cols={3}>
+              {isValid(previousInjuries) && <Row label="Previous Injuries" value={previousInjuries} highlight />}
+              {isValid(currentMedications) && <Row label="Current Medications" value={currentMedications} highlight />}
+              {isValid(allergies) && <Row label="Allergies" value={allergies} />}
+              {isValid(occupation) && <Row label="Occupation" value={occupation} />}
+              {isValid(insuranceProvider) && <Row label="Insurance Provider" value={insuranceProvider} />}
+              {isValid(effectivePain) && <Row label="Pain Type" value={PAIN_LABEL_MAP[effectivePain] || effectivePain} highlight />}
+            </Grid>
+            {activityLevels.length > 0 && (
+              <div style={{ marginTop: 6 }}>
+                <span style={{ fontWeight: 700, fontSize: '0.72rem', color: T.textLight, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Activity Levels: </span>
+                {activityLevels.map(lvl => <Chip key={lvl} label={lvl} color={T.bgcolor} bg={T.bgLight} />)}
+              </div>
+            )}
+          </Section>
         )}
 
-        {/* Medication Table */}
-        {medicines.length > 0 && (
-          <CCard className="shadow-sm mb-3">
-            <CCardHeader className="py-2">
-              <strong style={{ color: COLORS.black }}>Medication Details</strong>
-            </CCardHeader>
-            <CCardBody>
-              <CTable striped hover responsive className="align-middle">
-                <CTableHead>
-                  <CTableRow className="bg-primary text-white">
-                    <CTableHeaderCell>S.No</CTableHeaderCell>
-                    <CTableHeaderCell>Medicine Type</CTableHeaderCell>
-                    <CTableHeaderCell>Medicine</CTableHeaderCell>
-                    <CTableHeaderCell>Dosage</CTableHeaderCell>
-                    <CTableHeaderCell>Duration</CTableHeaderCell>
-                    <CTableHeaderCell>Frequency</CTableHeaderCell>
-                    <CTableHeaderCell>Instructions</CTableHeaderCell>
-                    <CTableHeaderCell>Notes</CTableHeaderCell>
-                    <CTableHeaderCell>Timings</CTableHeaderCell>
-                  </CTableRow>
-                </CTableHead>
+        {/* 4. Therapy Questionnaire */}
+        <QuestionnaireSection therapyGroups={therapyGroups} />
 
-                <CTableBody>
-                  {medicines.map((med, index) => {
-                    const durationValue = parseInt(med.duration, 10);
-                    const durationUnit =
-                      med.duration_unit && med.duration_unit !== "NA"
-                        ? med.duration_unit.trim()
-                        : "";
-
-                    const displayDuration =
-                      durationValue > 0 && med.durationUnit
-                        ? `${durationValue} ${med.durationUnit}${durationValue > 1 ? "s" : ""}`
-                        : durationValue > 0
-                          ? `${durationValue}`
-                          : "NA";
-
-
-                    const displayFrequency =
-                      med.remindWhen && med.remindWhen !== "NA"
-                        ? med.remindWhen === "Other" && med.others
-                          ? `Other (${med.others})`
-                          : med.remindWhen
-                        : med.others || "NA";
-
-                    const displayTimes =
-                      Array.isArray(med.times) && med.times.filter(Boolean).length > 0
-                        ? med.times.filter(Boolean).join(", ")
-                        : "NA";
-
-                    return (
-                      <CTableRow key={index}>
-                        <CTableDataCell>{index + 1}</CTableDataCell>
-                        <CTableDataCell>{med.medicineType || "NA"}</CTableDataCell>
-                        <CTableDataCell>{med.name || "NA"}</CTableDataCell>
-                        <CTableDataCell>{med.dose || "NA"}</CTableDataCell>
-                        <CTableDataCell>{displayDuration}</CTableDataCell>
-                        <CTableDataCell>{displayFrequency}</CTableDataCell>
-                        <CTableDataCell>{med.food || "NA"}</CTableDataCell>
-                        <CTableDataCell>{med.note || "NA"}</CTableDataCell>
-                        <CTableDataCell>{displayTimes}</CTableDataCell>
-                      </CTableRow>
-                    );
-                  })}
-                </CTableBody>
-              </CTable>
-            </CCardBody>
-          </CCard>
-        )}
-
-
-        {/* Tests */}
-        {(tests.length > 0 || testsReason) && (
-          <CCard className="shadow-sm mb-3">
-            <CCardHeader className="py-2">
-              <strong style={{ color: COLORS.black }}>Investigations</strong>
-            </CCardHeader>
-            <CCardBody>
-              {tests.length > 0 ? (
-                <ul className="mb-2">
-                  {tests.map((t, i) => (
-                    <li key={`test-${i}`}>
-                      <span className="fw-semibold">Recommended Test (Optional): </span>
-                      <span>{typeof t === 'string' ? t : t?.name || '—'}</span>
-                    </li>
+        {/* 5. Investigation */}
+        {(investigationTestsArray.length > 0 || isValid(investigationReason)) && (
+          <Section icon="🔬" title="Investigation">
+            {investigationTestsArray.length > 0 && (
+              <div style={{ marginBottom: investigationReason ? 10 : 0 }}>
+                <span style={{ fontWeight: 700, fontSize: '0.72rem', color: T.textLight, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Recommended Tests:</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
+                  {investigationTestsArray.map((test, i) => (
+                    <span key={i} style={{ background: T.tealLight, color: T.teal, borderRadius: 20, padding: '3px 12px', fontSize: '0.75rem', fontWeight: 700, border: `1px solid #5eead4`, display: 'inline-flex', alignItems: 'center', gap: 5 }}>🔬 {test}</span>
                   ))}
-                </ul>
-              ) : (
-                <p className="mb-2">
-                  <span className="fw-semibold">Recommended Test (Optional):</span> NA
-                </p>
-              )}
-
-              {testsReason && (
-                <div className="mt-2">
-                  <div className="text-muted fw-semibold">Reason:{testsReason}</div>
-
                 </div>
-              )}
-            </CCardBody>
-          </CCard>
+              </div>
+            )}
+            {isValid(investigationReason) && <Row label="Notes / Reason" value={investigationReason} full highlight />}
+          </Section>
         )}
 
-        {/* Treatments */}
-        {treatments.length > 0 && (
-          <CCard className="shadow-sm mb-3">
-            <CCardHeader className="py-2">
-              <strong style={{ color: COLORS.black }}>Procedures</strong>
-            </CCardHeader>
-            <CCardBody>
-              <ul className="mb-2">
-                {treatments.map((t, i) => (
-                  <li key={`treat-${i}`}>
-                    <strong>Selected Treatments: </strong>
-                    {typeof t === "string" ? t : t?.name || "—"}
-                  </li>
-                ))}
-              </ul>
+        {/* 6. Assessment */}
+        {hasAssessmentData && (
+          <Section icon="📊" title="Assessment">
+            <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${T.border}` }}>
+              <div style={{ fontWeight: 700, fontSize: '0.75rem', color: T.bgcolor, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>📋 Subjective Assessment</div>
+              <Grid cols={2}>
+                {isValid(assessment.chiefComplaint) && <Row label="Chief Complaint" value={assessment.chiefComplaint} highlight />}
+                {isValid(assessment.painScale) && <Row label="Pain Scale" value={assessment.painScale} highlight />}
+                {isValid(assessment.painType) && <Row label="Pain Type" value={assessment.painType} />}
+                {isValid(assessment.duration) && <Row label="Duration" value={assessment.duration} />}
+                {isValid(assessment.onset) && <Row label="Onset" value={assessment.onset} />}
+                {isValid(assessment.aggravatingFactors) && <Row label="Aggravating Factors" value={assessment.aggravatingFactors} />}
+                {isValid(assessment.relievingFactors) && <Row label="Relieving Factors" value={assessment.relievingFactors} />}
+              </Grid>
+              {isValid(assessment.observations) && <Row label="Observations" value={assessment.observations} full />}
+            </div>
 
-              {treatmentReason ? (
-                <div className="mt-2">
-                  <div className="text-muted">Reason</div>
-                  <div>{treatmentReason}</div>
+            {(difficultiesIn.length > 0 || isValid(otherDifficulty) || isValid(dailyLivingAffected)) && (
+              <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${T.border}` }}>
+                <div style={{ fontWeight: 700, fontSize: '0.75rem', color: T.teal, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>🏃 Functional Assessment</div>
+                {difficultiesIn.length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.72rem', color: T.textLight, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Difficulties in: </span>
+                    {difficultiesIn.map(d => <Chip key={d} label={d} color={T.bgcolor} bg={T.bgLight} />)}
+                    {isValid(otherDifficulty) && <Chip label={`Other: ${otherDifficulty}`} color={T.bgcolor} bg={T.bgLight} />}
+                  </div>
+                )}
+                {isValid(dailyLivingAffected) && <Row label="Daily Living Affected" value={dailyLivingAffected} full highlight />}
+              </div>
+            )}
+
+            {(postureAssessment.length > 0 || romStatus.length > 0 || muscleStrength.length > 0 || neurologicalSigns.length > 0) && (
+              <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${T.border}` }}>
+                <div style={{ fontWeight: 700, fontSize: '0.75rem', color: T.purple, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>🔬 Physical Examination</div>
+                <div style={{ background: T.bgLight, border: `1px solid ${T.border}`, borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+                  {[
+                    { label: 'Posture Assessment', opts: ['Normal', 'Deviations'], sel: postureAssessment, note: postureDeviations },
+                    { label: 'Range of Motion', opts: ['Normal', 'Restricted'], sel: romStatus, note: romRestricted },
+                    { label: 'Muscle Strength', opts: ['Normal', 'Weakness in'], sel: muscleStrength, note: muscleWeakness },
+                    { label: 'Neurological Signs', opts: ['Normal', 'Balance', 'Coordination', 'Sensation issues'], sel: neurologicalSigns, note: '' },
+                  ].map((row, ri, arr) => (
+                    <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderBottom: ri < arr.length - 1 ? `1px solid ${T.border}` : 'none', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.75rem', color: T.text, minWidth: 140 }}>{row.label}:</span>
+                      {row.opts.map(opt => <CheckChip key={opt} label={opt} checked={row.sel.includes(opt)} />)}
+                      {isValid(row.note) && <span style={{ fontSize: '0.75rem', color: T.textMid, fontStyle: 'italic' }}>— {row.note}</span>}
+                    </div>
+                  ))}
                 </div>
-              ) : null}
-            </CCardBody>
-          </CCard>
-        )}
 
-        {/* Treatment Schedules */}
-        {treatmentSchedules && Object.keys(treatmentSchedules).length > 0 && (
-          <CCard className="shadow-sm mb-3">
-            <CCardHeader className="py-2">
-              <strong style={{ color: COLORS.black }}>Treatment Schedule</strong>
-            </CCardHeader>
-            <CCardBody>
-              {Object.entries(treatmentSchedules).map(([name, meta]) => (
-                <CCard key={name} className="mb-3 p-2">
-                  <div style={{ fontWeight: 'bold' }}>
-                    {name} — {freqLabel(meta?.frequency)} ({meta?.sittings ?? 0} sittings from{' '}
-                    {meta?.startDate ?? '—'})
+                {/* Objective Findings Section */}
+                {(isValid(posture) || isValid(rangeOfMotion) || isValid(specialTests)) && (
+                  <div style={{ background: '#FFFFFF', border: `1.5px solid ${T.borderLight}`, borderRadius: 8, padding: '12px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.7rem', color: T.textLight, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>📐 Objective / Additional Findings:</div>
+                    <Grid cols={2}>
+                      {isValid(posture) && <Row label="Posture Notes" value={posture} />}
+                      {isValid(rangeOfMotion) && <Row label="ROM Notes" value={rangeOfMotion} />}
+                      {isValid(specialTests) && <Row label="Special Tests" value={specialTests} full />}
+                    </Grid>
                   </div>
+                )}
+              </div>
+            )}
 
-                  <div className="mt-2 table-responsive">
-                    <table className="table table-sm mb-0">
-                      <thead className="table-light">
-                        <tr>
-                          <th style={{ width: "8%", textAlign: "center" }}>S.No</th>
-                          <th style={{ width: "46%", textAlign: "center" }}>Date</th>
-                          <th style={{ width: "46%", textAlign: "center" }}>Sitting</th>
-                          <th style={{ width: "46%", textAlign: "center" }}>Status</th>
+            {effectivePain === 'chronicPain' && (isValid(painTriggers) || isValid(chronicRelieving)) && (
+              <div style={{ marginBottom: 12, background: '#fff5f5', border: '1.5px solid #fecaca', borderRadius: 8, padding: '10px 14px' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.75rem', color: T.rose, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>🔴 Chronic Pain Assessment</div>
+                <Grid cols={2}>
+                  {isValid(painTriggers) && <Row label="Pain Triggers" value={painTriggers} highlight />}
+                  {isValid(chronicRelieving) && <Row label="Relieving Factors" value={chronicRelieving} highlight />}
+                </Grid>
+              </div>
+            )}
+            {effectivePain === 'sportsRehab' && (isValid(typeOfSport) || isValid(recurringInjuries) || isValid(returnToSportGoals)) && (
+              <div style={{ marginBottom: 12, background: '#f0fff4', border: '1.5px solid #6ee7b7', borderRadius: 8, padding: '10px 14px' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.75rem', color: T.green, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>🟢 Sports Rehab Assessment</div>
+                <Grid cols={2}>
+                  {isValid(typeOfSport) && <Row label="Type of Sport" value={typeOfSport} highlight />}
+                  {isValid(recurringInjuries) && <Row label="Recurring Injuries" value={recurringInjuries} highlight />}
+                  {isValid(returnToSportGoals) && <Row label="Return-to-Sport Goals" value={returnToSportGoals} full />}
+                </Grid>
+              </div>
+            )}
+            {effectivePain === 'neuroRehab' && (isValid(neuroDiagnosis) || isValid(neuroOnset) || isValid(mobilityStatus) || isValid(cognitiveStatus)) && (
+              <div style={{ marginBottom: 12, background: '#f5f3ff', border: '1.5px solid #c4b5fd', borderRadius: 8, padding: '10px 14px' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.75rem', color: T.purple, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>🟣 Neuro Rehab Assessment</div>
+                <Grid cols={2}>
+                  {isValid(neuroDiagnosis) && <Row label="Diagnosis" value={neuroDiagnosis} highlight />}
+                  {isValid(neuroOnset) && <Row label="Onset" value={neuroOnset} highlight />}
+                  {isValid(mobilityStatus) && <Row label="Mobility Status" value={mobilityStatus} />}
+                  {isValid(cognitiveStatus) && <Row label="Cognitive / Communication" value={cognitiveStatus} />}
+                </Grid>
+              </div>
+            )}
 
+            {/* Red Flags & Screening */}
+            {(() => {
+              const rf = record.assessment?.redFlags || record.redFlags || {}
+              const rn = record.assessment?.radiationNeuro || record.radiationNeuro || {}
+              const ss = record.assessment?.specialSymptoms || record.specialSymptoms || {}
 
-                        </tr>
+              if (!Object.values(rf).some(v => v === true) &&
+                !Object.values(rn).some(v => v === true) &&
+                !Object.values(ss).some(v => v === true)) return null
 
-                      </thead>
-                      <tbody>
-                        {(meta?.dates || []).map((d, i) => (
-                          <tr key={`${name}-row-${i}`} className="text-center">
-                            <td>{i + 1}</td>
-                            <td>{d?.date ?? '—'}</td>
-                            <td>{d?.sitting ?? '—'}</td>
-                            <td style={{ textAlign: "center" }}>
-                              <span
-                                className={`badge ${d?.status === "Pending"
-                                    ? "bg-warning text-dark"
-                                    : d?.status === "Completed"
-                                      ? "bg-success"
-                                      : d?.status === "Cancelled"
-                                        ? "bg-danger"
-                                        : "bg-secondary"
-                                  }`}
-                              >
-                                {d?.status || "Pending"}
-                              </span>
-                            </td>
+              return (
+                <div style={{ marginBottom: 12, background: '#fff1f2', border: '1.5px solid #fda4af', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.75rem', color: T.rose, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>🚩 Clinical Screening & Red Flags</div>
 
+                  {Object.values(rf).some(v => v === true) && (
+                    <div style={{ marginBottom: 10 }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.7rem', color: T.textLight, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Red Flags:</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                        {rf.trauma && <Chip label="Trauma" color={T.rose} bg={T.roseLight} />}
+                        {rf.weightLoss && <Chip label="Unexplained Weight Loss" color={T.rose} bg={T.roseLight} />}
+                        {rf.fever && <Chip label="Fever / Night Sweats" color={T.rose} bg={T.roseLight} />}
+                        {rf.cancer && <Chip label="History of Cancer" color={T.rose} bg={T.roseLight} />}
+                        {rf.nightPain && <Chip label="Severe Night Pain" color={T.rose} bg={T.roseLight} />}
+                        {rf.swallowing && <Chip label="Difficulty Swallowing" color={T.rose} bg={T.roseLight} />}
+                      </div>
+                    </div>
+                  )}
 
-                          </tr>
-                        ))}
-                      </tbody>
+                  {Object.values(rn).some(v => v === true) && (
+                    <div style={{ marginBottom: 10 }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.7rem', color: T.textLight, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Neurological Screening:</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                        {rn.radiating && <Chip label="Radiating Pain" color={T.amber} bg={T.amberLight} />}
+                        {rn.numbness && <Chip label="Numbness / Tingling" color={T.amber} bg={T.amberLight} />}
+                        {rn.weakness && <Chip label="Muscle Weakness" color={T.amber} bg={T.amberLight} />}
+                        {rn.gripDifficulty && <Chip label="Grip / Fine Motor Difficulty" color={T.amber} bg={T.amberLight} />}
+                      </div>
+                    </div>
+                  )}
 
-                    </table>
-                  </div>
-
-                  {meta?.reason ? <div className="mt-2">Reason: {meta.reason}</div> : null}
-                </CCard>
-              ))}
-            </CCardBody>
-          </CCard>
-        )}
-
-        {/* Follow-up Plan */}
-        {followUp.durationValue !== 'NA' && (
-          <CCard className="shadow-sm mb-4">
-            <CCardHeader className="py-2">
-              <strong style={{ color: COLORS.black }}>Follow-up Plan</strong>
-            </CCardHeader>
-            <CCardBody>
-              <CCol xs={12} md={6}>
-                <div>
-                  <span className="fw-semibold">Next Follow Up :</span>{' '}
-                  {followUp.durationValue && followUp.durationValue !== 0 ? (
-                    <>
-                      After{' '}
-                      <span>
-                        {followUp.durationValue} {followUp.durationUnit || 'NA'}
-                      </span>
-                      {followUp.date && followUp.date !== '—' && (
-                        <> ({followUp.date})</>
-                      )}
-                    </>
-                  ) : (
-                    'NA'
+                  {Object.values(ss).some(v => v === true) && (
+                    <div>
+                      <span style={{ fontWeight: 700, fontSize: '0.7rem', color: T.textLight, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Special Symptoms:</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                        {ss.headache && <Chip label="Frequent Headaches" color={T.bgcolor} bg={T.bgLight} />}
+                        {ss.dizziness && <Chip label="Dizziness / Vertigo" color={T.bgcolor} bg={T.bgLight} />}
+                      </div>
+                    </div>
                   )}
                 </div>
-              </CCol>
+              )
+            })()}
 
-              <CCol xs={12}>
-                <div>
-                  <span className="fw-semibold">Follow Up Note:</span>{' '}
-                  <span style={{ whiteSpace: 'pre-wrap' }}>
-                    {followUp.note && followUp.note.trim() !== '' ? followUp.note : 'NA'}
-                  </span>
+            {/* Psychosocial */}
+            {(() => {
+              const ps = record.assessment?.psychosocial || record.psychosocial || {}
+              if (!isValid(ps.stressLevel) && !ps.workSatisfaction && !ps.fearOfMovement) return null
+
+              return (
+                <div style={{ marginBottom: 12, background: '#f0f9ff', border: '1.5px solid #bae6fd', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.75rem', color: T.text, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>🧠 Psychosocial Assessment</div>
+                  <Grid cols={3}>
+                    {isValid(ps.stressLevel) && <Row label="Stress Level" value={ps.stressLevel} highlight />}
+                    {ps.workSatisfaction && <Row label="Work Dissatisfaction" value="Yes" />}
+                    {ps.fearOfMovement && <Row label="Fear of Movement" value="Yes" />}
+                  </Grid>
                 </div>
-              </CCol>
-            </CCardBody>
-          </CCard>
+              )
+            })()}
+          </Section>
+        )}
+
+        {/* 7. Diagnosis */}
+        {diagnosisRows.length > 0 && (
+          <Section icon="🔍" title="Diagnosis">
+            <div style={{ overflowX: 'auto' }}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>{['#', 'Primary Diagnosis', 'Differential Diagnosis', 'Affected Area', 'Severity', 'Stage', 'Notes'].map(h => <th key={h} style={thStyle}>{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {diagnosisRows.map((d, i) => {
+                    const sevColor = { Mild: ['#e6f4ea', '#2e7d32'], Moderate: ['#fff3e0', '#e65100'], Severe: ['#fdecea', '#c62828'] }
+                    const stagColor = { Acute: ['#fdecea', '#c62828'], 'Sub-acute': ['#fff8e1', '#f57f17'], Chronic: ['#e8eaf6', '#283593'] }
+                    const [sBg, sFg] = sevColor[d.severity] || ['#f3f4f6', '#374151']
+                    const [tBg, tFg] = stagColor[d.stage] || ['#f3f4f6', '#374151']
+                    return (
+                      <tr key={i}>
+                        <td style={{ ...tdStyle(i), fontWeight: 700, color: T.bgcolor }}>{i + 1}</td>
+                        <td style={{ ...tdStyle(i), fontWeight: 600 }}>{d.physioDiagnosis || '—'}</td>
+                        <td style={{ ...tdStyle(i), maxWidth: 180, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{d.differentialDiagnosis || '—'}</td>
+                        <td style={tdStyle(i)}>{d.affectedArea || '—'}</td>
+                        <td style={tdStyle(i)}>{d.severity ? <span style={{ background: sBg, color: sFg, borderRadius: 20, padding: '2px 8px', fontWeight: 700, fontSize: '0.7rem' }}>{d.severity}</span> : '—'}</td>
+                        <td style={tdStyle(i)}>{d.stage ? <span style={{ background: tBg, color: tFg, borderRadius: 20, padding: '2px 8px', fontWeight: 700, fontSize: '0.7rem' }}>{d.stage}</span> : '—'}</td>
+                        <td style={{ ...tdStyle(i), maxWidth: 180, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{d.notes || '—'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Section>
+        )}
+
+        {/* 8. Treatment Plan */}
+        {(isValid(treatmentPlanDisplay.therapistId) || isValid(treatmentPlanDisplay.therapistName)) && (
+          <Section icon="🧑‍⚕️" title="Treatment Plan">
+            <Grid cols={2}>
+              {isValid(treatmentPlanDisplay.doctorId) && <Row label="Doctor ID" value={treatmentPlanDisplay.doctorId} />}
+              {isValid(treatmentPlanDisplay.doctorName) && <Row label="Doctor Name" value={treatmentPlanDisplay.doctorName} />}
+              {isValid(treatmentPlanDisplay.therapistId) && <Row label="Therapist ID" value={treatmentPlanDisplay.therapistId} />}
+              {isValid(treatmentPlanDisplay.therapistName) && <Row label="Therapist Name" value={treatmentPlanDisplay.therapistName} highlight />}
+              {isValid(manualTherapy) && <Row label="Manual Therapy" value={manualTherapy} />}
+              {isValid(patientResponse) && <Row label="Patient Response" value={patientResponse} />}
+            </Grid>
+            {precautionsArr.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: '0.72rem', color: T.textLight, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Precautions: </span>
+                {precautionsArr.map((p, i) => <Chip key={i} label={p} color={T.amber} bg={T.amberLight} />)}
+              </div>
+            )}
+            {modalitiesArr.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: '0.72rem', color: T.textLight, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Modalities Used: </span>
+                {modalitiesArr.map((m, i) => <Chip key={i} label={m} color={T.teal} bg={T.tealLight} />)}
+              </div>
+            )}
+          </Section>
+        )}
+
+        {/* 9. Therapy Sessions */}
+        <Section icon="🏥" title="Therapy Sessions" badge={sessionsList.length ? `${sessionsList.length} session(s)` : null}>
+          {isValid(overallStatus) && (
+            <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontWeight: 700, fontSize: '0.72rem', color: T.textLight, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Overall Status:</span>
+              <StatusDot status={overallStatus} />
+            </div>
+          )}
+          <TherapySessionsDisplay sessionsList={sessionsList} therapistId={topTherapistId} therapistName={topTherapistName} />
+        </Section>
+
+        {/* 10. Exercise Plan */}
+        {(homeExercises.length > 0 || isValid(homeAdvice)) && (
+          <Section icon="🏋️" title="Exercise Plan">
+            {homeExercises.length > 0 && (
+              <div style={{ overflowX: 'auto', marginBottom: isValid(homeAdvice) ? 12 : 0 }}>
+                <table style={tableStyle}>
+                  <thead><tr>{['#', 'Exercise', 'Sets', 'Reps', 'Sessions', 'Act. Duration', 'Frequency', 'Instructions'].map(h => <th key={h} style={thStyle}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {homeExercises.map((ex, i) => (
+                      <tr key={i}>
+                        <td style={{ ...tdStyle(i), fontWeight: 700 }}>{i + 1}</td>
+                        <td style={{ ...tdStyle(i), fontWeight: 600 }}>{ex.name || ex.exerciseName || '—'}</td>
+                        <td style={{ ...tdStyle(i), textAlign: 'center' }}>{ex.sets ? <Chip label={`🔁 ${ex.sets}`} color={T.bgcolor} bg={T.bgLight} /> : '—'}</td>
+                        <td style={{ ...tdStyle(i), textAlign: 'center' }}>{(ex.reps || ex.repetitions) ? <Chip label={`🔄 ${ex.reps || ex.repetitions}`} color={T.teal} bg={T.tealLight} /> : '—'}</td>
+                        <td style={{ ...tdStyle(i), textAlign: 'center' }}>{(ex.sessions || ex.session) ? <Chip label={`🗓 ${ex.sessions || ex.session}`} color={T.navy} bg={T.bgLight} /> : '—'}</td>
+                        <td style={{ ...tdStyle(i), textAlign: 'center' }}>{(ex.activityDuration || ex.activityduration || ex.duration) ? <Chip label={`⏱ ${ex.activityDuration || ex.activityduration || ex.duration}`} color={T.bgcolor} bg={T.bgLight} /> : '—'}</td>
+                        <td style={tdStyle(i)}>{ex.frequency ? <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>📆 {ex.frequency}</span> : '—'}</td>
+                        <td style={{ ...tdStyle(i), maxWidth: 220 }}><div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ex.instructions || ex.notes}>{ex.instructions || ex.notes || '—'}</div></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {isValid(homeAdvice) && <Row label="Home Advice" value={homeAdvice} full highlight />}
+          </Section>
+        )}
+
+        {/* 11. Follow Up */}
+        {(isValid(followUpEntry.nextVisitDate) || isValid(followUpEntry.reviewNotes)) && (
+          <Section icon="📅" title="Follow Up">
+            <Grid cols={2}>
+              {isValid(followUpEntry.nextVisitDate) && <Row label="Next Visit Date" value={followUpEntry.nextVisitDate} highlight />}
+              {isValid(followUpEntry.reviewNotes) && <Row label="Review Notes" value={followUpEntry.reviewNotes} highlight />}
+            </Grid>
+            {isValid(followUpEntry.nextVisitDate) && (() => {
+              const urgency = getVisitUrgency(followUpEntry.nextVisitDate)
+              return urgency ? (
+                <div style={{ marginTop: 6 }}>
+                  <span style={{ background: urgency.bg, color: urgency.color, border: `1px solid ${urgency.border}`, borderRadius: 10, padding: '2px 10px', fontSize: '0.72rem', fontWeight: 700 }}>{urgency.icon} {urgency.label}</span>
+                </div>
+              ) : null
+            })()}
+          </Section>
+        )}
+
+        {/* 12. Treatment Templates */}
+        {treatmentTemplates.length > 0 && (
+          <Section icon="📁" title="Treatment Templates">
+            <div style={{ overflowX: 'auto' }}>
+              <table style={tableStyle}>
+                <thead><tr>{['#', 'Condition', 'Modalities', 'Manual Therapy', 'Exercises', 'Duration', 'Frequency'].map(h => <th key={h} style={thStyle}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {treatmentTemplates.map((t, i) => (
+                    <tr key={i}>
+                      <td style={{ ...tdStyle(i), fontWeight: 700 }}>{i + 1}</td>
+                      <td style={{ ...tdStyle(i), fontWeight: 600 }}>{t.condition || '—'}</td>
+                      <td style={tdStyle(i)}>{Array.isArray(t.modalities) && t.modalities.length ? t.modalities.map(m => <Chip key={m} label={m} color={T.bgcolor} bg={T.bgLight} />) : '—'}</td>
+                      <td style={tdStyle(i)}>{t.manualTherapy || '—'}</td>
+                      <td style={tdStyle(i)}>{Array.isArray(t.exercises) && t.exercises.length ? t.exercises.map(e => <Chip key={e} label={e} color={T.green} bg={T.greenLight} />) : '—'}</td>
+                      <td style={{ ...tdStyle(i), whiteSpace: 'nowrap' }}>{t.duration || '—'}</td>
+                      <td style={{ ...tdStyle(i), whiteSpace: 'nowrap' }}>{t.frequency || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Section>
         )}
 
       </CContainer>
 
-      {/* Sticky Bottom Bar */}
-      <div
-        className="position-fixed bottom-0"
-        style={{
-          left: sidebarWidth ? `${sidebarWidth}px` : 0,
-          width: sidebarWidth ? `calc(100vw - ${sidebarWidth}px)` : '100vw',
-          backgroundColor: '#F3f3f7',
-          display: 'flex',
-          justifyContent: 'space-evenly',
-          padding: 12,
-          zIndex: 999,
-        }}
-      >
-        <div className="d-flex gap-2 mx-4 justify-content-between w-75">
-          <Button
-            customColor={COLORS.bgcolor}
-            onClick={() => {
-              setClickedSaveTemplate(true)
-              // uploadPrescription({ downloadAfter: false })
-
-              onSaveTemplate?.()
-              info('Template saved. You can now Save or Save & Download.', { title: 'Template' })
-            }}
-          >
-            {!updateTemplate ? 'Save Prescription Template' : 'Update Prescription Template'}
-          </Button>
-
-          <div className="d-flex gap-2">
-            <Button
-              onClick={() => {
-                setPendingAction(ACTIONS.SAVE)
-                clickedSaveTemplate
-                  ? skipTemplate() // skip modal, proceed
-                  : setShowTemplateModal(true)
-              }}
-              customColor={COLORS.bgcolor} // background color of button
-              color={COLORS.black}
-            >
-              Save
-            </Button>
-
-            <Button
-              customColor={COLORS.bgcolor}
-              onClick={() => {
-                setPendingAction(ACTIONS.SAVE_PRINT)
-                clickedSaveTemplate
-                  ? skipTemplate() // skip modal, proceed with download
-                  : setShowTemplateModal(true)
-              }}
-            >
-              Save & Download PDF
-            </Button>
-          </div>
-
-          {showTemplateModal && !clickedSaveTemplate && (
-            <div
-              style={{ zIndex: 999 }}
-              className="vh-modal-backdrop"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Save as template?"
-            >
-              <div className="vh-modal position-relative p-3">
-                {/* 🔹 X Close Button */}
-                <button
-                  onClick={() => setShowTemplateModal(false)}
-                  style={{
-                    position: "absolute",
-                    top: "8px",
-                    right: "10px",
-                    background: "none",
-                    border: "none",
-                    fontSize: "18px",
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                    color: COLORS.black
-                  }}
-                  aria-label="Close modal"
-                >
-                  ✕
-                </button>
-
-                <h6 className="mb-2 mt-3">Save this as a template?</h6>
-                <p className="muted mb-3">
-                  You can reuse this prescription layout later for faster entry.
-                </p>
-
-                <div className="d-flex gap-2 justify-content-end">
-                  <Button
-                    onClick={() => {
-                      setPendingAction(ACTIONS.SAVE);
-                      skipTemplate(); // just navigate back
-                    }}
-                    customColor={COLORS.bgcolor}
-                    color={COLORS.black}
-                  >
-                    No, just continue
-                  </Button>
-
-                  <Button customColor={COLORS.bgcolor} onClick={confirmSaveAsTemplate}>
-                    Yes, save as template
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-        </div>
+      {/* ── Sticky Bottom Bar ── */}
+      <div style={{ position: 'fixed', bottom: 0, left: sidebarWidth ? `${sidebarWidth}px` : 0, width: sidebarWidth ? `calc(100vw - ${sidebarWidth}px)` : '100vw', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '8px 24px', zIndex: 999, boxShadow: '0 -2px 10px rgba(27,79,138,0.12)', borderTop: '2px solid #1B4F8A' }}>
+        {/* <Button customColor="#1B4F8A" color="#FFFFFF" style={{ borderRadius: '20px', fontWeight: 700, padding: '5px 20px', fontSize: 12, boxShadow: '0 2px 8px rgba(27,79,138,0.30)', border: '1.5px solid #1B4F8A' }}
+          onClick={() => { setClickedSaveTemplate(true); onSaveTemplate?.(); info('Template saved!', { title: 'Template' }) }}>
+          {!updateTemplate ? '💾 Save as Template' : '🔄 Update Template'}
+        </Button> */}
+        {saving && <CSpinner size="sm" style={{ color: '#1B4F8A' }} />}
+        <Button customColor="#1B4F8A" color="#FFFFFF" style={{ borderRadius: '20px', fontWeight: 700, padding: '5px 20px', fontSize: 12, boxShadow: '0 2px 8px rgba(27,79,138,0.30)', border: '1.5px solid #1B4F8A' }}
+          onClick={() => { setPendingAction(ACTIONS.SAVE); clickedSaveTemplate ? doSave() : setShowTemplateModal(true) }} disabled={saving}>
+          ✅ Save
+        </Button>
+        <Button customColor="#1B4F8A" color="#FFFFFF" style={{ borderRadius: '20px', fontWeight: 700, padding: '5px 20px', fontSize: 12, boxShadow: '0 2px 8px rgba(27,79,138,0.30)', border: '1.5px solid #1B4F8A' }}
+          onClick={() => { setPendingAction(ACTIONS.SAVE_PRINT); clickedSaveTemplate ? doSave({ downloadAfter: true }) : setShowTemplateModal(true) }} disabled={saving}>
+          📄 Save & Download PDF
+        </Button>
       </div>
+
+      {/* ── Template modal ── */}
+      {showTemplateModal && !clickedSaveTemplate && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(27,79,138,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: T.white, borderRadius: 16, padding: '24px 28px', maxWidth: 400, width: '90%', boxShadow: '0 24px 64px rgba(27,79,138,0.25)', border: `2px solid ${T.orange}`, position: 'relative' }}>
+            <button onClick={() => setShowTemplateModal(false)} style={{ position: 'absolute', top: 12, right: 14, background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: T.textLight, lineHeight: 1 }}>✕</button>
+            <div style={{ fontSize: 30, marginBottom: 10, textAlign: 'center' }}>📋</div>
+            <h6 style={{ margin: '0 0 6px', color: T.bgcolor, fontWeight: 800, textAlign: 'center', fontSize: 16 }}>Save as Template?</h6>
+            <p style={{ color: T.textMid, fontSize: '0.82rem', textAlign: 'center', marginBottom: 20, lineHeight: 1.5 }}>Reuse this layout for faster entry next time.</p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button onClick={skipTemplate} style={{ padding: '8px 20px', borderRadius: 8, cursor: 'pointer', border: `1.5px solid ${T.border}`, background: T.bgLight, color: T.text, fontWeight: 600, fontSize: '0.82rem' }}>No, just save</button>
+              <button onClick={confirmSaveAsTemplate} style={{ padding: '8px 20px', borderRadius: 8, cursor: 'pointer', border: 'none', background: T.bgcolor, color: T.white, fontWeight: 700, fontSize: '0.82rem', boxShadow: `0 2px 8px rgba(249,197,113,0.3)`, outline: `2px solid ${T.orange}`, outlineOffset: 2 }}>Yes, save template</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {snackbar.show && <Snackbar message={snackbar.message} type={snackbar.type} />}
     </div>

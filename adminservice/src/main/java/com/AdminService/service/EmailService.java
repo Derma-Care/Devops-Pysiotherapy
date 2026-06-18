@@ -9,7 +9,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
-import jakarta.mail.internet.MimeMessage;   // error
+import jakarta.mail.internet.MimeMessage;
 
 @Service
 public class EmailService {
@@ -28,10 +28,11 @@ public class EmailService {
         );
         this.clinicLoginUrl = env.getProperty(
                 "notification.clinic-login-url",
-                "http://52.66.144.177:3000/clinic-admin"
+                "https://clinic.ccmstestserver.online"
         );
     }
 
+    // ================= SEND EMAIL =================
     public void sendEmail(String to, Map<String, String> data) {
         try {
             if (to == null || to.isBlank()) {
@@ -39,15 +40,18 @@ public class EmailService {
                 return;
             }
 
-            String subject = data.getOrDefault("subject", "CCMS Notification");
+            String subject = data.getOrDefault("subject", "Kinetix Wellness Care");
 
-            // Determine emoji based on subject
+            // Emoji support
             String emoji = "";
             if (subject.contains("Verified")) emoji = "🎉";
             else if (subject.contains("Pending")) emoji = "⏳";
             else if (subject.contains("Review")) emoji = "🔍";
             else if (subject.contains("Rejected")) emoji = "❌";
             else if (subject.contains("OTP")) emoji = "🔒";
+
+            // Fix subject branding
+            subject = subject.replace("CCMS Notification", "Kinetix Wellness Care");
 
             String subjectWithEmoji = emoji.isEmpty() ? subject : emoji + " " + subject;
 
@@ -58,7 +62,6 @@ public class EmailService {
             helper.setFrom(fromAddress);
             helper.setSubject(subjectWithEmoji);
 
-            // Select template based on email type
             if (subject.contains("OTP")) {
                 helper.setText(buildOtpMessageBody(data, emoji), true);
             } else if (subject.contains("Rejected")) {
@@ -75,219 +78,138 @@ public class EmailService {
         }
     }
 
-    // Standard notification emails
+    // ================= COMMON TEMPLATE =================
     private String buildMessageBody(Map<String, String> data, String emoji) {
-        String bodyMessage = data.getOrDefault("message", "");
-        String otpType = data.get("otpType");
 
+        String bodyMessage = data.getOrDefault("message", "");
         String username = data.get("username");
         String password = data.get("password");
-        String payoutUsername = data.get("payoutUsername");
-        String payoutPassword = data.get("payoutPassword");
 
-        String greetingEmoji = "👋";
+        // ✅ NEW: Normalize Admin message to match Doctor format
+        if (bodyMessage != null && bodyMessage.contains("clinic has been verified")) {
 
-        StringBuilder body = new StringBuilder();
+            String clinicId = username != null ? username : "";
 
-        body.append("""
-                <html>
-                <body style="font-family: Arial, sans-serif; font-size: 15px; color: #333; background:#f9f9f9; padding:20px;">
-                <div style="
-                    max-width:600px;
-                    margin:0 auto;
-                    border:1px solid #ccc;
-                    padding:20px;
-                    border-radius:8px;
-                    background:#ffffff;
-                ">
-                """);
-
-        // Greeting
-        body.append(String.format("<p>%s Hello,</p>", greetingEmoji));
-
-        // Main message
-        if (!emoji.isEmpty()) {
-            body.append("<p>").append(emoji).append(" ")
-                .append(bodyMessage.replace("\n", "<br>"))
-                .append("</p>");
-        } else {
-            body.append("<p>").append(bodyMessage.replace("\n", "<br>")).append("</p>");
+            bodyMessage =
+                    "Welcome to CCMS KINETIX!\n\n" +
+                    "Your account has been created successfully.\n" +
+                    "Please use the below credentials to login.\n\n" +
+                    "Clinic ID: " + clinicId;
         }
 
-        // Login button
-        if (username != null && password != null) {
-            body.append(String.format("""
-                    <p style="text-align:center; margin-top:30px;">
-                        <a href="%s" style="
-                            background-color:#D2025B;
-                            color:#ffffff;
-                            padding:12px 24px;
-                            text-decoration:none;
-                            font-weight:bold;
-                            border-radius:6px;
-                            display:inline-block;
-                            font-size:16px;">
-                            Login to Clinic Portal
-                        </a>
-                    </p>
-                    """, clinicLoginUrl));
-        }
+    
+        if (bodyMessage != null) {
 
-        // Clinic login credentials
-        if (username != null && password != null) {
-            body.append(String.format("""
-                    <h3 style="color:#D2025B;">Clinic Login Credentials</h3>
-                    <p style="background:#f4f4f4; padding:10px; border-radius:4px;">
-                        <b>Username:</b> %s<br>
-                        <b>Password:</b> %s
-                    </p>
-                    """, username, password));
-        }
+            // Remove any existing "Welcome..." line completely
+            bodyMessage = bodyMessage.replaceAll("Welcome to CCMS.*", "").trim();
 
-        // Payout credentials
-        if (payoutUsername != null && payoutPassword != null) {
-            body.append(String.format("""
-                    <h3 style="color:#D2025B;">Payout Login Credentials</h3>
-                    <p style="background:#f4f4f4; padding:10px; border-radius:4px;">
-                        <b>Payout Username:</b> %s<br>
-                        <b>Payout Password:</b> %s
-                    </p>
-                    """, payoutUsername, payoutPassword));
+          
+            bodyMessage = "Welcome to CCMS Kinetix!\n\n" + bodyMessage;
         }
-
-        // Closing
-        body.append("""
-                <p>🙏 Thank you,<br><b>CCMS Team</b></p>
+        return """
+            <html>
+            <body style="margin:0; padding:0; font-family: Arial, sans-serif; background:#f5f7fa;">
+            
+            <div style="max-width:600px; margin:30px auto; background:#ffffff; border-radius:10px; 
+                        border:1px solid #e0e0e0; overflow:hidden;">
+                
+                <!-- Header -->
+                <div style="background:linear-gradient(135deg, #0f2027, #203a43, #2c5364); padding:18px; text-align:center;">
+                    <h2 style="color:#ffffff; margin:0;">Kinetix Wellness Care</h2>
                 </div>
-                </body>
-                </html>
-                """);
 
-        return body.toString();
+                <!-- Body -->
+                <div style="padding:20px; color:#333;">
+                    
+                    <p>👋 Hello,</p>
+
+                    <p style="line-height:1.6;">
+                        %s
+                    </p>
+
+                    %s
+
+                    %s
+
+                    <p style="margin-top:20px;">
+                        Regards,<br>
+                        CCMS Team
+                    </p>
+
+                </div>
+
+                <!-- Footer -->
+                <div style="background:#f1f3f6; padding:12px; text-align:center; font-size:12px; color:#777;">
+                    © 2026 CCMS. All rights reserved.
+                </div>
+
+            </div>
+
+            </body>
+            </html>
+            """.formatted(
+
+                bodyMessage.replace("\n", "<br>"),
+
+                (username != null && password != null)
+                        ? """
+                        <div style="background:#e8f0fe; padding:15px; border-radius:6px; margin-top:15px;">
+                            <h3 style="margin-top:0; color:#1a73e8;">Login Credentials</h3>
+                            <p><b>Username:</b> %s</p>
+                            <p><b>Password:</b> %s</p>
+                        </div>
+                        """.formatted(username, password)
+                        : "",
+
+                (username != null && password != null)
+                        ? """
+                        <div style="text-align:center; margin-top:20px;">
+                            <a href="%s"
+                               style="background:#28a745; color:white; padding:10px 22px; 
+                                      border-radius:6px; text-decoration:none; font-weight:bold;">
+                               Login Now
+                            </a>
+                        </div>
+                        """.formatted(clinicLoginUrl)
+                        : ""
+        );
     }
 
-    // OTP emails with highlighted OTP
+    // ================= OTP TEMPLATE =================
     private String buildOtpMessageBody(Map<String, String> data, String emoji) {
-
         String bodyMessage = data.getOrDefault("message", "");
-        String otpType = data.get("otpType");
-
-        // Extract OTP (4–6 digits)
-        String otp = "";
-        java.util.regex.Matcher matcher =
-                java.util.regex.Pattern.compile("\\b\\d{4,6}\\b").matcher(bodyMessage);
-        if (matcher.find()) {
-            otp = matcher.group();
-        }
-
-        String otpTitle;
-        String otpDescription;
-
-        if ("PAYOUT_PASSWORD_RESET".equals(otpType)) {
-            otpTitle = "Payout Password Reset OTP";
-            otpDescription = "Your OTP for resetting your Payout password:";
-        } else {
-            otpTitle = "Clinic Login Password Reset OTP";
-            otpDescription = "Your OTP for resetting your Clinic Login password:";
-        }
 
         return """
             <html>
-            <body style="font-family: Arial, sans-serif; font-size:15px; color:#333; background:#f9f9f9; padding:20px;">
-                <div style="
-                    max-width:600px;
-                    margin:0 auto;
-                    background:#ffffff;
-                    border:1px solid #ccc;
-                    border-radius:8px;
-                    padding:25px;
-                ">
-
-                    <p>👋 Hello,</p>
-
-                    <h3 style="color:#D2025B; margin-bottom:10px;">
-                        %s
-                    </h3>
-
-                    <p style="margin-top:5px;">
-                        🔒 %s
-                    </p>
-
-                    <p style="text-align:center; margin:25px 0;">
-                        <span style="
-                            background:#f4f4f4;
-                            color:#D2025B;
-                            font-size:28px;
-                            font-weight:bold;
-                            letter-spacing:3px;
-                            padding:12px 26px;
-                            border-radius:8px;
-                            display:inline-block;
-                        ">
-                            %s
-                        </span>
-                    </p>
-
-                    <p>This OTP is valid for <b>10 minutes</b>.</p>
-
-                    <p style="margin-top:30px;">
-                        🙏 Thank you,<br>
-                        <b>CCMS Team</b>
-                    </p>
-
+            <body style="font-family: Arial, sans-serif; background:#f5f7fa; padding:20px;">
+                <div style="max-width:600px; margin:auto; background:#fff; padding:20px; border-radius:10px;">
+                    <h3 style="color:#0f2027;">🔒 OTP Verification</h3>
+                    <p>%s</p>
+                    <p style="font-size:24px; font-weight:bold; color:#28a745;">%s</p>
+                    <p>This OTP is valid for 10 minutes.</p>
                 </div>
             </body>
             </html>
-            """.formatted(otpTitle, otpDescription, otp);
+            """.formatted(bodyMessage, bodyMessage.replaceAll("\\D+", ""));
     }
 
-
-    // Rejection emails
+    // ================= REJECTION TEMPLATE =================
     private String buildRejectionMessageBody(Map<String, String> data, String emoji) {
         String bodyMessage = data.getOrDefault("message", "");
-        String rejectionReason = data.getOrDefault("reason", "Not specified");
+        String reason = data.getOrDefault("reason", "Not specified");
 
-        String greetingEmoji = "👋";
-        StringBuilder body = new StringBuilder();
-
-        body.append("""
-                <html>
-                <body style="font-family: Arial, sans-serif; font-size: 15px; color: #333; background:#f9f9f9; padding:20px;">
-                <div style="
-                    max-width:600px;
-                    margin:0 auto;
-                    border:1px solid #ccc;
-                    padding:20px;
-                    border-radius:8px;
-                    background:#ffffff;
-                ">
-                """);
-
-        body.append(String.format("<p>%s Hello,</p>", greetingEmoji));
-
-        if (!emoji.isEmpty()) {
-            body.append("<p>").append(emoji).append(" ")
-                .append(bodyMessage.replace("\n", "<br>"))
-                .append("</p>");
-        } else {
-            body.append("<p>").append(bodyMessage.replace("\n", "<br>")).append("</p>");
-        }
-
-        // Highlight the rejection reason
-        body.append(String.format("""
-                <p style="background:#fdecea; color:#611a15; padding:10px; border-radius:4px;">
-                    <b>Reason for rejection:</b> %s
-                </p>
-                """, rejectionReason));
-
-        // Closing
-        body.append("""
-                <p>🙏 Thank you,<br><b>CCMS Team</b></p>
+        return """
+            <html>
+            <body style="font-family: Arial, sans-serif; background:#f5f7fa; padding:20px;">
+                <div style="max-width:600px; margin:auto; background:#fff; padding:20px; border-radius:10px;">
+                    <h3 style="color:#d32f2f;">❌ Rejected</h3>
+                    <p>%s</p>
+                    <p style="background:#fdecea; padding:10px; border-radius:5px;">
+                        <b>Reason:</b> %s
+                    </p>
                 </div>
-                </body>
-                </html>
-                """);
-
-        return body.toString();
+            </body>
+            </html>
+            """.formatted(bodyMessage, reason);
     }
 }
