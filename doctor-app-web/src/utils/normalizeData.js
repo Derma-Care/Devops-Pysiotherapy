@@ -133,10 +133,21 @@ export const normalizeSavedData = (saved) => {
   const rawModalities = tp.modalitiesUsed || saved.therapySessions?.modalitiesUsed
   const rawPrecautions = tp.precautions || saved.therapySessions?.precautions
 
+  const tId = tp.therapistId || saved.therapySessions?.therapistId || ''
+  const tName = tp.therapistName || saved.therapySessions?.therapistName || ''
   const therapySessions = {
     sessions: sessions,
-    therapistId: tp.therapistId || saved.therapySessions?.therapistId || '',
-    therapistName: tp.therapistName || saved.therapySessions?.therapistName || '',
+    therapistId: tId,
+    therapistName: tName,
+    therapists: Array.isArray(saved.therapySessions?.therapists)
+      ? saved.therapySessions.therapists
+      : (tId && tName ? [{ therapistId: tId, fullName: tName }] : []),
+    therapistIds: Array.isArray(saved.therapySessions?.therapistIds)
+      ? saved.therapySessions.therapistIds
+      : (tId ? [tId] : []),
+    therapistNames: Array.isArray(saved.therapySessions?.therapistNames)
+      ? saved.therapySessions.therapistNames
+      : (tName ? [tName] : []),
     manualTherapy: tp.manualTherapy || saved.therapySessions?.manualTherapy || '',
     modalitiesUsed: Array.isArray(rawModalities) ? rawModalities : (rawModalities ? [rawModalities] : []),
     patientResponse: tp.patientResponse || saved.therapySessions?.patientResponse || '',
@@ -145,8 +156,11 @@ export const normalizeSavedData = (saved) => {
 
   // 5. Exercise Plan
   const ep = saved.exercisePlan || {}
+  const rawSupport = saved.recoverySupport || ep.recoverySupport || []
+  const recoverySupportNormalized = Array.isArray(rawSupport) ? rawSupport : (rawSupport ? [rawSupport] : [])
   const exercisePlan = {
     homeAdvice: ep.homeAdvice || '',
+    recoverySupport: recoverySupportNormalized,
     exercises: Array.isArray(ep.homeExercises) ? ep.homeExercises : (Array.isArray(ep.exercises) ? ep.exercises : []),
   }
 
@@ -172,6 +186,7 @@ export const normalizeSavedData = (saved) => {
     diagnosis,
     therapySessions,
     exercisePlan,
+    recoverySupport: recoverySupportNormalized,
     investigation,
     followUp: Array.isArray(saved.followUp) ? saved.followUp : (saved.followUp ? [saved.followUp] : []),
     history: saved.history || {},
