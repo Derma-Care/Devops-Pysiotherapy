@@ -71,7 +71,7 @@ const SessionFeedback = () => {
   const [form, setForm] = useState({
     patientId: '',
     patientName: '',
-    patientPhone: '',
+    mobileNumber: '',
     doctorId: '',
     doctorName: '',
     therapistId: '',
@@ -103,7 +103,7 @@ const SessionFeedback = () => {
           ...prev,
           patientId: p.patientId,
           patientName: p.patientName,
-          patientPhone: p.mobileNumber,
+          mobileNumber: p.mobileNumber,
           bookingId: p.bookingId,
           doctorId: p.doctorId,
           doctorName: p.doctorName,
@@ -138,7 +138,7 @@ const SessionFeedback = () => {
       setPatients(patientsList);
 
       // 2. Fetch All Submitted Feedbacks (for table)
-      const feedbackRes = await getAllSessionFeedback();
+      const feedbackRes = await getAllSessionFeedback(hId, bId);
       const feedbackRaw = feedbackRes?.data;
       let feedbackList = [];
       if (Array.isArray(feedbackRaw?.data)) feedbackList = feedbackRaw.data;
@@ -168,7 +168,7 @@ const SessionFeedback = () => {
         ...prev,
         patientId: p.patientId || p.id || '',
         patientName: p.patientName || '',
-        patientPhone: p.mobileNumber || '',
+        mobileNumber: p.mobileNumber || '',
         bookingId: p.bookingId || '',
         doctorId: p.doctorId || '',
         doctorName: p.doctorName || '',
@@ -185,7 +185,7 @@ const SessionFeedback = () => {
     } else {
       setForm(prev => ({
         ...prev,
-        patientId: '', patientName: '', patientPhone: '',
+        patientId: '', patientName: '', mobileNumber: '',
         bookingId: '', doctorId: '', doctorName: '',
         therapistId: '', therapistName: '',
         serviceType: '', serviceNames: '',
@@ -229,6 +229,7 @@ const SessionFeedback = () => {
       noOfSessionsCompleted: completed,
       halfSessionsCompleted: isHalf,
       fullSessionsCompleted: isFull,
+      // mobileNumber: form.mobileNumber,
       date: now.toISOString().split('T')[0],
       time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
@@ -254,7 +255,7 @@ const SessionFeedback = () => {
 
   const openAddForm = () => {
     setForm({
-      patientId: '', patientName: '', patientPhone: '',
+      patientId: '', patientName: '', mobileNumber: '',
       doctorId: '', doctorName: '', therapistId: '', therapistName: '',
       serviceType: '', service: [],
       totalNoOfSessions: '', noOfSessionsCompleted: '',
@@ -408,7 +409,7 @@ const SessionFeedback = () => {
                                 {(!s.patientName || s.patientName === 'null') ? 'N/A' : s.patientName}
                               </span>
                               <span className="sf-pat-phone">
-                                {(!s.patientPhone || s.patientPhone === 'null' || s.mobileNumber === 'null') ? (s.mobileNumber || '—') : s.patientPhone}
+                                {s.mobileNumber || "_"}
                               </span>
                             </div>
                           </td>
@@ -419,9 +420,10 @@ const SessionFeedback = () => {
                             </div>
                           </td>
                           <td>
-                            <div className="sf-service-cell">
-                              <span className="sf-service-type">{s.serviceType || '—'}</span>
-
+                            <div>
+                              {s?.serviceType?.toLowerCase() === "exercise"
+                                ? "Activity"
+                                : s?.serviceType}
                             </div>
                           </td>
                           <td>
@@ -500,7 +502,11 @@ const SessionFeedback = () => {
                     <label className="sf-label">Service Type</label>
                     <input
                       type="text" className="sf-input" readOnly
-                      value={form.serviceType || '—'}
+                      value={
+                        form.serviceType?.toLowerCase() === 'exercise'
+                          ? 'Activity'
+                          : form.serviceType || '—'
+                      }
                       style={{ background: '#f8fafc', color: '#64748b' }}
                     />
                   </CCol>
@@ -617,7 +623,7 @@ const SessionFeedback = () => {
           {selectedSession && (
             <div className="sf-report-view">
               <div className="sf-report-section main">
-                <div className="sf-rep-row"><strong>Patient:</strong> <span>{(!selectedSession.patientName || selectedSession.patientName === 'null') ? 'N/A' : selectedSession.patientName} ({(!selectedSession.patientPhone || selectedSession.patientPhone === 'null' || selectedSession.mobileNumber === 'null') ? (selectedSession.mobileNumber || '—') : selectedSession.patientPhone})</span></div>
+                <div className="sf-rep-row"><strong>Patient:</strong> <span>{(!selectedSession.patientName || selectedSession.patientName === 'null') ? 'N/A' : selectedSession.patientName} ({(!selectedSession.mobileNumber || selectedSession.mobileNumber === 'null' || selectedSession.mobileNumber === 'null') ? (selectedSession.mobileNumber || '—') : selectedSession.mobileNumber})</span></div>
                 <div className="sf-rep-row"><strong>Booking ID:</strong> <span className="sf-booking-badge">{selectedSession.bookingId || '—'}</span></div>
                 <div className="sf-rep-row">
                   <strong>Progress:</strong>

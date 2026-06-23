@@ -370,6 +370,7 @@ export default function Billing() {
       {/* Payment component */}
       {selectedBooking && (
         <ProgramPayment
+          key={selectedBooking.bookingId}
           paymentProps={{
             bookingId: selectedBooking.bookingId,
             doctorId: selectedBooking.doctorId,
@@ -378,6 +379,7 @@ export default function Billing() {
             patientId: selectedBooking.patientId,
           }}
           isBillingTab={true}
+          onPaymentSuccess={() => setSelectedBooking(null)}
         />
       )}
     </div>
