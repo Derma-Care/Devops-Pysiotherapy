@@ -13,7 +13,7 @@ import { COLORS } from "../../Constant/Themes";
 import PrintLetterHead from "../../Utils/PrintLetterHead";
 import { CalendarOff, Info } from "lucide-react";
 
-export default function ProgramPayment({ paymentProps, isBillingTab }) {
+export default function ProgramPayment({ paymentProps, isBillingTab, onPaymentSuccess }) {
   const location = useLocation();
 
   console.log("Received data:", location.state || paymentProps);
@@ -153,14 +153,28 @@ export default function ProgramPayment({ paymentProps, isBillingTab }) {
       const res = await fetch(
         `${wifiUrl}/api/physiotherapy-doctor/getTherapySessionsByServiceType/${clinicId}/${branchId}/${patientId}/${bookingId}`
       );
-      if (res.status === 204) {
+
+      const data = await res.json();
+
+      console.log("API RESPONSE:", data);
+
+      if (
+        !data.success ||
+
+        data.data == null
+      ) {
+        setApiData([]);
+        setNoSessionMsg(data.message || "No session for this booking");
+        return;
+      }
+
+      const apiResponse = data.data || [];
+
+      if (!apiResponse.length) {
         setApiData([]);
         setNoSessionMsg("No session for this booking");
         return;
       }
-      const data = await res.json();
-      const apiResponse = data?.data || [];
-      if (!apiResponse.length) { setApiData([]); return; }
       const type = apiResponse?.[0]?.serviceType?.toLowerCase() || "";
       let normalized = [];
       if (type === "package") {
@@ -950,7 +964,15 @@ export default function ProgramPayment({ paymentProps, isBillingTab }) {
         setIsFollowUpPayment(true);
         setPrintData({ ...payload, selectedItems: selectedValue, tableData, startDate });
         showCustomToast("Payment processed successfully!", "success");
-        navigate(-1);
+        if (!isBillingTab) {
+          navigate(-1);
+        } else {
+          // Stay in billing tab and refresh the payment details
+          initializePayment();
+          if (onPaymentSuccess) {
+            onPaymentSuccess();
+          }
+        }
       } else {
         showCustomToast(data.message || "Payment processing failed.", "error");
       }

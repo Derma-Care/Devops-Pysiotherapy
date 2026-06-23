@@ -43,7 +43,7 @@ const BookingSearch = ({ visitType, fetchSlots, onSelectBooking, onProceed }) =>
         if (visitType !== 'followup') showCustomToast('No patient records found.', 'info')
       } else {
         setBookingData(validItems.map((item) => ({
-          ...item, patientAddress: formatAddress(item.patientAddress),
+          ...item, patientAddress: visitType === 'followup' ? item?.patientAddress : formatAddress(item.patientAddress),
         })))
       }
     } catch (err) {
@@ -107,6 +107,8 @@ const BookingSearch = ({ visitType, fetchSlots, onSelectBooking, onProceed }) =>
     color: isFollowup ? '#854f0b' : '#3b6d11',
   })
 
+  console.log(selectedBooking)
+
   return (
     <div>
       {/* Search Bar */}
@@ -115,8 +117,9 @@ const BookingSearch = ({ visitType, fetchSlots, onSelectBooking, onProceed }) =>
           <CFormInput
             type="text"
             placeholder={visitType === 'followup' ? 'Search by Booking ID' : 'Search by Name / Patient ID / Mobile'}
-            value={patientSearch.toUpperCase()}
-            onChange={(e) => setPatientSearch(e.target.value)}
+            value={patientSearch}
+            // style={{ textTransform: 'uppercase' }}
+            onChange={(e) => setPatientSearch(e.target.value.trimStart())}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           />
         </CCol>
@@ -209,8 +212,8 @@ const BookingSearch = ({ visitType, fetchSlots, onSelectBooking, onProceed }) =>
                 {[
                   ['Customer ID', selectedBooking.customerId],
                   ['Age / Gender', `${selectedBooking.age}y, ${selectedBooking.gender}`],
-                  ['Mobile', selectedBooking.mobileNumber],
-                  ['Doctor', selectedBooking.doctorName],
+                  ['Mobile', selectedBooking.mobileNumber || selectedBooking.patientMobileNumber],
+
                 ].map(([label, val]) => (
                   <div key={label}>
                     <div style={{ fontSize: 11, color: '#6c757d', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.05em' }}>{label}</div>
@@ -229,10 +232,11 @@ const BookingSearch = ({ visitType, fetchSlots, onSelectBooking, onProceed }) =>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 20px' }}>
                     {[
                       ['Visit Type', selectedBooking.visitType],
+                      ['Doctor', selectedBooking.doctorName],
                       ['Consultation Type', selectedBooking.consultationType],
-                      ['Consultation Fee', `₹${selectedBooking.consultationFee}`],
-                      ['Total Fee', `₹${selectedBooking.totalFee}`],
-                      ['Service Date', selectedBooking.serviceDate],
+                      ['Consultation Fee', `₹${selectedBooking?.listOfConsultationFee?.[0]?.consulationFee || selectedBooking.consultationFee || 0}`],
+                      // ['Total Fee', `₹${selectedBooking.totalFee}`],
+                      ['Service Start Date', selectedBooking.serviceDate],
                       ['Service Time', selectedBooking.servicetime],
                       ['Clinic', selectedBooking.clinicName],
                       ['Branch', selectedBooking.branchname],
