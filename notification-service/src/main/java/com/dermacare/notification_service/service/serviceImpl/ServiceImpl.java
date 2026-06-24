@@ -93,26 +93,29 @@ public class ServiceImpl implements ServiceInterface{
 			convertToNotification(bookingDTO);	  
 			String title=buildTitle(bookingDTO);
 			String body =buildBody(bookingDTO);
+			System.out.println(bookingDTO);
 			customerDeviceId = cllinicFeign.customerDeviceId(bookingDTO.getCustomerId());
 			Id = cllinicFeign.getDeviceId(bookingDTO.getClinicId(),bookingDTO.getBranchId());
 			try {
-			if(customerDeviceId != null || !customerDeviceId.isEmpty()) {
+			if(customerDeviceId != null) {
 			appNotification.sendPushNotification(customerDeviceId,title,body, "BOOKING",
-				    "BookingScreen","default");}
-			if(Id != null || !Id.isEmpty()) {
-				String content = "Doctor:+ booking.getDoctorName() + \n"
-						+ "Branch: + booking.getBranchname() + \n"
-						+ "Date:+ booking.getServiceDate() + \n"
-						+ "Time:+ booking.getServicetime()";
+				    "BookingScreen","default","dashboard");}
+			if(Id != null) {
+				String content = 
+						"AppointmentId:"+bookingDTO.getBookingId()+ "\n\n"
+						+ "Doctor:"+bookingDTO.getDoctorName()+ "\n\n"
+						+ "Branch: "+ bookingDTO.getBranchname() +"\n\n"
+						+ "Date:"+ bookingDTO.getServiceDate() +"\n\n"
+						+ "Time:"+ bookingDTO.getServicetime();
 						
-				appNotification.sendPushNotification(Id,"An appointment has been successfully confirmed.\n\n",content, "BOOKING",
-					    "BookingScreen","default");}	
+				appNotification.sendPushNotification(Id,"An appointment has been successfully confirmed for "+bookingDTO.getName()+".\n\n",content, "BOOKING",
+					    "BookingScreen","default","dashboard");}	
 			
 	        res.setMessage("notification sent");
 	        res.setStatus(200);
 	        res.setSuccess(true);
 			}catch(Exception e) {
-				res.setMessage("notification not sent");
+				res.setMessage(e.getMessage());
 		        res.setStatus(404);
 		        res.setSuccess(false);	
 			}}catch (Exception e) {
@@ -285,7 +288,7 @@ public class ServiceImpl implements ServiceInterface{
 		                                b.getDoctorName() + " Accepted Your Appointment For " +
 		                                b.getSubServiceName() + " on " + b.getServiceDate() + " at " + b.getServicetime(),
 		                                "BOOKING SUCCESS",
-		                			    "BookingVerificationScreen","default" );}
+		                			    "BookingVerificationScreen","default" ,"dashboard");}
 		                        
 		                        if (b.getDoctorDeviceId() != null) {
 		                            appNotification.sendPushNotification(
@@ -293,7 +296,7 @@ public class ServiceImpl implements ServiceInterface{
 		                                " Hello " + b.getDoctorName()," You Have A New "+b.getConsultationType() +" Appointment For " +
 		                                b.getSubServiceName() + " on " + b.getServiceDate() + " at " + b.getServicetime(),
 		                                "BOOKING SUCCESS",
-		                			    "BookingVerificationScreen","default" );}
+		                			    "BookingVerificationScreen","default" ,"dashboard");}
 		                        
 //		                        if(b.getDoctorWebDeviceId() != null) {
 //		                            appNotification.sendPushNotification(
@@ -319,7 +322,7 @@ public class ServiceImpl implements ServiceInterface{
 		                                b.getDoctorName() + " Rejected Your Appointment For " +
 		                                b.getSubServiceName() + " on " + b.getServiceDate() + " at " + b.getServicetime(),
 		                                "BOOKING REJECT",
-		                			    "BookingVerificationScreen","default"
+		                			    "BookingVerificationScreen","default","dashboard"
 		                            );
 		                        }
 		                    } catch (Exception ex) {}		                
@@ -429,27 +432,27 @@ public class ServiceImpl implements ServiceInterface{
 	                            		customerDeviceId,
 	                                " Hello " + b.getName()+ "," ,
 	                                b.getDoctorName() + " Connect With You Through Video Call within 5 Minutes ", "Alert",
-	                			    "AlertScreen","default");
+	                			    "AlertScreen","default","dashboard");
 	                            
 	                            appNotification.sendPushNotification(
 	                                b.getDoctorDeviceId(),
 	                                " Hello " +b.getDoctorName()+ "," , " You Have a Video Consultation within 5 Minutes With " +
 	                                b.getName(), "Alert",
-	                			    "AlertScreen","default");}
+	                			    "AlertScreen","default","dashboard");}
 	                            
 	                            if(b.getDoctorWebDeviceId() != null) {
 	                            	 appNotification.sendPushNotification(
 	     	                                b.getDoctorWebDeviceId(),
 	     	                                " Hello " +b.getDoctorName()+ "," , " You Have a Video Consultation within 5 Minutes With " +
 	     	                                b.getName(), "Alert",
-	     	                			    "AlertScreen","default");}
+	     	                			    "AlertScreen","default","dashboard");}
 	                            
 	                            if(b.getClinicDeviceId() != null) {
 	                            	 appNotification.sendPushNotification(
 	     	                                b.getClinicDeviceId(),
 	     	                                " Hello ClinicAdmin", b.getDoctorName()+ " Have a Video Consultation within 5 Minutes With " +
 	     	                                b.getName(), "Alert",
-	     	                			    "AlertScreen","default");}
+	     	                			    "AlertScreen","default","dashboard");}
 	                            
 	                            //System.out.println("Notification sent to doctor and customer");
 	                    }catch (Exception ex) {}}
@@ -570,7 +573,7 @@ public class ServiceImpl implements ServiceInterface{
 	            "🌞 Good morning!",
 	           "Time to take your prescribed "+m.getName()+","+m.getDose()+" with water.",
 	            "MEDICINE REMINDER",
-			    "reminderScreen","default"
+			    "reminderScreen","default","dashboard"
 	        );	
 		    }}}}}}catch (Exception e) {e.printStackTrace();}}
 
@@ -641,7 +644,7 @@ public class ServiceImpl implements ServiceInterface{
 	                                "Time to take your prescribed " + m.getName() + ", " + m.getDose() + " with water.",
 	                                "MEDICINE REMINDER",
 	                                "reminderScreen",
-	                                "default"
+	                                "default","dashboard"
 	                        );
 	                       // System.out.println("Notification sent for " + m.getName());
 	                    } 
@@ -720,7 +723,7 @@ public class ServiceImpl implements ServiceInterface{
 			             "🌆 Good evening!",
 			            "Time to take your prescribed "+m.getName()+","+m.getDose()+" with water.",
 			             "MEDICINE REMINDER",
-			 		    "reminderScreen","default"
+			 		    "reminderScreen","default","dashboard"
 			         );	
 		             }}}}}}catch (Exception e) {e.printStackTrace();}}
 
@@ -788,7 +791,7 @@ public class ServiceImpl implements ServiceInterface{
 			             "🌃 Good evening!",
 			            "Time to take your prescribed "+m.getName()+","+m.getDose()+" with water.",
 			             "MEDICINE REMINDER",
-			 		    "reminderScreen","default"
+			 		    "reminderScreen","default","dashboard"
 			         );	
 		             }}}}}}catch (Exception e) {e.printStackTrace();}}
 
@@ -844,7 +847,7 @@ public class ServiceImpl implements ServiceInterface{
 			             "📍 "+doctorSaveDetailsDTO.getClinicName()+" \n" +
 			             "Please be present, and contact us if you need to reschedule.",
 			             "FollowUp REMINDER",
-			 		    "reminderScreen","default"
+			 		    "reminderScreen","default","dashboard"
 			         );	
 		             }}}catch (Exception e) {e.printStackTrace();}}
 
@@ -999,7 +1002,7 @@ public class ServiceImpl implements ServiceInterface{
 			        	if(n.getDeviceId() != null) {
 			        		System.out.println(n.getDeviceId());
 			 appNotification.sendPushNotification(n.getDeviceId(),"🎉 Happy Birthday, " + n.getFullName() + "!","Your health and happiness are our priority. Have a great birthday!", "birthdayGreeting",
-					    "bithdayGreetingsScreen","default");
+					    "bithdayGreetingsScreen","default","dashboard");
 			        	//System.out.println("notifications sent successfully");
 			 }}
 			 return n;}return null;}).toList();
