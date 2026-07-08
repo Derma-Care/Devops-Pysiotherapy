@@ -7,6 +7,7 @@ import { addLabTest, getLabTests, updateAppointmentBasedOnBookingId, SavePatient
 import { COLORS } from '../Themes'
 import { useDoctorContext } from '../Context/DoctorContext'
 import PrescriptionPDF from '../utils/PdfGenerator'
+import InvestigationPDF from '../utils/InvestigationPDF'
 import { uploadPrescriptionPdf } from '../utils/S3UploadServices'
 import { pdf } from '@react-pdf/renderer'
 /* ─── Styles ──────────────────────────────────────────────────────────────── */
@@ -144,10 +145,10 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData, patientData: 
   const buildPhysioRecordPayload = (prescriptionPdf = '') => {
     const record = formData ?? {}
     const existingRecordId = record.id || record._id || record.therapyRecordId || record.therapyrecordid || (record.therapistRecordId !== 'TR001' ? record.therapistRecordId : null)
-
+    
     // Top-level IDs
     const bookingId = record.bookingId || patientData?.bookingId || ''
-    const clinicId = record.clinicId || patientData?.clinicId || clinicDetails?.hospitalId || ''
+   const clinicId = record.clinicId || patientData?.clinicId || clinicDetails?.hospitalId || ''
     const branchId = record.branchId || patientData?.branchId || ''
     const doctorId = doctorDetails?.doctorId || patientData?.doctorId || ''
     const doctorName = doctorDetails?.name || doctorDetails?.fullName || patientData?.doctorName || ''
@@ -155,25 +156,25 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData, patientData: 
     // Patient Info
     const patientId = record.patientInfo?.patientId || patientData?.patientId || ''
     const patientName = record.patientInfo?.patientName || patientData?.patientName || patientData?.name || patientData?.fullName || ''
-    const patientMobile = record.patientInfo?.mobileNumber ||
-      patientData?.patientMobileNumber ||
-      patientData?.mobileNumber ||
-      patientData?.contactNumber ||
-      patientData?.phone ||
-      patientData?.phoneNumber || ''
+    const patientMobile = record.patientInfo?.mobileNumber || 
+                         patientData?.patientMobileNumber || 
+                         patientData?.mobileNumber || 
+                         patientData?.contactNumber || 
+                         patientData?.phone || 
+                         patientData?.phoneNumber || ''
     const patientAge = record.patientInfo?.age || patientData?.age || ''
     const patientSex = record.patientInfo?.sex || patientData?.sex || patientData?.gender || ''
 
     // Complaints / Symptoms
     const comp = record.complaints || record.symptoms || {}
-
+    
     const complaintDetails = comp.complaintDetails || comp.symptomDetails || patientData?.problem || ''
     const complaintDuration = comp.duration || patientData?.symptomsDuration || ''
     const selectedTherapy = comp.selectedTherapy || patientData?.subServiceName || ''
     const selectedTherapyID = comp.selectedTherapyId || comp.selectedTherapyID || patientData?.subServiceId || ''
     const partImage = comp.painAssessmentImage || comp.partImage || ''
-    const partImageKey = comp.partImageKey || comp.partImage || ''
-
+     const partImageKey = comp.partImageKey || comp.partImage || ''
+    
     const reportImages = (() => {
       const apiImgs = comp.reportImages
       const intImgs = comp.attachmentImages
@@ -187,9 +188,9 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData, patientData: 
     const allergies = comp.allergies || record.allergies || patientData?.allergies || ''
     const occupation = comp.occupation || record.occupation || patientData?.occupation || ''
     const insuranceProvider = comp.insuranceProvider || record.insuranceProvider || patientData?.insuranceProvider || ''
-
+    
     const activityLevels = Array.isArray(comp.activityLevels) ? comp.activityLevels : (Array.isArray(record.activityLevels) ? record.activityLevels : [])
-
+    
     const effectivePain = comp.patientPain || comp.reasonforVisit || record.patientPain || patientData?.patientPain || ''
 
     // Flat therapyAnswers
@@ -273,8 +274,8 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData, patientData: 
       },
       complaints: {
         complaintDetails: complaintDetails || '',
-        painAssessmentImage: partImageKey || '',
-        // partImageKey: partImageKey | '',
+        painAssessmentImage: partImage || '',
+         painAssessmentImage: partImageKey || '',
         reportImages: reportImages || [],
         selectedTherapy: selectedTherapy || '',
         selectedTherapyId: selectedTherapyID || '',
@@ -402,7 +403,7 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData, patientData: 
   const handleNext = () => {
     const payload = { investigation: { selectedTests, notes } }
     setFormData?.((prev) => ({ ...prev, investigation: { selectedTests, notes } }))
-    onNext?.(payload)
+        onNext?.(payload)
 
     // const nextStatus = 'On-Going'
     // console.log(`[Investigation.jsx] handleNext triggered: nextStatus="${nextStatus}", selectedTestsCount=${selectedTests.length}`)
@@ -438,26 +439,26 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData, patientData: 
       delete createPayload.therapistRecordId
 
       console.log('Sending investigation payload to create record:', createPayload)
-      if (response.status == 200) {
-        const res = await SavePatientPrescription(createPayload)
-        console.log('SavePatientPrescription response:', res)
-        const savedRecord = res?.data || res
+      if(response.status == 200) {
+              const res = await SavePatientPrescription(createPayload)
+      console.log('SavePatientPrescription response:', res)
+       const savedRecord = res?.data || res
         if (savedRecord) {
-          savedId = savedRecord.therapistRecordId || savedRecord.therapyRecordId || savedRecord.id || savedRecord._id || savedRecord.therapyrecordid
-        }
-        else
-          showSnackbar(response.message || 'Failed to save prescription record. Investigation not sent.', 'error')
+        savedId = savedRecord.therapistRecordId || savedRecord.therapyRecordId || savedRecord.id || savedRecord._id || savedRecord.therapyrecordid
+      }
+     else
+      showSnackbar(response.message||'Failed to save prescription record. Investigation not sent.', 'error')
 
 
 
       }
-
+    
 
       // MOCK: simulate network delay
       await new Promise((resolve) => setTimeout(resolve, 900))
 
       showSnackbar('Investigation sent to Lab Technician successfully! ✉️', 'success')
-
+      
       const payload = {
         uptoInvestigation: true,
         therapyRecordId: savedId || undefined,
@@ -490,7 +491,7 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData, patientData: 
   const handlePrint = async () => {
     const patientName = patientData?.name || patientData?.fullName || 'Record'
     const safeName = patientName.replace(/[^\w\-]+/g, '_')
-
+    
     // We should make sure the generated PDF has the updated investigation tests and notes.
     const updatedFormData = {
       ...formData,
@@ -502,9 +503,9 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData, patientData: 
 
     let savedId = null
     try {
-      // 1. Generate PDF blob
+      // 1. Generate PDF blob using InvestigationPDF
       const blob = await pdf(
-        <PrescriptionPDF
+        <InvestigationPDF
           doctorData={doctorDetails}
           clicniData={clinicDetails}
           formData={updatedFormData}
@@ -513,7 +514,7 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData, patientData: 
       ).toBlob()
 
       // 2. Upload PDF to S3
-      const pdfFile = new File([blob], `${safeName}.pdf`, { type: 'application/pdf' })
+      const pdfFile = new File([blob], `${safeName}_Investigation.pdf`, { type: 'application/pdf' })
       const prescriptionPdfKey = await uploadPrescriptionPdf(pdfFile)
 
       // 3. Update status
@@ -545,12 +546,9 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData, patientData: 
         savedId = savedRecord.therapistRecordId || savedRecord.therapyRecordId || savedRecord.id || savedRecord._id || savedRecord.therapyrecordid
       }
 
-      // 5. Open PDF blob in a new tab/window for print/preview
+      // 5. Open PDF in new tab for viewing in browser
       const url = URL.createObjectURL(blob)
-      const win = window.open(url, '_blank')
-      if (!win) {
-        alert('Please allow pop-ups to print.')
-      }
+      window.open(url, '_blank')
 
       // 6. Update local form data
       setFormData?.((prev) => {
@@ -566,8 +564,10 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData, patientData: 
         return nextFormData
       })
 
-      // 7. Navigate back to dashboard
-      navigate('/dashboard', { replace: true })
+      // 7. Navigate back to dashboard after delay
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true })
+      }, 1000)
     } catch (e) {
       console.error('Failed to generate/save/print record:', e)
       showSnackbar('Failed to generate PDF. Please try again.', 'error')
@@ -579,7 +579,7 @@ const Investigation = ({ seed = {}, onNext, setFormData, formData, patientData: 
     <div
       className="container pb-5"
       style={{
-
+        
         backgroundColor: '#FFFFFF',
         minHeight: '100vh',
       }}
