@@ -836,8 +836,7 @@ const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formDa
   const partImage =
     symptomsInternal.partImage ||
     complaintsAPI.painAssessmentImage || ''
-
-  const partImageKey = symptomsInternal.partImageKey || complaintsAPI.partImageKey || ''
+    const partImageKey = symptomsInternal.partImageKey || complaintsAPI.partImageKey || ''
 
   const reportImages = (() => {
     const apiImgs = complaintsAPI.reportImages
@@ -1171,7 +1170,7 @@ const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formDa
       // ── Complaints ─────────────────────────────────────────────────────
       complaints: {
         complaintDetails: complaintDetails || '',
-        painAssessmentImage: partImageKey || '',
+          painAssessmentImage: partImageKey || '',
         reportImages: reportImages || [],
         selectedTherapy: selectedTherapy || '',
         selectedTherapyId: selectedTherapyID || '',
@@ -1314,7 +1313,7 @@ const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formDa
       prescription: record.prescription ?? formData?.prescription ?? {},
       prescriptionPdf: prescriptionPdf || record.prescriptionPdf || formData?.prescriptionPdf || '',
     }
-  }
+  } 
 
   const doSave = async ({ downloadAfter = false } = {}) => {
     setSaving(true)
@@ -1344,24 +1343,23 @@ const Summary = ({ onNext, sidebarWidth = 0, onSaveTemplate, patientData, formDa
       //   }
       // }
 
-      const shouldUpdate = !!existingRecordId && isUptoInvestigation
+      const shouldUpdate = !!existingRecordId&&isUptoInvestigation
 
       let resp
       if (shouldUpdate) {
         console.log('Calling Update API on Save...', payload)
         const createPayload = { ...payload }
 
-        resp = await UpdatePatientPrescription(createPayload)
-        console.log(resp)
-        if (resp) {
-          try {
-            await updateAppointmentBasedOnBookingId({
-              data: { bookingId, status: 'In-progress' }
-            })
-          } catch (err) {
-            console.error('Status update failed:', err)
-          }
-        }
+       resp = await UpdatePatientPrescription(createPayload)
+       console.log(resp)
+      if (resp) {
+  try {
+    await updateAppointmentBasedOnBookingId({
+      data: { bookingId, status: 'In-progress' }
+    })
+  } catch (err) {
+    console.error('Status update failed:', err)
+  }}
 
 
 

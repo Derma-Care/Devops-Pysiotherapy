@@ -251,65 +251,89 @@ const TherapistMultiSearch = ({ therapists, loading, selectedTherapists, onChang
         }}>
           {filtered.length > 0 ? filtered.map((t, i) => {
             const sel = isSelected(t.therapistId)
+            const isAbsent = t.isPresent === true || String(t.isPresent).toLowerCase() === 'true'
             return (
               <div
                 key={i}
-                onMouseDown={e => { e.preventDefault(); toggleTherapist(t) }}
-                style={{
-                  padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid #eee',
-                  background: sel ? '#dceeff' : i % 2 === 0 ? '#f8fbff' : '#fff',
-                  display: 'flex', alignItems: 'center', gap: 10,
+                onMouseDown={e => {
+                  e.preventDefault()
+                  if (isAbsent) return
+                  toggleTherapist(t)
                 }}
-                onMouseEnter={e => { if (!sel) e.currentTarget.style.background = '#f0f7ff' }}
-                onMouseLeave={e => { if (!sel) e.currentTarget.style.background = i % 2 === 0 ? '#f8fbff' : '#fff' }}
+                style={{
+                  padding: '9px 12px',
+                  cursor: isAbsent ? 'not-allowed' : 'pointer',
+                  borderBottom: '1px solid #eee',
+                  background: isAbsent ? '#f1f5f9' : (sel ? '#dceeff' : i % 2 === 0 ? '#f8fbff' : '#fff'),
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  opacity: isAbsent ? 0.65 : 1,
+                }}
+                onMouseEnter={e => {
+                  if (!sel && !isAbsent) e.currentTarget.style.background = '#f0f7ff'
+                }}
+                onMouseLeave={e => {
+                  if (!sel && !isAbsent) e.currentTarget.style.background = i % 2 === 0 ? '#f8fbff' : '#fff'
+                }}
               >
                 {/* checkbox-style indicator */}
                 <div style={{
-                  width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-                  border: `2px solid ${sel ? '#1B4F8A' : '#a0bcda'}`,
-                  background: sel ? 'linear-gradient(135deg,#1B4F8A,#2A6DB5)' : '#fff',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 16,
+                  height: 16,
+                  borderRadius: 4,
+                  flexShrink: 0,
+                  border: `2px solid ${isAbsent ? '#cbd5e1' : (sel ? '#1B4F8A' : '#a0bcda')}`,
+                  background: isAbsent ? '#cbd5e1' : (sel ? 'linear-gradient(135deg,#1B4F8A,#2A6DB5)' : '#fff'),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}>
-                  {sel && <span style={{ color: '#fff', fontSize: '0.6rem', fontWeight: 700 }}>✓</span>}
+                  {sel && !isAbsent && <span style={{ color: '#fff', fontSize: '0.6rem', fontWeight: 700 }}>✓</span>}
                 </div>
-                <span
+                <span 
                   style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}
                   onMouseLeave={() => setHoveredTherapist(null)}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <strong style={{ color: '#1B4F8A', fontSize: '0.9rem' }}>{t.therapistId}</strong>
-                    <span style={{ color: '#1a3a5c', fontWeight: 600 }}>— {t.fullName}</span>
-                    <div>
-                      {/* Service Type Badge */}
-                      {Array.isArray(t.services) && t.services.length > 0 && (
-                        <span style={{ background: '#e6fffa', border: '1px solid #81e6d9', padding: '2px 8px', borderRadius: 12, fontSize: '0.65rem', color: '#234e52', fontWeight: 700, textTransform: 'capitalize', marginRight: "10px" }}>
-                          {t.services.join(', ')}
-                        </span>
+                    <strong style={{ color: isAbsent ? '#64748b' : '#1B4F8A', fontSize: '0.9rem' }}>{t.therapistId}</strong>
+                    <span style={{ color: isAbsent ? '#64748b' : '#1a3a5c', fontWeight: 600 }}>— {t.fullName}</span>
+                    
+                    {/* Availability Status Badge */}
+                    {isAbsent ? (
+                      <span style={{ background: '#fee2e2', border: '1px solid #fecaca', padding: '2px 8px', borderRadius: 12, fontSize: '0.65rem', color: '#991b1b', fontWeight: 700 }}>
+                        Absent
+                      </span>
+                    ) : (
+                      <span style={{ background: '#dcfce7', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: 12, fontSize: '0.65rem', color: '#166534', fontWeight: 700 }}>
+                        Available
+                      </span>
+                    )}
 
-                      )}
-                      {/* <span style={{ background: '#e6fffa', border: '1px solid #81e6d9', padding: '2px 8px', borderRadius: 12, fontSize: '0.65rem', color: '#234e52', fontWeight: 700, textTransform: 'capitalize' }}>Today Sessions: {t.totalSessionCount}</span> */}
-                    </div>
+                    {/* Service Type Badge */}
+                    {Array.isArray(t.services) && t.services.length > 0 && (
+                      <span style={{ background: '#e6fffa', border: '1px solid #81e6d9', padding: '2px 8px', borderRadius: 12, fontSize: '0.65rem', color: '#234e52', fontWeight: 700, textTransform: 'capitalize' }}>
+                        {t.services.join(', ')}
+                      </span>
+                    )}
+                    {/* <span style={{ background: '#e6fffa', border: '1px solid #81e6d9', padding: '2px 8px', borderRadius: 12, fontSize: '0.65rem', color: '#234e52', fontWeight: 700, textTransform: 'capitalize' }}>Today Sessions: {t.totalSessionCount}</span> */}
 
                     {/* View Button placed at the end */}
-                    <div
+                    <div 
                       style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}
                       onMouseEnter={() => setHoveredTherapist(t.therapistId)}
                       onMouseDown={(e) => e.stopPropagation()}
                     >
-
                       <span style={{ cursor: 'pointer', color: '#319795', fontSize: '0.7rem', padding: '2px 8px', background: '#e6fffa', borderRadius: 12, border: '1px solid #81e6d9', fontWeight: 700 }}>👁️ View Details</span>
                     </div>
                   </div>
-
+                  
                   {/* Expandable Line: Specialization and Expertise */}
                   {hoveredTherapist === t.therapistId && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: '0.72rem', color: '#4a5568', background: '#f8fafc', padding: '6px 10px', borderRadius: 6, marginTop: 4 }}>
                       <span><strong style={{ color: '#718096' }}>Specialization:</strong> {Array.isArray(t.specializations) && t.specializations.length > 0 ? t.specializations.join(', ') : 'N/A'}</span>
                       <span><strong style={{ color: '#718096' }}>Expertise:</strong> {Array.isArray(t.expertiseAreas) && t.expertiseAreas.length > 0 ? t.expertiseAreas.join(', ') : 'N/A'}</span>
-
                     </div>
-
-
                   )}
                 </span>
                 {sel && <span style={{ color: '#38a169', fontWeight: 700, fontSize: '0.8rem' }}>Selected</span>}
@@ -1857,7 +1881,7 @@ const TherapySession = ({ seed = {}, onNext, patientData }) => {
   return (
     <div
       className="pb-5"
-      style={{ backgroundColor: '#FFFFFF', minHeight: '100vh' }}
+      style={{  backgroundColor: '#FFFFFF', minHeight: '100vh' }}
     >
       <style>{`@keyframes toastSlide { from { opacity:0; transform:translateX(40px) } to { opacity:1; transform:translateX(0) } }`}</style>
       <ToastContainer toasts={toasts} />
