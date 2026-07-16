@@ -1,3 +1,23 @@
+# =========================================================
+# NOTE ON MEMORY LIMITS
+# =========================================================
+# Every service below uses the top-level `mem_limit` / `mem_reservation`
+# keys instead of `deploy.resources.limits/reservations`. The `deploy:`
+# block is part of the Swarm spec and is SILENTLY IGNORED by plain
+# `docker compose up` / `docker-compose up` (non-swarm) unless you pass
+# `--compatibility`. That silent no-op was the root cause behind
+# customerservice appearing to run unconstrained (jcmd showed a ~2GB
+# G1 heap even though the file said 768m) -- the JVM's
+# -XX:MaxRAMPercentage was computing against the *host's* total RAM,
+# not a cgroup limit, because no cgroup limit was actually being set.
+# `mem_limit` / `mem_reservation` map directly to `docker run
+# --memory` / `--memory-reservation` and are honored by both the
+# legacy `docker-compose` binary and the `docker compose` v2 plugin,
+# with or without swarm. Verify after deploying with:
+#   docker inspect <container> --format='{{.HostConfig.Memory}}'
+# (should be a nonzero byte count matching the mem_limit below).
+# =========================================================
+
 services:
 
   # =========================================================
@@ -37,12 +57,8 @@ services:
       retries: 10
       start_period: 30s
 
-    deploy:
-      resources:
-        limits:
-          memory: 1536m
-        reservations:
-          memory: 512m
+    mem_limit: 1536m
+    mem_reservation: 512m
 
     logging:
       driver: json-file
@@ -99,12 +115,8 @@ services:
       retries: 10
       start_period: 90s
 
-    deploy:
-      resources:
-        limits:
-          memory: 512m
-        reservations:
-          memory: 256m
+    mem_limit: 512m
+    mem_reservation: 256m
 
     logging:
       driver: json-file
@@ -157,12 +169,8 @@ services:
       retries: 10
       start_period: 90s
 
-    deploy:
-      resources:
-        limits:
-          memory: 512m
-        reservations:
-          memory: 256m
+    mem_limit: 512m
+    mem_reservation: 256m
 
     logging:
       driver: json-file
@@ -222,12 +230,8 @@ services:
       retries: 10
       start_period: 90s
 
-    deploy:
-      resources:
-        limits:
-          memory: 640m
-        reservations:
-          memory: 320m
+    mem_limit: 640m
+    mem_reservation: 320m
 
     logging:
       driver: json-file
@@ -293,12 +297,8 @@ services:
       retries: 10
       start_period: 90s
 
-    deploy:
-      resources:
-        limits:
-          memory: 768m
-        reservations:
-          memory: 384m
+    mem_limit: 768m
+    mem_reservation: 384m
 
     logging:
       driver: json-file
@@ -361,12 +361,8 @@ services:
       retries: 5
       start_period: 120s
 
-    deploy:
-      resources:
-        limits:
-          memory: 768m
-        reservations:
-          memory: 384m
+    mem_limit: 768m
+    mem_reservation: 384m
 
     logging:
       driver: json-file
@@ -437,12 +433,8 @@ services:
       retries: 5
       start_period: 120s
 
-    deploy:
-      resources:
-        limits:
-          memory: 768m
-        reservations:
-          memory: 384m
+    mem_limit: 768m
+    mem_reservation: 384m
 
     logging:
       driver: json-file
@@ -502,12 +494,8 @@ services:
       retries: 5
       start_period: 120s
 
-    deploy:
-      resources:
-        limits:
-          memory: 640m
-        reservations:
-          memory: 320m
+    mem_limit: 640m
+    mem_reservation: 320m
 
     logging:
       driver: json-file
@@ -564,12 +552,8 @@ services:
       retries: 5
       start_period: 120s
 
-    deploy:
-      resources:
-        limits:
-          memory: 640m
-        reservations:
-          memory: 320m
+    mem_limit: 640m
+    mem_reservation: 320m
 
     logging:
       driver: json-file
@@ -607,10 +591,7 @@ services:
       retries: 5
       start_period: 30s
 
-    deploy:
-      resources:
-        limits:
-          memory: 128m
+    mem_limit: 128m
 
     logging:
       driver: json-file
@@ -647,10 +628,7 @@ services:
       retries: 5
       start_period: 30s
 
-    deploy:
-      resources:
-        limits:
-          memory: 128m
+    mem_limit: 128m
 
     logging:
       driver: json-file
@@ -687,10 +665,7 @@ services:
       retries: 5
       start_period: 30s
 
-    deploy:
-      resources:
-        limits:
-          memory: 128m
+    mem_limit: 128m
 
     logging:
       driver: json-file
@@ -727,10 +702,7 @@ services:
       retries: 5
       start_period: 30s
 
-    deploy:
-      resources:
-        limits:
-          memory: 128m
+    mem_limit: 128m
 
     logging:
       driver: json-file
@@ -767,10 +739,7 @@ services:
       retries: 5
       start_period: 30s
 
-    deploy:
-      resources:
-        limits:
-          memory: 128m
+    mem_limit: 128m
 
     logging:
       driver: json-file
