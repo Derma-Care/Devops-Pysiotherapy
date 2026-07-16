@@ -60,7 +60,7 @@ services:
       interval: 20s
       timeout: 10s
       retries: 10
-      start_period: 90s
+      start_period: 150s
     deploy:
       resources:
         limits:
@@ -115,6 +115,13 @@ services:
         -XX:MaxRAMPercentage=70.0
         -XX:InitialRAMPercentage=50.0
         -XX:MaxMetaspaceSize=256m
+      SPRING_DATA_MONGODB_URI: mongodb://admin_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/AdminService?authSource=AdminService&connectTimeoutMS=10000&timeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 120s
     deploy:
       resources:
         limits:
@@ -139,6 +146,13 @@ services:
         -XX:MaxRAMPercentage=70.0
         -XX:InitialRAMPercentage=50.0
         -XX:MaxMetaspaceSize=256m
+      SPRING_DATA_MONGODB_URI: mongodb://clinicadmin_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/clinicadminservice?authSource=clinicadminservice&connectTimeoutMS=10000&timeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 120s
     deploy:
       resources:
         limits:
@@ -163,6 +177,13 @@ services:
         -XX:MaxRAMPercentage=70.0
         -XX:InitialRAMPercentage=50.0
         -XX:MaxMetaspaceSize=256m
+      SPRING_DATA_MONGODB_URI: mongodb://physio_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/physiotherapydoctorservice?authSource=physiotherapydoctorservice&connectTimeoutMS=10000&timeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 180s
     deploy:
       resources:
         limits:
@@ -187,6 +208,13 @@ services:
         -XX:MaxRAMPercentage=70.0
         -XX:InitialRAMPercentage=50.0
         -XX:MaxMetaspaceSize=256m
+      SPRING_DATA_MONGODB_URI: mongodb://customer_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/customerService?authSource=customerService&connectTimeoutMS=10000&timeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 180s
     deploy:
       resources:
         limits:
@@ -194,7 +222,7 @@ services:
     networks:
       - app-network
 
-  # =========================================================
+   # =========================================================
   # BOOKING SERVICE
   # =========================================================
   bookingservice:
@@ -211,6 +239,13 @@ services:
         -XX:MaxRAMPercentage=70.0
         -XX:InitialRAMPercentage=50.0
         -XX:MaxMetaspaceSize=256m
+      SPRING_DATA_MONGODB_URI: mongodb://booking_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/customerAppointments?authSource=customerAppointments&connectTimeoutMS=10000&timeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9900/actuator/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 150s
     deploy:
       resources:
         limits:
@@ -235,6 +270,13 @@ services:
         -XX:MaxRAMPercentage=70.0
         -XX:InitialRAMPercentage=50.0
         -XX:MaxMetaspaceSize=256m
+      SPRING_DATA_MONGODB_URI: mongodb://notification_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/DermaCareNotifications?authSource=DermaCareNotifications&connectTimeoutMS=10000&timeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9909/actuator/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 180s
     deploy:
       resources:
         limits:
