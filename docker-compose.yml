@@ -16,6 +16,28 @@
 # with or without swarm. Verify after deploying with:
 #   docker inspect <container> --format='{{.HostConfig.Memory}}'
 # (should be a nonzero byte count matching the mem_limit below).
+#
+# NOTE ON HEALTHCHECKS (fixed in this revision)
+# =========================================================
+# customerservice, bookingservice, notification-service, and
+# physiotherapydoctor-service previously used:
+#   test: ["CMD-SHELL", "curl -sf http://localhost:PORT > /dev/null || exit 0"]
+# The `|| exit 0` means the test ALWAYS returns success, whether curl
+# succeeds or fails -- so `docker inspect` reports these containers as
+# "healthy" even if the app never finished booting or the endpoint 404s.
+# That's a no-op healthcheck. Fixed to use `CMD curl -f` (which fails the
+# healthcheck on a non-2xx response, matching eureka/apigateway/admin
+# below) against the real actuator path.
+#
+# customerservice is confirmed to have `server.servlet.context-path: /api`
+# in its application.yml, so its actuator path is /api/actuator/health.
+# The other three (bookingservice, notification-service,
+# physiotherapydoctor-service) are assumed to have NO context-path below
+# -- VERIFY each service's application.yml for
+# `server.servlet.context-path` before deploying this; if any of them do
+# set one, prefix it the same way customerservice's is prefixed, or the
+# healthcheck will 404 and the container will be marked unhealthy despite
+# working fine.
 # =========================================================
 
 services:
@@ -72,15 +94,6 @@ services:
   # =========================================================
   # EUREKA SERVER
   # =========================================================
-  # 512m limit was measured at ~60% real usage under load -> kept as-is,
-  # comfortable headroom. Added -XX:+ExitOnOutOfMemoryError +
-  # -XX:+HeapDumpOnOutOfMemoryError to every JVM service below so that if
-  # a service DOES genuinely exhaust heap (as opposed to being cgroup
-  # SIGKILL'd from outside), it dies loudly with a heap dump instead of
-  # silently restarting with no trace in the app logs -- which is exactly
-  # what made the customerservice incident hard to diagnose from
-  # `docker logs | grep OutOfMemoryError` alone (a cgroup OOM-kill is a
-  # SIGKILL from the kernel; the JVM never gets to log anything).
   eureka-server:
     build:
       context: ./eureka-server
@@ -130,7 +143,6 @@ services:
   # =========================================================
   # API GATEWAY
   # =========================================================
-  # Measured ~55% real usage -> kept at 512m, comfortable headroom.
   apigateway:
     build:
       context: ./apigateway
@@ -184,9 +196,6 @@ services:
   # =========================================================
   # ADMIN SERVICE
   # =========================================================
-  # Was measured at ~75% real usage under load. Bumped 512m -> 640m to
-  # give real headroom above steady-state instead of running at the
-  # ceiling, same class of risk that caused the customerservice OOM-kill.
   adminservice:
     build:
       context: ./adminservice
@@ -245,9 +254,6 @@ services:
   # =========================================================
   # CLINIC ADMIN SERVICE
   # =========================================================
-  # Was measured at ~82% real usage. Also carries the AWS SDK (S3) and
-  # WhatsApp HTTP client, both of which add off-heap buffer overhead on
-  # top of the JVM heap. Bumped 512m -> 768m.
   clinicadmin:
     build:
       context: ./clinicadmin
@@ -312,9 +318,10 @@ services:
   # =========================================================
   # PHYSIOTHERAPY DOCTOR SERVICE
   # =========================================================
-  # Was measured at ~85.66% real usage -- the second-tightest service
-  # after customerservice, and also the highest CPU user (1.17%),
-  # suggesting real sustained load. Bumped 512m -> 768m.
+  # Healthcheck fixed: was `curl ... || exit 0` (always "healthy") hitting
+  # bare "/". Now fails the check on non-2xx and hits /actuator/health.
+  # ASSUMPTION: no context-path set for this service -- verify against
+  # its application.yml (grep server.servlet.context-path) before deploy.
   physiotherapydoctor-service:
     build:
       context: ./physiotherapydoctor-service
@@ -355,7 +362,7 @@ services:
       WHATSAPP_FOLLOWUP_REMINDER_TEMPLATE_ID: ${WHATSAPP_FOLLOWUP_REMINDER_TEMPLATE_ID}
 
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8888 > /dev/null || exit 0"]
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
       interval: 30s
       timeout: 15s
       retries: 5
@@ -376,15 +383,9 @@ services:
   # =========================================================
   # CUSTOMER SERVICE
   # =========================================================
-  # UPDATE: added G1 periodic-GC flags. Root cause investigation showed
-  # committed heap was NOT being released back to the OS after G1 grew it
-  # during a load spike -- `docker stats` reports committed RSS, not live
-  # usage, so the container looked permanently "full" even at idle with
-  # zero API traffic. These flags make G1 run a low-priority cycle every
-  # 60s specifically to uncommit unused pages when idle. This does not
-  # change behavior under real load -- heap will still grow as needed via
-  # MaxRAMPercentage; it only affects what happens AFTER load subsides.
-  # Verify with: docker exec -it customer_service jcmd 1 GC.heap_info
+  # Healthcheck fixed: now hits /api/actuator/health, matching the
+  # confirmed server.servlet.context-path: /api in this service's
+  # application.yml, and fails on non-2xx instead of always passing.
   customerservice:
     build:
       context: ./customerservice
@@ -425,7 +426,7 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
 
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8083 > /dev/null || exit 0"]
+      test: ["CMD", "curl", "-f", "http://localhost:8083/api/actuator/health"]
       interval: 30s
       timeout: 15s
       retries: 5
@@ -446,7 +447,10 @@ services:
   # =========================================================
   # BOOKING SERVICE
   # =========================================================
-  # Was measured at ~77% real usage. Bumped 512m -> 640m for headroom.
+  # Healthcheck fixed: was `curl ... || exit 0` (always "healthy") hitting
+  # bare "/". Now fails the check on non-2xx and hits /actuator/health.
+  # ASSUMPTION: no context-path set for this service -- verify against
+  # its application.yml before deploy.
   bookingservice:
     build:
       context: ./bookingservice
@@ -486,7 +490,7 @@ services:
       WHATSAPP_BOOKING_CONFIRMATION_TEMPLATE_ID: ${WHATSAPP_BOOKING_CONFIRMATION_TEMPLATE_ID}
 
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9900 > /dev/null || exit 0"]
+      test: ["CMD", "curl", "-f", "http://localhost:9900/actuator/health"]
       interval: 30s
       timeout: 15s
       retries: 5
@@ -507,10 +511,10 @@ services:
   # =========================================================
   # NOTIFICATION SERVICE
   # =========================================================
-  # Was measured at ~79.54% real usage. Bumped 512m -> 640m. Also fixed
-  # MaxMetaspaceSize, which was inconsistently set to 96m here vs 128m
-  # everywhere else -- standardized to 128m so metaspace headroom is
-  # uniform across all Java services.
+  # Healthcheck fixed: was `curl ... || exit 0` (always "healthy") hitting
+  # bare "/". Now fails the check on non-2xx and hits /actuator/health.
+  # ASSUMPTION: no context-path set for this service -- verify against
+  # its application.yml before deploy.
   notification-service:
     build:
       context: ./notification-service
@@ -544,7 +548,7 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
 
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9909 > /dev/null || exit 0"]
+      test: ["CMD", "curl", "-f", "http://localhost:9909/actuator/health"]
       interval: 30s
       timeout: 15s
       retries: 5
@@ -565,7 +569,6 @@ services:
   # =========================================================
   # FRONTEND - CLINIC ADMIN
   # =========================================================
-  # Static nginx frontends were measured at 2-4% usage -- left untouched.
   clinic-admin-web:
     build:
       context: ./clinic-admin-web
