@@ -8,15 +8,19 @@ spring:
 
   mvc:
     async:
-      request-timeout: 60000
+      request-timeout: 15000
 
   cloud:
     openfeign:
       client:
         config:
           default:
-            connectTimeout: 30000
-            readTimeout: 60000
+            # Tightened from 30000/60000. Internal service-to-service calls on the
+            # same docker network should return in low seconds, not up to a minute.
+            # A hung downstream call no longer holds a customerservice request
+            # thread (and its stack + in-flight objects) for up to 60s.
+            connectTimeout: 3000
+            readTimeout: 8000
 
 server:
   port: 8083
@@ -25,7 +29,7 @@ server:
     context-path: /api
 
   tomcat:
-    connection-timeout: 60s
+    connection-timeout: 20s
 
 eureka:
   client:
@@ -95,7 +99,10 @@ app:
 # ===============================
 # Logging
 # ===============================
+# NOTE: previously "com.sureCare.CustomerService", which does not match the
+# actual base package "com.dermaCare.customerService" and was silently
+# doing nothing. Fixed so DEBUG actually applies to this service's code.
 logging:
   level:
     org.springframework.web: INFO
-    com.sureCare.CustomerService: DEBUG
+    com.dermaCare.customerService: DEBUG
