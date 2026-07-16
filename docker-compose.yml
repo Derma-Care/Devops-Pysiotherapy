@@ -55,6 +55,12 @@ services:
         -XX:MaxRAMPercentage=70.0
         -XX:InitialRAMPercentage=50.0
         -XX:MaxMetaspaceSize=256m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
     deploy:
       resources:
         limits:
@@ -79,6 +85,12 @@ services:
         -XX:MaxRAMPercentage=70.0
         -XX:InitialRAMPercentage=50.0
         -XX:MaxMetaspaceSize=256m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/actuator/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
     deploy:
       resources:
         limits:
@@ -314,7 +326,7 @@ services:
     networks:
       - app-network
 
-   # =========================================================
+  # =========================================================
   # FRONTEND - THERAPY REPORT
   # =========================================================
   therapy-report:
