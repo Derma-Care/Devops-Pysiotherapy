@@ -391,9 +391,9 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
+        -XX:MaxRAMPercentage=75.0
         -XX:InitialRAMPercentage=50.0
-        -XX:MaxMetaspaceSize=128m
+        -XX:MaxMetaspaceSize=512m
       SPRING_APPLICATION_NAME: customerservice
       SPRING_DATA_MONGODB_URI: mongodb://customer_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/customerService?authSource=customerService&connectTimeoutMS=10000&socketTimeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
