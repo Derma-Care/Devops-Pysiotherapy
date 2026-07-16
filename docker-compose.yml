@@ -376,20 +376,15 @@ services:
   # =========================================================
   # CUSTOMER SERVICE
   # =========================================================
-  # ROOT CAUSE OF THE INCIDENT: this service was measured at 96.06%
-  # (491.8MiB / 512MiB), the tightest of any service in the whole stack.
-  # Under any load spike -- heap growth, GC pause, connection burst -- it
-  # blew past the 512m cgroup limit and the kernel OOM-killer sent a
-  # SIGKILL from outside the JVM. That's a hard kill: the JVM gets no
-  # chance to log "OutOfMemoryError" anywhere, which is why grepping the
-  # app logs for that string came back empty even though memory exhaustion
-  # was the cause. `restart: always` then silently brought it back up
-  # within seconds, producing the DOWN/UP flapping seen in Eureka.
-  # FIX: bumped 512m -> 768m to bring real usage down to a safer ~65%
-  # band, matching the other historically-tight services above. Also
-  # added the ExitOnOutOfMemoryError/HeapDumpOnOutOfMemoryError flags so
-  # that if it DOES exhaust heap again, it dies with an actual log line
-  # and a heap dump in /tmp instead of vanishing silently.
+  # UPDATE: added G1 periodic-GC flags. Root cause investigation showed
+  # committed heap was NOT being released back to the OS after G1 grew it
+  # during a load spike -- `docker stats` reports committed RSS, not live
+  # usage, so the container looked permanently "full" even at idle with
+  # zero API traffic. These flags make G1 run a low-priority cycle every
+  # 60s specifically to uncommit unused pages when idle. This does not
+  # change behavior under real load -- heap will still grow as needed via
+  # MaxRAMPercentage; it only affects what happens AFTER load subsides.
+  # Verify with: docker exec -it customer_service jcmd 1 GC.heap_info
   customerservice:
     build:
       context: ./customerservice
@@ -413,16 +408,19 @@ services:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
         -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
+        -XX:InitialRAMPercentage=25.0
         -XX:MaxMetaspaceSize=128m
         -XX:+ExitOnOutOfMemoryError
         -XX:+HeapDumpOnOutOfMemoryError
         -XX:HeapDumpPath=/tmp/heapdump.hprof
+        -XX:G1PeriodicGCInterval=60000
+        -XX:+G1PeriodicGCInvokesConcurrent
+        -XX:G1PeriodicGCSystemLoadThreshold=0
       SPRING_APPLICATION_NAME: customerservice
       SPRING_DATA_MONGODB_URI: mongodb://customer_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/customerService?authSource=customerService&connectTimeoutMS=10000&socketTimeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
-      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_CONNECTTIMEOUT: 10000
-      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_READTIMEOUT: 30000
+      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_CONNECTTIMEOUT: 3000
+      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_READTIMEOUT: 8000
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
 
