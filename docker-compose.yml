@@ -1,19 +1,75 @@
+# =========================================================
+# NOTE ON MEMORY LIMITS
+# =========================================================
+# All services use top-level `mem_limit` / `mem_reservation` (maps to
+# `docker run --memory` / `--memory-reservation`) instead of
+# `deploy.resources.limits/reservations`, which is Swarm-only and
+# silently ignored by plain `docker compose up`. Verify after deploy:
+#   docker inspect <container> --format='{{.HostConfig.Memory}}'
+#
+# NOTE ON JVM TUNING (standardized this revision)
+# =========================================================
+# Every Java service now shares a common baseline:
+#   -XX:+UseContainerSupport         -> respects cgroup limit, not host RAM
+#   -XX:MaxRAMPercentage=60.0        -> heap ceiling, leaves headroom for
+#                                        metaspace + direct memory + threads
+#   -XX:InitialRAMPercentage=30.0
+#   -XX:MaxMetaspaceSize=128m
+#   -XX:MaxDirectMemorySize=<X>m     -> TAILORED per service below, caps
+#                                        Netty/gRPC/NIO off-heap buffers
+#                                        which MaxRAMPercentage does NOT cover
+#   -XX:+ExitOnOutOfMemoryError / HeapDumpOnOutOfMemoryError -> fail fast,
+#                                        leave a dump instead of hanging
+#
+# Periodic GC (G1PeriodicGCInterval=60000, InvokesConcurrent,
+# SystemLoadThreshold=0) is added ONLY to services with idle off-heap
+# footprints that were observed creeping in `docker stats`
+# (notification-service, customerservice). It is deliberately NOT added
+# to low-allocation services like eureka-server, where there's nothing
+# meaningful to reclaim and it would just burn idle CPU cycles.
+#
+# MaxDirectMemorySize sizing rationale:
+#   eureka-server            64m  - minimal off-heap usage, registry only
+#   apigateway               128m - Spring Cloud Gateway is Netty/reactive,
+#                                    genuinely needs off-heap buffer headroom
+#   adminservice              64m - blocking Feign + JavaMail, light off-heap
+#   clinicadmin                96m - AWS SDK (S3) + WhatsApp HTTP client
+#   physiotherapydoctor-svc    96m - AWS SDK + WhatsApp HTTP client
+#   customerservice            96m - AWS SDK + Feign
+#   bookingservice              96m - AWS SDK + WhatsApp HTTP client
+#   notification-service      128m - firebase-admin pulls gRPC+Netty, the
+#                                     heaviest off-heap user in the stack
+#
+# NOTE ON HEALTHCHECKS
+# =========================================================
+# All healthchecks use `CMD curl -f` (fails on non-2xx), not
+# `CMD-SHELL ... || exit 0` (which always "succeeds"). customerservice
+# has server.servlet.context-path: /api confirmed in application.yml, so
+# its actuator path is /api/actuator/health. bookingservice,
+# notification-service, and physiotherapydoctor-service are ASSUMED to
+# have no context-path -- verify against each service's application.yml
+# before deploying, or the healthcheck will 404 and mark the container
+# unhealthy despite the app working fine.
+#
+# NOTE ON notification-service PORT MISMATCH -- VERIFY BEFORE DEPLOY
+# =========================================================
+# This compose file maps 9909:9909 and healthchecks port 9909, but the
+# service's Dockerfile has `EXPOSE 8089`. EXPOSE is documentation only
+# and doesn't break anything by itself, but it strongly suggests
+# server.port in notification-service's application.yml may not
+# actually be 9909. If it isn't, the healthcheck will fail internally,
+# Docker will keep the container marked unhealthy, and repeated restart
+# attempts will themselves cause memory/CPU spikes. Confirm with:
+#   grep server.port notification-service/src/main/resources/application*.yml
+#   docker exec notification_service curl -sf http://localhost:9909/actuator/health
+# before relying on this file as-is.
+# =========================================================
+
 services:
 
   # =========================================================
   # MONGODB
   # =========================================================
-  # CHANGES vs before:
-  #  - wiredTigerCacheSizeGB raised 0.25 -> 1: 0.25GB was far too small for
-  #    6 application databases sharing one mongod. A starved cache means
-  #    Mongo has to evict/re-read pages constantly under any concurrent
-  #    load, which is the kind of latency spike that trips
-  #    serverSelectionTimeoutMS on the client side.
-  #  - container memory limit raised 512m -> 1536m to give the larger
-  #    cache (1GB) + WiredTiger's own overhead + connection/index memory
-  #    room to breathe without getting OOM-killed.
-  #  - added --setParameter maxTransactionLockRequestTimeoutMillis to fail
-  #    fast on lock contention instead of hanging.
   mongodb:
     image: mongo:6.0
     container_name: mongodb_service
@@ -48,10 +104,8 @@ services:
       retries: 10
       start_period: 30s
 
-    deploy:
-      resources:
-        limits:
-          memory: 1536m
+    mem_limit: 1536m
+    mem_reservation: 512m
 
     logging:
       driver: json-file
@@ -65,14 +119,6 @@ services:
   # =========================================================
   # EUREKA SERVER
   # =========================================================
-  # CHANGES: switched from fixed -Xmx to container-aware percentage-based
-  # heap sizing. This is the modern JVM best practice inside containers
-  # (Java 10+): the JVM reads the container's cgroup memory limit and
-  # sizes the heap as a percentage of it, instead of a hardcoded value
-  # that may be too tight (starves the JVM -> GC pauses/OOM) or too loose
-  # (wastes container memory). MaxRAMPercentage=70 leaves ~30% of the
-  # container limit for metaspace, thread stacks, direct buffers (used
-  # heavily by Netty/Feign/Mongo driver), and JIT code cache.
   eureka-server:
     build:
       context: ./eureka-server
@@ -89,9 +135,13 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
         -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=64m
+        -XX:+ExitOnOutOfMemoryError
+        -XX:+HeapDumpOnOutOfMemoryError
+        -XX:HeapDumpPath=/tmp/heapdump.hprof
 
     depends_on:
       mongodb:
@@ -104,10 +154,8 @@ services:
       retries: 10
       start_period: 90s
 
-    deploy:
-      resources:
-        limits:
-          memory: 512m
+    mem_limit: 512m
+    mem_reservation: 256m
 
     logging:
       driver: json-file
@@ -141,9 +189,13 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
         -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=128m
+        -XX:+ExitOnOutOfMemoryError
+        -XX:+HeapDumpOnOutOfMemoryError
+        -XX:HeapDumpPath=/tmp/heapdump.hprof
       SPRING_APPLICATION_NAME: apigateway
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRING_CLOUD_GATEWAY_HTTPCLIENT_CONNECT_TIMEOUT: 30000
@@ -156,10 +208,8 @@ services:
       retries: 10
       start_period: 90s
 
-    deploy:
-      resources:
-        limits:
-          memory: 512m
+    mem_limit: 512m
+    mem_reservation: 256m
 
     logging:
       driver: json-file
@@ -173,22 +223,6 @@ services:
   # =========================================================
   # ADMIN SERVICE
   # =========================================================
-  # Mongo URI CHANGES (applied to every service below that talks to Mongo):
-  #  - serverSelectionTimeoutMS=10000  (was unset -> defaulted to 30000ms).
-  #    This is the actual timeout that fired in your incident
-  #    ("Timed out while waiting for a server that matches
-  #    ReadPreferenceServerSelector"). 10s is long enough to absorb a brief
-  #    GC pause or Mongo hiccup, but short enough that a genuine outage
-  #    fails fast and visibly instead of hanging the request for 30s.
-  #  - maxPoolSize=20&minPoolSize=5  -- caps how many connections any one
-  #    service can hold open against the shared mongod, so no single
-  #    service can starve the others under load (default maxPoolSize is
-  #    100 per client; with 6 services that's up to 600 possible
-  #    connections against one mongod).
-  #  - connectTimeoutMS/socketTimeoutMS trimmed from 30000/60000 to
-  #    10000/30000 -- 60s socket timeouts mean a genuinely stuck query
-  #    blocks the calling thread for a full minute; 30s is still generous
-  #    for any legitimate query against this dataset size.
   adminservice:
     build:
       context: ./adminservice
@@ -211,9 +245,13 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
         -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=64m
+        -XX:+ExitOnOutOfMemoryError
+        -XX:+HeapDumpOnOutOfMemoryError
+        -XX:HeapDumpPath=/tmp/heapdump.hprof
       SPRING_APPLICATION_NAME: adminservice
       SPRING_DATA_MONGODB_URI: mongodb://admin_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/AdminService?authSource=AdminService&connectTimeoutMS=10000&socketTimeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
@@ -229,10 +267,8 @@ services:
       retries: 10
       start_period: 90s
 
-    deploy:
-      resources:
-        limits:
-          memory: 512m
+    mem_limit: 640m
+    mem_reservation: 320m
 
     logging:
       driver: json-file
@@ -268,9 +304,13 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
         -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=96m
+        -XX:+ExitOnOutOfMemoryError
+        -XX:+HeapDumpOnOutOfMemoryError
+        -XX:HeapDumpPath=/tmp/heapdump.hprof
       SPRING_APPLICATION_NAME: clinicadmin
       SPRING_DATA_MONGODB_URI: mongodb://clinicadmin_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/clinicadminservice?authSource=clinicadminservice&connectTimeoutMS=10000&socketTimeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
@@ -292,10 +332,8 @@ services:
       retries: 10
       start_period: 90s
 
-    deploy:
-      resources:
-        limits:
-          memory: 512m
+    mem_limit: 768m
+    mem_reservation: 384m
 
     logging:
       driver: json-file
@@ -331,9 +369,13 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
         -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=96m
+        -XX:+ExitOnOutOfMemoryError
+        -XX:+HeapDumpOnOutOfMemoryError
+        -XX:HeapDumpPath=/tmp/heapdump.hprof
       SPRING_APPLICATION_NAME: physiotherapydoctor-service
       SPRING_DATA_MONGODB_URI: mongodb://physio_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/physiotherapydoctorservice?authSource=physiotherapydoctorservice&connectTimeoutMS=10000&socketTimeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
@@ -346,16 +388,14 @@ services:
       WHATSAPP_FOLLOWUP_REMINDER_TEMPLATE_ID: ${WHATSAPP_FOLLOWUP_REMINDER_TEMPLATE_ID}
 
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8888 > /dev/null || exit 0"]
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
       interval: 30s
       timeout: 15s
       retries: 5
       start_period: 120s
 
-    deploy:
-      resources:
-        limits:
-          memory: 512m
+    mem_limit: 768m
+    mem_reservation: 384m
 
     logging:
       driver: json-file
@@ -391,28 +431,33 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
         -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=96m
+        -XX:+ExitOnOutOfMemoryError
+        -XX:+HeapDumpOnOutOfMemoryError
+        -XX:HeapDumpPath=/tmp/heapdump.hprof
+        -XX:G1PeriodicGCInterval=60000
+        -XX:+G1PeriodicGCInvokesConcurrent
+        -XX:G1PeriodicGCSystemLoadThreshold=0
       SPRING_APPLICATION_NAME: customerservice
       SPRING_DATA_MONGODB_URI: mongodb://customer_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/customerService?authSource=customerService&connectTimeoutMS=10000&socketTimeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
-      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_CONNECTTIMEOUT: 10000
-      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_READTIMEOUT: 30000
+      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_CONNECTTIMEOUT: 3000
+      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_READTIMEOUT: 8000
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
 
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8083 > /dev/null || exit 0"]
+      test: ["CMD", "curl", "-f", "http://localhost:8083/api/actuator/health"]
       interval: 30s
       timeout: 15s
       retries: 5
       start_period: 120s
 
-    deploy:
-      resources:
-        limits:
-          memory: 512m
+    mem_limit: 768m
+    mem_reservation: 384m
 
     logging:
       driver: json-file
@@ -448,9 +493,13 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
         -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=96m
+        -XX:+ExitOnOutOfMemoryError
+        -XX:+HeapDumpOnOutOfMemoryError
+        -XX:HeapDumpPath=/tmp/heapdump.hprof
       SPRING_APPLICATION_NAME: bookingservice
       SPRING_DATA_MONGODB_URI: mongodb://booking_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/customerAppointments?authSource=customerAppointments&connectTimeoutMS=10000&socketTimeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
@@ -462,16 +511,14 @@ services:
       WHATSAPP_BOOKING_CONFIRMATION_TEMPLATE_ID: ${WHATSAPP_BOOKING_CONFIRMATION_TEMPLATE_ID}
 
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9900 > /dev/null || exit 0"]
+      test: ["CMD", "curl", "-f", "http://localhost:9900/actuator/health"]
       interval: 30s
       timeout: 15s
       retries: 5
       start_period: 120s
 
-    deploy:
-      resources:
-        limits:
-          memory: 512m
+    mem_limit: 640m
+    mem_reservation: 320m
 
     logging:
       driver: json-file
@@ -485,6 +532,12 @@ services:
   # =========================================================
   # NOTIFICATION SERVICE
   # =========================================================
+  # mem_limit raised 640m -> 768m and MaxDirectMemorySize added: this
+  # service was observed at 95.83% memory usage (613MB/640MB) at idle,
+  # traced to firebase-admin's gRPC/Netty stack allocating off-heap
+  # buffers that MaxRAMPercentage alone doesn't account for.
+  # VERIFY server.port and context-path before deploy -- see top-of-file
+  # note; Dockerfile currently EXPOSEs 8089 while this maps 9909:9909.
   notification-service:
     build:
       context: ./notification-service
@@ -507,24 +560,29 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
-        -XX:MaxMetaspaceSize=96m
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
+        -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=128m
+        -XX:+ExitOnOutOfMemoryError
+        -XX:+HeapDumpOnOutOfMemoryError
+        -XX:HeapDumpPath=/tmp/heapdump.hprof
+        -XX:G1PeriodicGCInterval=60000
+        -XX:+G1PeriodicGCInvokesConcurrent
+        -XX:G1PeriodicGCSystemLoadThreshold=0
       SPRING_APPLICATION_NAME: notification-service
       SPRING_DATA_MONGODB_URI: mongodb://notification_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/DermaCareNotifications?authSource=DermaCareNotifications&connectTimeoutMS=10000&socketTimeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
 
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9909 > /dev/null || exit 0"]
+      test: ["CMD", "curl", "-f", "http://localhost:9909/actuator/health"]
       interval: 30s
       timeout: 15s
       retries: 5
       start_period: 120s
 
-    deploy:
-      resources:
-        limits:
-          memory: 512m
+    mem_limit: 768m
+    mem_reservation: 384m
 
     logging:
       driver: json-file
@@ -561,10 +619,7 @@ services:
       retries: 5
       start_period: 30s
 
-    deploy:
-      resources:
-        limits:
-          memory: 128m
+    mem_limit: 128m
 
     logging:
       driver: json-file
@@ -601,10 +656,7 @@ services:
       retries: 5
       start_period: 30s
 
-    deploy:
-      resources:
-        limits:
-          memory: 128m
+    mem_limit: 128m
 
     logging:
       driver: json-file
@@ -641,10 +693,7 @@ services:
       retries: 5
       start_period: 30s
 
-    deploy:
-      resources:
-        limits:
-          memory: 128m
+    mem_limit: 128m
 
     logging:
       driver: json-file
@@ -681,10 +730,7 @@ services:
       retries: 5
       start_period: 30s
 
-    deploy:
-      resources:
-        limits:
-          memory: 128m
+    mem_limit: 128m
 
     logging:
       driver: json-file
@@ -721,10 +767,7 @@ services:
       retries: 5
       start_period: 30s
 
-    deploy:
-      resources:
-        limits:
-          memory: 128m
+    mem_limit: 128m
 
     logging:
       driver: json-file

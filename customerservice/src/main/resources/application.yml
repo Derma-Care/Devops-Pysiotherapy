@@ -4,81 +4,62 @@ spring:
 
   data:
     mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://mongodb:27017/customerService}
+      uri: ${SPRING_DATA_MONGODB_URI}
 
   mvc:
     async:
-      request-timeout: 60000
+      request-timeout: 15000
 
   cloud:
     openfeign:
       client:
         config:
           default:
-            connectTimeout: 30000
-            readTimeout: 60000
+            connectTimeout: 3000
+            readTimeout: 8000
+            loggerLevel: BASIC
 
 server:
   port: 8083
-
   servlet:
     context-path: /api
-
   tomcat:
-    connection-timeout: 60s
+    connection-timeout: 20s
 
 eureka:
   client:
     fetch-registry: true
     register-with-eureka: true
-
     healthcheck:
       enabled: true
-
     service-url:
-      defaultZone: http://eureka-server:8761/eureka/
-
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE}
   instance:
     prefer-ip-address: true
-    lease-renewal-interval-in-seconds: 30
-    lease-expiration-duration-in-seconds: 90
+    lease-renewal-interval-in-seconds: 60
+    lease-expiration-duration-in-seconds: 180
 
-# ===============================
-# Resilience4j
-# ===============================
 resilience4j:
   circuitbreaker:
     instances:
       circuitBreaker:
-        failure-rate-threshold: 80
+        failure-rate-threshold: 50
         sliding-window-size: 10
-        sliding-window-type: COUNT_BASED
         minimum-number-of-calls: 5
-        automatic-transition-from-open-to-half-open-enabled: true
-        permitted-number-of-calls-in-half-open-state: 4
-        wait-duration-in-open-state: 1m
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 2
 
-# ===============================
-# Actuator
-# ===============================
 management:
-  server:
-    base-path: /
-
   endpoints:
     web:
       exposure:
         include: health,info,metrics
-
   endpoint:
     health:
       show-details: always
       probes:
         enabled: true
 
-# ===============================
-# AWS S3
-# ===============================
 aws:
   accessKeyId: ${AWS_ACCESS_KEY_ID}
   secretAccessKey: ${AWS_SECRET_ACCESS_KEY}
@@ -86,16 +67,11 @@ aws:
   s3:
     bucket: physiocare-prod-storage
 
-# ===============================
-# Firebase
-# ===============================
 app:
   firebase-configuration-file: firebase-key.json
 
-# ===============================
-# Logging
-# ===============================
 logging:
   level:
+    root: INFO
     org.springframework.web: INFO
-    com.sureCare.CustomerService: DEBUG
+    com.dermaCare.customerService: INFO
