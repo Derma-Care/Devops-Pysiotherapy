@@ -40,18 +40,40 @@
 #   notification-service      128m - firebase-admin pulls gRPC+Netty, the
 #                                     heaviest off-heap user in the stack
 #
+# REVISION LOG (this pass)
+# =========================================================
+# - bookingservice mem_limit/mem_reservation raised 640m/320m -> 768m/384m.
+#   It shares the identical off-heap profile (AWS SDK + WhatsApp HTTP
+#   client, MaxDirectMemorySize=96m) as clinicadmin, physiotherapydoctor-
+#   service, and customerservice, all of which already run at 768m/384m.
+#   Leaving it at 640m was inconsistent with its own JVM flags: heap
+#   ceiling (60% of 640m = 384MB) + metaspace (128MB) + direct memory
+#   (96MB) already sums to 608MB, ~95% of the container limit, before
+#   counting thread stacks, JIT code cache, or GC bookkeeping -- none of
+#   which MaxRAMPercentage accounts for. Observed usage (433.9MiB /
+#   67.80%) confirms it was the tightest-headroom service in its class.
+# - bookingservice healthcheck path corrected from
+#   http://localhost:9900/actuator/health to
+#   http://localhost:9900/api/actuator/health. Confirmed via
+#   bookingservice's application.yml: server.servlet.context-path: /api.
+#   This is the exact 404-on-healthcheck failure mode warned about below
+#   for customerservice's sibling case -- bookingservice was the
+#   unverified one and turned out to need the fix.
+# =========================================================
+#
 # NOTE ON HEALTHCHECKS
 # =========================================================
 # All healthchecks use `CMD curl -f` (fails on non-2xx), not
 # `CMD-SHELL ... || exit 0` (which always "succeeds"). customerservice
-# has server.servlet.context-path: /api confirmed in application.yml, so
-# its actuator path is /api/actuator/health. bookingservice,
-# notification-service, and physiotherapydoctor-service are ASSUMED to
-# have no context-path -- verify against each service's application.yml
-# before deploying, or the healthcheck will 404 and mark the container
-# unhealthy despite the app working fine.
+# and bookingservice both have server.servlet.context-path: /api
+# confirmed in application.yml, so their actuator paths are
+# /api/actuator/health. notification-service and
+# physiotherapydoctor-service are ASSUMED to have no context-path --
+# verify against each service's application.yml before deploying, or
+# the healthcheck will 404 and mark the container unhealthy despite the
+# app working fine.
 #
-# NOTE ON notification-service PORT MISMATCH -- VERIFY BEFORE DEPLOY
+# NOTE ON notification-service PORT MISMATCH -- STILL UNVERIFIED
 # =========================================================
 # This compose file maps 9909:9909 and healthchecks port 9909, but the
 # service's Dockerfile has `EXPOSE 8089`. EXPOSE is documentation only
@@ -62,7 +84,9 @@
 # attempts will themselves cause memory/CPU spikes. Confirm with:
 #   grep server.port notification-service/src/main/resources/application*.yml
 #   docker exec notification_service curl -sf http://localhost:9909/actuator/health
-# before relying on this file as-is.
+# before relying on this file as-is. Not changed in this revision --
+# no application.yml was provided to confirm the actual port/context-path,
+# unlike bookingservice above.
 # =========================================================
 
 services:
@@ -471,6 +495,10 @@ services:
   # =========================================================
   # BOOKING SERVICE
   # =========================================================
+  # mem_limit/mem_reservation raised 640m/320m -> 768m/384m this revision.
+  # Healthcheck path corrected to include /api context-path, confirmed
+  # via bookingservice's own application.yml (server.servlet.context-path: /api).
+  # See REVISION LOG at top of file for the full rationale.
   bookingservice:
     build:
       context: ./bookingservice
@@ -503,6 +531,8 @@ services:
       SPRING_APPLICATION_NAME: bookingservice
       SPRING_DATA_MONGODB_URI: mongodb://booking_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/customerAppointments?authSource=customerAppointments&connectTimeoutMS=10000&socketTimeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_CONNECTTIMEOUT: 3000
+      SPRING_CLOUD_OPENFEIGN_CLIENT_CONFIG_DEFAULT_READTIMEOUT: 8000
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       WHATSAPP_BASE_URL: ${WHATSAPP_BASE_URL}
@@ -511,14 +541,14 @@ services:
       WHATSAPP_BOOKING_CONFIRMATION_TEMPLATE_ID: ${WHATSAPP_BOOKING_CONFIRMATION_TEMPLATE_ID}
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9900/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9900/api/actuator/health"]
       interval: 30s
       timeout: 15s
       retries: 5
       start_period: 120s
 
-    mem_limit: 640m
-    mem_reservation: 320m
+    mem_limit: 768m
+    mem_reservation: 384m
 
     logging:
       driver: json-file
@@ -536,8 +566,10 @@ services:
   # service was observed at 95.83% memory usage (613MB/640MB) at idle,
   # traced to firebase-admin's gRPC/Netty stack allocating off-heap
   # buffers that MaxRAMPercentage alone doesn't account for.
-  # VERIFY server.port and context-path before deploy -- see top-of-file
-  # note; Dockerfile currently EXPOSEs 8089 while this maps 9909:9909.
+  # STILL UNVERIFIED: server.port and context-path before deploy -- see
+  # top-of-file note; Dockerfile currently EXPOSEs 8089 while this maps
+  # 9909:9909. No application.yml was provided for this service, so the
+  # healthcheck path/port is left as-is. Confirm before deploying.
   notification-service:
     build:
       context: ./notification-service
