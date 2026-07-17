@@ -4,82 +4,80 @@ spring:
 
   data:
     mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://mongodb:27017/DermaCareNotifications}
+      uri: ${SPRING_DATA_MONGODB_URI}
 
   mvc:
     async:
-      request-timeout: 60000
+      request-timeout: 30000   # tightened for prod
 
   cloud:
     openfeign:
       client:
         config:
           default:
-            connectTimeout: 30000
-            readTimeout: 60000
+            connectTimeout: 3000
+            readTimeout: 8000
+            loggerLevel: BASIC
 
 server:
   port: 9909
-
   servlet:
     context-path: /api
-
   tomcat:
-    connection-timeout: 60s
+    connection-timeout: 20s
 
+# =========================================================
+# Eureka (production stability)
+# =========================================================
 eureka:
   instance:
     prefer-ip-address: true
-    lease-renewal-interval-in-seconds: 30
-    lease-expiration-duration-in-seconds: 90
-
+    lease-renewal-interval-in-seconds: 60
+    lease-expiration-duration-in-seconds: 180
   client:
     register-with-eureka: true
     fetch-registry: true
-
     healthcheck:
       enabled: true
-
     service-url:
-      defaultZone: http://eureka-server:8761/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE}
 
-# ===============================
-# Actuator
-# ===============================
+# =========================================================
+# Actuator (prod monitoring)
+# =========================================================
 management:
   server:
     base-path: /
-
   endpoints:
     web:
       exposure:
         include: health,info,metrics
-
   endpoint:
     health:
       show-details: always
       probes:
         enabled: true
 
-# ===============================
+# =========================================================
 # App Info
-# ===============================
+# =========================================================
 info:
   app:
     name: notification-service
     description: Service responsible for handling notifications related to bookings
     version: 1.0.0
 
-# ===============================
-# Firebase
-# ===============================
+# =========================================================
+# Firebase (prod key)
+# =========================================================
 app:
   firebase-configuration-file: firebase-key.json
 
-# ===============================
-# Logging
-# ===============================
+# =========================================================
+# Logging (INFO for prod)
+# =========================================================
 logging:
   level:
+    root: INFO
     org.springframework.web: INFO
-    com.dermacare.notification_service: DEBUG
+    com.dermacare.notification_service: INFO

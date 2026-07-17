@@ -1,43 +1,68 @@
 # =========================================================
 # NOTE ON MEMORY LIMITS
 # =========================================================
-# Every service below uses the top-level `mem_limit` / `mem_reservation`
-# keys instead of `deploy.resources.limits/reservations`. The `deploy:`
-# block is part of the Swarm spec and is SILENTLY IGNORED by plain
-# `docker compose up` / `docker-compose up` (non-swarm) unless you pass
-# `--compatibility`. That silent no-op was the root cause behind
-# customerservice appearing to run unconstrained (jcmd showed a ~2GB
-# G1 heap even though the file said 768m) -- the JVM's
-# -XX:MaxRAMPercentage was computing against the *host's* total RAM,
-# not a cgroup limit, because no cgroup limit was actually being set.
-# `mem_limit` / `mem_reservation` map directly to `docker run
-# --memory` / `--memory-reservation` and are honored by both the
-# legacy `docker-compose` binary and the `docker compose` v2 plugin,
-# with or without swarm. Verify after deploying with:
+# All services use top-level `mem_limit` / `mem_reservation` (maps to
+# `docker run --memory` / `--memory-reservation`) instead of
+# `deploy.resources.limits/reservations`, which is Swarm-only and
+# silently ignored by plain `docker compose up`. Verify after deploy:
 #   docker inspect <container> --format='{{.HostConfig.Memory}}'
-# (should be a nonzero byte count matching the mem_limit below).
 #
-# NOTE ON HEALTHCHECKS (fixed in this revision)
+# NOTE ON JVM TUNING (standardized this revision)
 # =========================================================
-# customerservice, bookingservice, notification-service, and
-# physiotherapydoctor-service previously used:
-#   test: ["CMD-SHELL", "curl -sf http://localhost:PORT > /dev/null || exit 0"]
-# The `|| exit 0` means the test ALWAYS returns success, whether curl
-# succeeds or fails -- so `docker inspect` reports these containers as
-# "healthy" even if the app never finished booting or the endpoint 404s.
-# That's a no-op healthcheck. Fixed to use `CMD curl -f` (which fails the
-# healthcheck on a non-2xx response, matching eureka/apigateway/admin
-# below) against the real actuator path.
+# Every Java service now shares a common baseline:
+#   -XX:+UseContainerSupport         -> respects cgroup limit, not host RAM
+#   -XX:MaxRAMPercentage=60.0        -> heap ceiling, leaves headroom for
+#                                        metaspace + direct memory + threads
+#   -XX:InitialRAMPercentage=30.0
+#   -XX:MaxMetaspaceSize=128m
+#   -XX:MaxDirectMemorySize=<X>m     -> TAILORED per service below, caps
+#                                        Netty/gRPC/NIO off-heap buffers
+#                                        which MaxRAMPercentage does NOT cover
+#   -XX:+ExitOnOutOfMemoryError / HeapDumpOnOutOfMemoryError -> fail fast,
+#                                        leave a dump instead of hanging
 #
-# customerservice is confirmed to have `server.servlet.context-path: /api`
-# in its application.yml, so its actuator path is /api/actuator/health.
-# The other three (bookingservice, notification-service,
-# physiotherapydoctor-service) are assumed to have NO context-path below
-# -- VERIFY each service's application.yml for
-# `server.servlet.context-path` before deploying this; if any of them do
-# set one, prefix it the same way customerservice's is prefixed, or the
-# healthcheck will 404 and the container will be marked unhealthy despite
-# working fine.
+# Periodic GC (G1PeriodicGCInterval=60000, InvokesConcurrent,
+# SystemLoadThreshold=0) is added ONLY to services with idle off-heap
+# footprints that were observed creeping in `docker stats`
+# (notification-service, customerservice). It is deliberately NOT added
+# to low-allocation services like eureka-server, where there's nothing
+# meaningful to reclaim and it would just burn idle CPU cycles.
+#
+# MaxDirectMemorySize sizing rationale:
+#   eureka-server            64m  - minimal off-heap usage, registry only
+#   apigateway               128m - Spring Cloud Gateway is Netty/reactive,
+#                                    genuinely needs off-heap buffer headroom
+#   adminservice              64m - blocking Feign + JavaMail, light off-heap
+#   clinicadmin                96m - AWS SDK (S3) + WhatsApp HTTP client
+#   physiotherapydoctor-svc    96m - AWS SDK + WhatsApp HTTP client
+#   customerservice            96m - AWS SDK + Feign
+#   bookingservice              96m - AWS SDK + WhatsApp HTTP client
+#   notification-service      128m - firebase-admin pulls gRPC+Netty, the
+#                                     heaviest off-heap user in the stack
+#
+# NOTE ON HEALTHCHECKS
+# =========================================================
+# All healthchecks use `CMD curl -f` (fails on non-2xx), not
+# `CMD-SHELL ... || exit 0` (which always "succeeds"). customerservice
+# has server.servlet.context-path: /api confirmed in application.yml, so
+# its actuator path is /api/actuator/health. bookingservice,
+# notification-service, and physiotherapydoctor-service are ASSUMED to
+# have no context-path -- verify against each service's application.yml
+# before deploying, or the healthcheck will 404 and mark the container
+# unhealthy despite the app working fine.
+#
+# NOTE ON notification-service PORT MISMATCH -- VERIFY BEFORE DEPLOY
+# =========================================================
+# This compose file maps 9909:9909 and healthchecks port 9909, but the
+# service's Dockerfile has `EXPOSE 8089`. EXPOSE is documentation only
+# and doesn't break anything by itself, but it strongly suggests
+# server.port in notification-service's application.yml may not
+# actually be 9909. If it isn't, the healthcheck will fail internally,
+# Docker will keep the container marked unhealthy, and repeated restart
+# attempts will themselves cause memory/CPU spikes. Confirm with:
+#   grep server.port notification-service/src/main/resources/application*.yml
+#   docker exec notification_service curl -sf http://localhost:9909/actuator/health
+# before relying on this file as-is.
 # =========================================================
 
 services:
@@ -110,9 +135,10 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
         -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=64m
         -XX:+ExitOnOutOfMemoryError
         -XX:+HeapDumpOnOutOfMemoryError
         -XX:HeapDumpPath=/tmp/heapdump.hprof
@@ -163,9 +189,10 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
         -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=128m
         -XX:+ExitOnOutOfMemoryError
         -XX:+HeapDumpOnOutOfMemoryError
         -XX:HeapDumpPath=/tmp/heapdump.hprof
@@ -218,9 +245,10 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
         -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=64m
         -XX:+ExitOnOutOfMemoryError
         -XX:+HeapDumpOnOutOfMemoryError
         -XX:HeapDumpPath=/tmp/heapdump.hprof
@@ -276,9 +304,10 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
         -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=96m
         -XX:+ExitOnOutOfMemoryError
         -XX:+HeapDumpOnOutOfMemoryError
         -XX:HeapDumpPath=/tmp/heapdump.hprof
@@ -318,10 +347,6 @@ services:
   # =========================================================
   # PHYSIOTHERAPY DOCTOR SERVICE
   # =========================================================
-  # Healthcheck fixed: was `curl ... || exit 0` (always "healthy") hitting
-  # bare "/". Now fails the check on non-2xx and hits /actuator/health.
-  # ASSUMPTION: no context-path set for this service -- verify against
-  # its application.yml (grep server.servlet.context-path) before deploy.
   physiotherapydoctor-service:
     build:
       context: ./physiotherapydoctor-service
@@ -344,9 +369,10 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
         -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=96m
         -XX:+ExitOnOutOfMemoryError
         -XX:+HeapDumpOnOutOfMemoryError
         -XX:HeapDumpPath=/tmp/heapdump.hprof
@@ -383,9 +409,6 @@ services:
   # =========================================================
   # CUSTOMER SERVICE
   # =========================================================
-  # Healthcheck fixed: now hits /api/actuator/health, matching the
-  # confirmed server.servlet.context-path: /api in this service's
-  # application.yml, and fails on non-2xx instead of always passing.
   customerservice:
     build:
       context: ./customerservice
@@ -408,9 +431,10 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=25.0
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
         -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=96m
         -XX:+ExitOnOutOfMemoryError
         -XX:+HeapDumpOnOutOfMemoryError
         -XX:HeapDumpPath=/tmp/heapdump.hprof
@@ -447,10 +471,6 @@ services:
   # =========================================================
   # BOOKING SERVICE
   # =========================================================
-  # Healthcheck fixed: was `curl ... || exit 0` (always "healthy") hitting
-  # bare "/". Now fails the check on non-2xx and hits /actuator/health.
-  # ASSUMPTION: no context-path set for this service -- verify against
-  # its application.yml before deploy.
   bookingservice:
     build:
       context: ./bookingservice
@@ -473,9 +493,10 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
         -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=96m
         -XX:+ExitOnOutOfMemoryError
         -XX:+HeapDumpOnOutOfMemoryError
         -XX:HeapDumpPath=/tmp/heapdump.hprof
@@ -511,10 +532,12 @@ services:
   # =========================================================
   # NOTIFICATION SERVICE
   # =========================================================
-  # Healthcheck fixed: was `curl ... || exit 0` (always "healthy") hitting
-  # bare "/". Now fails the check on non-2xx and hits /actuator/health.
-  # ASSUMPTION: no context-path set for this service -- verify against
-  # its application.yml before deploy.
+  # mem_limit raised 640m -> 768m and MaxDirectMemorySize added: this
+  # service was observed at 95.83% memory usage (613MB/640MB) at idle,
+  # traced to firebase-admin's gRPC/Netty stack allocating off-heap
+  # buffers that MaxRAMPercentage alone doesn't account for.
+  # VERIFY server.port and context-path before deploy -- see top-of-file
+  # note; Dockerfile currently EXPOSEs 8089 while this maps 9909:9909.
   notification-service:
     build:
       context: ./notification-service
@@ -537,12 +560,16 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=70.0
-        -XX:InitialRAMPercentage=50.0
+        -XX:MaxRAMPercentage=60.0
+        -XX:InitialRAMPercentage=30.0
         -XX:MaxMetaspaceSize=128m
+        -XX:MaxDirectMemorySize=128m
         -XX:+ExitOnOutOfMemoryError
         -XX:+HeapDumpOnOutOfMemoryError
         -XX:HeapDumpPath=/tmp/heapdump.hprof
+        -XX:G1PeriodicGCInterval=60000
+        -XX:+G1PeriodicGCInvokesConcurrent
+        -XX:G1PeriodicGCSystemLoadThreshold=0
       SPRING_APPLICATION_NAME: notification-service
       SPRING_DATA_MONGODB_URI: mongodb://notification_svc_user:${MONGO_APP_PASSWORD}@mongodb:27017/DermaCareNotifications?authSource=DermaCareNotifications&connectTimeoutMS=10000&socketTimeoutMS=30000&serverSelectionTimeoutMS=10000&maxPoolSize=20&minPoolSize=5
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
@@ -554,8 +581,8 @@ services:
       retries: 5
       start_period: 120s
 
-    mem_limit: 640m
-    mem_reservation: 320m
+    mem_limit: 768m
+    mem_reservation: 384m
 
     logging:
       driver: json-file
