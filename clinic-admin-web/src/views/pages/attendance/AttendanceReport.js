@@ -8,6 +8,9 @@ import { http } from "../../../Utils/Interceptors";
 import { BASE_URL, GetAllUsersDailyByClinicAndBranch, SaveUserAttendence, UpdateUserAttendence } from "../../../baseUrl";
 import capitalizeWords from "../../../Utils/capitalizeWords";
 import { showCustomToast } from "../../../Utils/Toaster";
+import { GetClinicBranches } from "../../Doctors/DoctorAPI";
+import { CFormSelect } from "@coreui/react";
+import { useHospital } from "../../Usecontext/HospitalContext";
 
 const styles = `
   .ar-wrapper {
@@ -445,7 +448,7 @@ function getStatusBadge(status) {
 export default function AttendanceReport() {
   const navigate = useNavigate();
   const today = new Date().toISOString().split("T")[0];
-
+  const role = sessionStorage.getItem("role");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Filters for Main Page
@@ -462,11 +465,13 @@ export default function AttendanceReport() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [saveLoading, setSaveLoading] = useState(false);
-  const fetchAttendance = useCallback(async () => {
+  const { globalBranchId } = useHospital() || {};
+  const fetchAttendance = useCallback(async (DbranchId = globalBranchId) => {
     setLoading(true);
     try {
-      const hospitalId = localStorage.getItem("HospitalId");
-      const branchId = localStorage.getItem("branchId");
+      const hospitalId = sessionStorage.getItem("HospitalId");
+      const branchId = DbranchId || sessionStorage.getItem("branchId");
+
       const res = await http.get(`${BASE_URL}/${GetAllUsersDailyByClinicAndBranch}/${hospitalId}/${branchId}/${selectedDate}`);
       if (res.status === 200 && res.data.success === true) {
         setAttendanceData(res.data.data || []);
@@ -476,11 +481,13 @@ export default function AttendanceReport() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
+  }, [selectedDate, globalBranchId]);
 
   useEffect(() => {
-    fetchAttendance();
-  }, [fetchAttendance]);
+    if (globalBranchId) {
+      fetchAttendance(globalBranchId);
+    }
+  }, [globalBranchId, fetchAttendance]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -525,8 +532,8 @@ export default function AttendanceReport() {
 
       const payload = {
         date: selectedDate,
-        clinicId: localStorage.getItem("HospitalId"),
-        branchId: localStorage.getItem("branchId"),
+        clinicId: sessionStorage.getItem("HospitalId"),
+        branchId: globalBranchId || sessionStorage.getItem("branchId"),
         role: selectedUserRole,
         login: {
           time: manualTime,
@@ -681,6 +688,7 @@ export default function AttendanceReport() {
               )}
             </div>
           </div>
+          {/* Global branch dropdown is in AppBreadcrumb now */}
         </div>
 
         {/* Table Card */}

@@ -23,6 +23,8 @@ import {
 } from './FeedbackAPI';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import Pagination from '../../Utils/Pagination';
+import { GetClinicBranches, getDoctorByClinicIdData } from '../Doctors/DoctorAPI';
+import { CFormSelect } from '@coreui/react';
 
 const RATING_OPTIONS = [
   { id: '1', emoji: '😡', label: '1', className: 'active-1' },
@@ -38,7 +40,7 @@ const RATING_OPTIONS = [
 ];
 
 const PatientFeedback = () => {
-  const { doctorData, addNotification } = useHospital() || {};
+  const { doctorData, addNotification, globalBranchId } = useHospital() || {};
   const navigate = useNavigate();
 
   // State for CRUD
@@ -59,7 +61,7 @@ const PatientFeedback = () => {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -72,13 +74,14 @@ const PatientFeedback = () => {
   const [patients, setPatients] = useState([]);
   const [therapistsList, setTherapistsList] = useState([]);
   const [receptionistsList, setReceptionistsList] = useState([]);
+  const [doctorsList, setDoctorsList] = useState([]);
 
-  const hospitalId = localStorage.getItem('HospitalId');
-  const branchId = localStorage.getItem('branchId');
+  const hospitalId = sessionStorage.getItem('HospitalId');
+  const role = sessionStorage.getItem('role');
 
   const [form, setForm] = useState({
     clinicId: hospitalId,
-    branchId: branchId,
+    branchId: '',
     patientId: '',
     patientName: '',
     patientPhone: '',
@@ -90,10 +93,11 @@ const PatientFeedback = () => {
 
   const [errors, setErrors] = useState({});
 
-  const fetchFeedbacks = async () => {
+  const fetchFeedbacks = async (branchIdOverride = globalBranchId) => {
     setLoading(true);
     try {
-      const res = await getAllOverallFeedback(hospitalId, branchId);
+      const bId = branchIdOverride || sessionStorage.getItem('branchId');
+      const res = await getAllOverallFeedback(hospitalId, bId);
       if (res?.data?.data) setFeedbacks(res.data.data);
       else if (res?.data) setFeedbacks(res.data);
       else if (Array.isArray(res)) setFeedbacks(res);
@@ -105,50 +109,68 @@ const PatientFeedback = () => {
     }
   };
 
-  // Fetch Data on mount
   useEffect(() => {
-    fetchFeedbacks();
-    const fetchPatients = async () => {
-      try {
-        const data = await CustomerData();
-        setPatients(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Failed to fetch patients", error);
-      }
-    };
+    if (globalBranchId) {
+      fetchFeedbacks(globalBranchId);
+      fetchPatients(globalBranchId);
+      fetchStaff(globalBranchId);
+      fetchDoctors(globalBranchId);
+    }
+  }, [globalBranchId]);
+  const fetchPatients = async (branchId) => {
+    try {
+      const data = await CustomerData(branchId);
+      setPatients(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
-    const fetchStaff = async () => {
-      const hId = localStorage.getItem('HospitalId');
-      const bId = localStorage.getItem('branchId');
-      if (hId && bId) {
-        try {
-          const physiosRes = await getAllPhysios(hId, bId);
-          let physioData = [];
-          if (Array.isArray(physiosRes?.data?.data)) physioData = physiosRes.data.data;
-          else if (Array.isArray(physiosRes?.data)) physioData = physiosRes.data;
-          else if (Array.isArray(physiosRes)) physioData = physiosRes;
-          setTherapistsList(physioData);
+  const fetchStaff = async (branchId) => {
+    try {
+      const physiosRes = await getAllPhysios(hospitalId, branchId);
 
-          const staffRes = await getAllFrontDeskAPI(hId, bId);
-          let staffData = [];
-          if (Array.isArray(staffRes?.data?.data)) staffData = staffRes.data.data;
-          else if (Array.isArray(staffRes?.data)) staffData = staffRes.data;
-          else if (Array.isArray(staffRes)) staffData = staffRes;
-          setReceptionistsList(staffData);
-        } catch (error) {
-          console.error("PatientFeedback: Failed to fetch staff data", error);
-        }
-      }
-    };
-    fetchPatients();
-    fetchStaff();
-  }, []);
+      let physioData = [];
+      if (Array.isArray(physiosRes?.data?.data))
+        physioData = physiosRes.data.data;
+      else if (Array.isArray(physiosRes?.data))
+        physioData = physiosRes.data;
+      else if (Array.isArray(physiosRes))
+        physioData = physiosRes;
 
-  // Use real doctors if available in context, else mock
-  const doctorsList = doctorData?.data || [
-    { doctorId: 'd1', doctorName: 'Dr. John Doe' },
-    { doctorId: 'd2', doctorName: 'Dr. Sarah Smith' }
-  ];
+      setTherapistsList(physioData);
+
+      const staffRes = await getAllFrontDeskAPI(hospitalId, branchId);
+
+      let staffData = [];
+      if (Array.isArray(staffRes?.data?.data))
+        staffData = staffRes.data.data;
+      else if (Array.isArray(staffRes?.data))
+        staffData = staffRes.data;
+      else if (Array.isArray(staffRes))
+        staffData = staffRes;
+
+      setReceptionistsList(staffData);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchDoctors = async (branchId) => {
+    try {
+      const hId = sessionStorage.getItem('HospitalId');
+      const res = await getDoctorByClinicIdData(hId, branchId);
+      const data = res?.data || res || [];
+      setDoctorsList(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to fetch doctors', err);
+    }
+  };
+
+  // Local branch change handler removed since it is globally handled by useHospital context
+
+  // Use branch-fetched doctors, fallback to context
+  const activeDoctorsList = doctorsList.length > 0 ? doctorsList : (doctorData?.data || []);
 
   const handlePatientSelect = (selectedOption) => {
     if (selectedOption) {
@@ -218,7 +240,19 @@ const PatientFeedback = () => {
     // Construct payload for backend
     const payload = {
       clinicId: hospitalId,
-      branchId: branchId,
+      branchId: globalBranchId || sessionStorage.getItem('branchId'),
+      patientId: form.patientId,
+      patientName: form.patientName,
+      patientPhone: form.patientPhone,
+      hospitalFeedback: form.hospitalFeedback.rating ? form.hospitalFeedback : null,
+      doctorFeedback: form.doctorFeedback.rating ? form.doctorFeedback : null,
+      therapistFeedback: form.therapistFeedback.rating ? form.therapistFeedback : null,
+      receptionistFeedback: form.receptionistFeedback.rating ? form.receptionistFeedback : null,
+      date: new Date().toISOString()
+    };
+
+    const updatepayload = {
+
       patientId: form.patientId,
       patientName: form.patientName,
       patientPhone: form.patientPhone,
@@ -232,7 +266,7 @@ const PatientFeedback = () => {
     try {
       let res;
       if (isEditing) {
-        res = await updateOverallFeedback(editingId, payload);
+        res = await updateOverallFeedback(editingId, updatepayload);
         showCustomToast(res?.data?.message || 'Feedback updated successfully.', 'success');
       } else {
         res = await createOverallFeedback(payload);
@@ -424,13 +458,15 @@ const PatientFeedback = () => {
           {!isFormVisible ? (
             /* --- Data Table View --- */
             <>
-              <div className="pf-filters">
+              <div className="pf-filters d-flex align-items-center gap-3">
+
                 <input
                   type="text"
                   className="pf-search-input"
                   placeholder="Search by Patient, Mobile, or Staff Name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ marginBottom: "1rem", minWidth: "250px" }}
                 />
               </div>
 
@@ -577,7 +613,7 @@ const PatientFeedback = () => {
                     onChange={(e) => handleSectionChange('doctorFeedback', 'targetId', e.target.value)}
                   >
                     <option value="">-- Choose Doctor --</option>
-                    {doctorsList.map((doc, idx) => (
+                    {activeDoctorsList.map((doc, idx) => (
                       <option key={doc.doctorId || idx} value={doc.doctorId || doc.doctorName}>
                         {doc.doctorName}
                       </option>

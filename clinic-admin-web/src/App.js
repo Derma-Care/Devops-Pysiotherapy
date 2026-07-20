@@ -48,11 +48,11 @@ const App = () => {
     return () => { clearTimeout(fadeTimer); clearTimeout(removeTimer) }
   }, [])
 
-  const data = JSON.parse(localStorage.getItem('selectedHospital') || '{}')
+  const data = JSON.parse(sessionStorage.getItem('selectedHospital') || '{}')
   const hospitalData = data.data;
   console.log(hospitalData, 'hospitalData')
   console.log(data, 'data')
-  const hospitalName = hospitalData?.name || hospitalData?.clinicName || "Kinetix Wellness Care"
+  const hospitalName = hospitalData?.name || hospitalData?.clinicName || "PhysioElite"
   const hospitalLogo = hospitalData?.hospitalLogo
     ? `data:image/webp;base64,${hospitalData.hospitalLogo}`
     : appLogo

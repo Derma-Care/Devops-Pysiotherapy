@@ -15,6 +15,8 @@ import {
 } from './FeedbackAPI';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import Pagination from '../../Utils/Pagination';
+import { GetClinicBranches } from '../Doctors/DoctorAPI';
+import { CFormSelect } from '@coreui/react';
 import './SessionFeedback.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -39,11 +41,10 @@ const RATING_OPTIONS = [
 ];
 
 const SessionFeedback = () => {
-  const { doctorData, addNotification, notifications, setNotifications, setNotificationCount } = useHospital() || {};
+  const { doctorData, addNotification, notifications, setNotifications, setNotificationCount, globalBranchId } = useHospital() || {};
 
   // State for CRUD
   const [sessions, setSessions] = useState([]);
-
 
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -58,8 +59,8 @@ const SessionFeedback = () => {
   // Data for Dropdowns
   const [patients, setPatients] = useState([]);
 
-  const hospitalId = localStorage.getItem('HospitalId');
-  const branchId = localStorage.getItem('branchId');
+  const hospitalId = sessionStorage.getItem('HospitalId');
+  const role = sessionStorage.getItem('role');
 
   // View Modal
   const [viewModalVisible, setViewModalVisible] = useState(false);
@@ -94,8 +95,8 @@ const SessionFeedback = () => {
     rating: '',
     whatWentWell: '',
     improvements: '',
-    clinicId: localStorage.getItem('HospitalId') || '',
-    branchId: localStorage.getItem('branchId') || ''
+    clinicId: sessionStorage.getItem('HospitalId') || '',
+    branchId: ''
   });
 
   const [errors, setErrors] = useState({});
@@ -129,14 +130,13 @@ const SessionFeedback = () => {
     }
   }, [patients]);
 
-  const fetchFeedbackData = async () => {
-    const hId = localStorage.getItem('HospitalId');
-    const bId = localStorage.getItem('branchId');
+  const fetchFeedbackData = async (branchIdOverride = globalBranchId) => {
+    const hId = sessionStorage.getItem('HospitalId');
+    const bId = branchIdOverride || sessionStorage.getItem('branchId');
     if (!hId || !bId) return;
 
     setLoading(true);
     try {
-      // 1. Fetch Patients needing feedback (for dropdown)
       const detailsRes = await getFeedbackDetails(hId, bId);
       const detailsRaw = detailsRes?.data;
       let patientsList = [];
@@ -145,7 +145,6 @@ const SessionFeedback = () => {
       else if (Array.isArray(detailsRaw)) patientsList = detailsRaw;
       setPatients(patientsList);
 
-      // 2. Fetch All Submitted Feedbacks (for table)
       const feedbackRes = await getAllSessionFeedback(hId, bId);
       const feedbackRaw = feedbackRes?.data;
       let feedbackList = [];
@@ -153,18 +152,18 @@ const SessionFeedback = () => {
       else if (feedbackRaw?.data && typeof feedbackRaw.data === 'object') feedbackList = [feedbackRaw.data];
       else if (Array.isArray(feedbackRaw)) feedbackList = feedbackRaw;
       setSessions(feedbackList);
-
     } catch (error) {
       console.error('SessionFeedback: Failed to fetch data', error);
-      // showCustomToast('Failed to load feedback records.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchFeedbackData();
-  }, []);
+    if (globalBranchId) {
+      fetchFeedbackData(globalBranchId);
+    }
+  }, [globalBranchId]);
 
   const doctorsList = doctorData?.data || [];
 
@@ -232,7 +231,7 @@ const SessionFeedback = () => {
     console.log(form)
     const payload = {
       ...form,
-      branchId: localStorage.getItem('branchId') || '',
+      branchId: globalBranchId || sessionStorage.getItem('branchId') || '',
       totalNoOfSessions: total,
       noOfSessionsCompleted: completed,
       halfSessionsCompleted: isHalf,
@@ -270,7 +269,7 @@ const SessionFeedback = () => {
       halfSessionsCompleted: false, fullSessionsCompleted: false,
       rating: '',
       whatWentWell: '', improvements: '',
-      clinicId: localStorage.getItem('HospitalId') || ''
+      clinicId: sessionStorage.getItem('HospitalId') || ''
     });
     setErrors({});
     setIsEditing(false);
@@ -374,13 +373,15 @@ const SessionFeedback = () => {
         <div className="sf-body">
           {!isFormVisible ? (
             <>
-              <div className="sf-filters">
+              <div className="sf-filters d-flex align-items-center gap-3">
+
                 <input
                   type="text"
                   className="sf-search-input"
                   placeholder="Search by Patient, Doctor or Therapist..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ minWidth: '250px' }}
                 />
               </div>
 

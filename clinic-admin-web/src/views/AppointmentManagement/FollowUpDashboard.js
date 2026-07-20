@@ -19,6 +19,7 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
+  CFormSelect
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilArrowRight, cilChevronBottom, cilChevronTop } from '@coreui/icons'
@@ -41,12 +42,19 @@ import { ToastContainer } from 'react-toastify'
 import { useHospital } from '../Usecontext/HospitalContext'
 import ConfirmationModal from '../../components/ConfirmationModal'
 import { showCustomToast } from '../../Utils/Toaster'
+import { GetClinicBranches } from '../Doctors/DoctorAPI'
 
 /* ─── Status list ─────────────────────────────────────────────────────── */
 const followUpStatus = [
   'All', 'Pending', 'Confirmed', 'Due for Investigation',
   'Investigation Done', 'Follow-up Needed', 'Cancelled',
-  'Rescheduled', 'Drop', 'No Reply', 'Completed', 'Follow-up Pending'
+  'Rescheduled', 'Drop', 'No Reply', 'Completed'
+]
+
+const followUpStatusDrop = [
+  'All', 'Pending', 'Confirmed', 'Due for Investigation',
+  'Investigation Done', 'Follow-up Needed', 'Cancelled',
+  'Rescheduled', 'Drop', 'No Reply', 'Completed', 'Follow-up Pending', 'in-progress'
 ]
 
 /* ─── Status colour map ──────────────────────────────────────────────── */
@@ -60,7 +68,7 @@ const statusColorMap = {
   'in progress': { bg: '#e6f1fb', color: '#185fa5', border: '#b5d4f4' },
   inprogress: { bg: '#e6f1fb', color: '#185fa5', border: '#b5d4f4' },
   'follow-up needed': { bg: '#f3f0ff', color: '#5b21b6', border: '#c4b5fd' },
-  'follow up needed': { bg: '#f3f0ff', color: '#5b21b6', border: '#c4b5fd' },
+
   cancelled: { bg: '#fcebeb', color: '#a32d2d', border: '#f4b5b5' },
   rescheduled: { bg: '#fff8e1', color: '#92680a', border: '#f0d080' },
   drop: { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1' },
@@ -166,7 +174,7 @@ export default function FollowupDashboard() {
   const [confirmedCount, setConfirmedCount] = useState(0)
   const [inProgressCount, setInProgressCount] = useState(0)
   const [loading, setLoading] = useState(false)
-  const role = localStorage.getItem('role')
+  const role = sessionStorage.getItem('role')
   const [visible, setVisible] = useState(false)
   const [showReasonModal, setShowReasonModal] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
@@ -183,20 +191,29 @@ export default function FollowupDashboard() {
   const [bookingIdToDelete, setBookingIdToDelete] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [editData, setEditData] = useState(null)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const { globalBranchId } = useHospital() || {}
 
   /* ══════════════════════════════════════════════════════════════════
      INITIAL LOAD
   ══════════════════════════════════════════════════════════════════ */
   useEffect(() => {
-    getInitialCounts()
-  }, [])
+    if (globalBranchId) {
+      setFromDate("");
+      setToDate("");
+      setActiveCard('today');
+      setFilter('All');
+      setCurrentPage(1);
+      getInitialCounts(globalBranchId);
+    }
+  }, [globalBranchId]);
 
-  const getInitialCounts = async () => {
+  const getInitialCounts = async (branchIdOverride = globalBranchId) => {
     setLoading(true)
     try {
       const [todayRes, upcomingRes] = await Promise.all([
-        getBookingsTodayFollowUps(),
-        getUpcomingFollowUps(),
+        getBookingsTodayFollowUps(branchIdOverride),
+        getUpcomingFollowUps(branchIdOverride),
       ])
 
       const today = todayRes.status === 200 && Array.isArray(todayRes?.data?.data)
@@ -232,15 +249,30 @@ export default function FollowupDashboard() {
     try {
       setLoading(true)
 
+      // const payload = {
+      //   bookingId,
+      //   followupStatus: status.toLowerCase(),
+      //   reason,
+      //   ...((status.toLowerCase() === "investigation done" ||
+      //     status.toLowerCase() === "due for investigation") && {
+      //     status,
+      //   }),
+      // }
       const payload = {
         bookingId,
         followupStatus: status.toLowerCase(),
-        reason,
-        ...((status.toLowerCase() === "investigation done" ||
-          status.toLowerCase() === "due for investigation") && {
-          status,
-        }),
-      }
+        reasonForCancel: reason,
+        ...(
+          [
+            "investigation done",
+            "due for investigation",
+            "cancelled",
+            "rescheduled", "drop"
+          ].includes(status.toLowerCase()) && {
+            status,
+          }
+        ),
+      };
       if (
         status === "Investigation Done" ||
         status === "Due for Investigation"
@@ -256,15 +288,15 @@ export default function FollowupDashboard() {
 
       // ✅ refresh current tab data
       if (activeCard === "upcoming") {
-        await getUpcomingAppointments()
+        await getUpcomingAppointments(globalBranchId)
       } else if (activeCard === "confirmed") {
-        const data = await getTodayFollowUps()
+        const data = await getTodayFollowUps(globalBranchId)
         setRows(data.filter((r) => rowMatchesStatus(r, "confirmed")))
       } else if (activeCard === "inprogress") {
-        const data = await getTodayFollowUps()
+        const data = await getTodayFollowUps(globalBranchId)
         setRows(data.filter((r) => rowMatchesStatus(r, "in progress")))
       } else {
-        await getTodayFollowUps()
+        await getTodayFollowUps(globalBranchId)
       }
     } catch (error) {
       console.error("Update failed:", error)
@@ -288,9 +320,9 @@ export default function FollowupDashboard() {
       showCustomToast('Appointment deleted successfully', 'success')
 
       // Refresh data
-      if (activeCard === 'today') await getTodayFollowUps()
-      else if (activeCard === 'upcoming') await getUpcomingAppointments()
-      else await getInitialCounts()
+      if (activeCard === 'today') await getTodayFollowUps(globalBranchId)
+      else if (activeCard === 'upcoming') await getUpcomingAppointments(globalBranchId)
+      else await getInitialCounts(globalBranchId)
 
     } catch (error) {
       console.error('Delete failed:', error)
@@ -310,7 +342,7 @@ export default function FollowupDashboard() {
   const fetchSlots = async (doctorId, branchId) => {
     try {
       setLoadingSlots(true)
-      const hospitalId = localStorage.getItem('HospitalId')
+      const hospitalId = sessionStorage.getItem('HospitalId')
       const response = await axios.get(
         `${BASE_URL}/getDoctorSlots/${hospitalId}/${branchId}/${doctorId}`
       )
@@ -350,10 +382,10 @@ export default function FollowupDashboard() {
   const visibleSlots = showAllSlots ? sortedSlots : sortedSlots.slice(0, 12)
 
   /* ── Today ────────────────────────────────────────────────────────── */
-  const getTodayFollowUps = async () => {
+  const getTodayFollowUps = async (branchIdOverride = globalBranchId) => {
     setLoading(true)
     try {
-      const res = await getBookingsTodayFollowUps()
+      const res = await getBookingsTodayFollowUps(branchIdOverride)
       if (res.status === 200) {
         const d = Array.isArray(res?.data?.data) ? res.data.data : []
         setRows(d)
@@ -377,12 +409,12 @@ export default function FollowupDashboard() {
   }
 
   /* ── 1 Week ───────────────────────────────────────────────────────── */
-  const getUpcomingAppointments = async () => {
+  const getUpcomingAppointments = async (branchIdOverride = globalBranchId) => {
     setLoading(true)
     try {
       const [upcomingRes, todayRes] = await Promise.all([
-        getUpcomingFollowUps(),
-        getBookingsTodayFollowUps(),
+        getUpcomingFollowUps(branchIdOverride),
+        getBookingsTodayFollowUps(branchIdOverride),
       ])
       const upcoming = upcomingRes.status === 200 && Array.isArray(upcomingRes?.data?.data)
         ? upcomingRes.data.data : []
@@ -407,11 +439,11 @@ export default function FollowupDashboard() {
   }
 
   /* ── Date range ───────────────────────────────────────────────────── */
-  const getDateRangeAppointments = async () => {
+  const getDateRangeAppointments = async (branchIdOverride = globalBranchId) => {
     if (!fromDate || !toDate) return
     setLoading(true)
     try {
-      const res = await getDateRangeFollowUps(fromDate, toDate)
+      const res = await getDateRangeFollowUps(fromDate, toDate, branchIdOverride)
       const d = Array.isArray(res?.data?.data)
         ? res.data.data
         : Array.isArray(res?.data) ? res.data : []
@@ -537,6 +569,7 @@ export default function FollowupDashboard() {
           </div>
 
           <div className="wd-header-right">
+            {/* Global branch dropdown is in AppBreadcrumb now */}
             <div className="cm-search-wrapper" style={{ minWidth: '250px', marginLeft: '0' }}>
               <Search size={14} className="cm-search-icon-left" />
               <input
@@ -660,7 +693,7 @@ export default function FollowupDashboard() {
                 value={filter} className="wd-select"
                 onChange={e => { setFilter(e.target.value); setCurrentPage(1) }}
               >
-                {followUpStatus.map(s => <option key={s}>{s}</option>)}
+                {followUpStatusDrop.map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
 
@@ -718,7 +751,9 @@ export default function FollowupDashboard() {
                 paginatedRows.map((row, index) => {
                   const st = getStatusStyle(row.status)
                   const isExpanded = expandedRow === row.bookingId
-
+                  const isDisabled = ['cancelled', 'drop'].includes(
+                    row?.status?.toLowerCase()
+                  );
                   return (
                     <React.Fragment key={row.bookingId}>
                       {/* Main Row */}
@@ -774,9 +809,9 @@ export default function FollowupDashboard() {
                             onChange={(e) => {
                               const value = e.target.value
 
+                              setSelectedRow(row)
+                              setSelectedStatus(value)
                               if (value === 'Rescheduled' || value === 'Cancelled') {
-                                setSelectedRow(row)
-                                setSelectedStatus(value)
 
                                 if (value === 'Rescheduled') {
                                   fetchSlots(row.doctorId, row.branchId)
@@ -784,12 +819,20 @@ export default function FollowupDashboard() {
 
                                 setShowReasonModal(true)
                               } else {
-                                updatePaymentStatus(row.bookingId, value, row)
+                                setShowConfirmModal(true)
+                                // updatePaymentStatus(row.bookingId, value, row)
                               }
+                            }}
+                            // disabled={row?.status?.toLowerCase() === 'cancelled'}
+                            disabled={isDisabled}
+                            style={{
+                              backgroundColor: isDisabled ? '#e9ecef' : '#fff',
+                              color: isDisabled ? '#6c757d' : '#212529',
+                              cursor: isDisabled ? 'not-allowed' : 'pointer',
                             }}
                           >
                             {followUpStatus.slice(1).map((s) => (
-                              <option key={s} value={s}>
+                              <option key={s} value={s} >
                                 {s}
                               </option>
                             ))}
@@ -929,7 +972,30 @@ export default function FollowupDashboard() {
             </CTableBody>
           </CTable>
         </div>
+        <ConfirmationModal
+          isVisible={showConfirmModal}
+          title="Update Follow-up Status"
+          message={`Are you sure you want to change the follow-up status to "${selectedStatus}"?`}
+          confirmText="Yes, Update"
+          cancelText="Cancel"
+          confirmColor="primary"
+          onConfirm={async () => {
+            await updatePaymentStatus(
+              selectedRow.bookingId,
+              selectedStatus,
+              selectedRow
+            )
 
+            setShowConfirmModal(false)
+            setSelectedRow(null)
+            setSelectedStatus('')
+          }}
+          onCancel={() => {
+            setShowConfirmModal(false)
+            setSelectedRow(null)
+            setSelectedStatus('')
+          }}
+        />
         {/* ── PAGINATION ────────────────────────────────────────────── */}
         {!loading && list.length > 0 && (
           <Pagination
