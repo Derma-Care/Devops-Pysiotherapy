@@ -22,6 +22,8 @@ import { cilCloudDownload, cilImage } from '@coreui/icons';
 import ConfirmationModal from "../../components/ConfirmationModal";
 import Pagination from '../../Utils/Pagination';
 import { useHospital } from '../Usecontext/HospitalContext';
+import { GetClinicBranches } from '../Doctors/DoctorAPI';
+import { CFormSelect } from '@coreui/react';
 
 
 // ─── Dropdown Constants ─────────────────────────────────────────────────────
@@ -50,7 +52,7 @@ const EMPTY_FORM = {
 };
 
 const EquipmentManagement = () => {
-  const { setNotifications, setNotificationCount } = useHospital() || {};
+  const { setNotifications, setNotificationCount, globalBranchId } = useHospital() || {};
   const [equipment, setEquipment] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isFormVisible, setIsFormVisible] = useState(false);
@@ -76,6 +78,8 @@ const EquipmentManagement = () => {
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+
+  const role = sessionStorage.getItem('role');
 
   // ─── Derived Stats ─────────────────────────────────────────────────────────
   const stats = useMemo(() => ({
@@ -150,11 +154,16 @@ const EquipmentManagement = () => {
 
   // ─── Fetch Real Data ────────────────────────────────────────────────────────
   useEffect(() => {
-    fetchEquipmentData();
     if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
       Notification.requestPermission();
     }
   }, []);
+
+  useEffect(() => {
+    if (globalBranchId) {
+      fetchEquipmentData(globalBranchId);
+    }
+  }, [globalBranchId]);
 
   // Send consolidated Local Browser Notification
   useEffect(() => {
@@ -203,16 +212,14 @@ const EquipmentManagement = () => {
     });
   }, [activeNotifications, setNotifications, setNotificationCount]);
 
-  const fetchEquipmentData = async () => {
+  const fetchEquipmentData = async (branchIdOverride = globalBranchId) => {
     try {
-      const clinicId = localStorage.getItem('HospitalId');
-      const branchId = localStorage.getItem('branchId');
+      const clinicId = sessionStorage.getItem('HospitalId');
+      const branchId = branchIdOverride || sessionStorage.getItem('branchId');
       if (!clinicId || !branchId) return;
 
       const res = await getAllEquipment(clinicId, branchId);
-      // Assuming res.data.data or res.data contains the list of equipment
       const data = res?.data?.data || res?.data || [];
-      // If it's not an array, default to empty array
       setEquipment(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch equipment", error);
@@ -226,8 +233,8 @@ const EquipmentManagement = () => {
     setLoading(true);
 
     try {
-      const clinicId = localStorage.getItem('HospitalId');
-      const branchId = localStorage.getItem('branchId');
+      const clinicId = sessionStorage.getItem('HospitalId');
+      const branchId = globalBranchId || sessionStorage.getItem('branchId');
 
       // Preserve image: new upload takes priority, else keep existing imageUrl or image from backend
       const existingImage = form.imageUrl || form.image || form.equipmentImage || '';
@@ -449,8 +456,8 @@ const EquipmentManagement = () => {
       {/* ── Main Content ── */}
       {!isFormVisible ? (
         <>
-          {/* Filters */}
-          <div className="em-filters">
+          <div className="em-filters d-flex align-items-center gap-3">
+
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1, maxWidth: '340px' }}>
               <input
                 className="em-search"

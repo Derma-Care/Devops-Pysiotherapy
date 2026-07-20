@@ -24,6 +24,7 @@ import { Edit2, Eye, Search, Trash2, UserPlus, Users, X } from 'lucide-react'
 import LoadingIndicator from '../../Utils/loader'
 import { useGlobalSearch } from '../Usecontext/GlobalSearchContext'
 import ConfirmationModal from '../../components/ConfirmationModal'
+import { GetClinicBranches } from '../Doctors/DoctorAPI'
 import { useHospital } from '../Usecontext/HospitalContext'
 import { emailPattern } from '../../Constant/Constants'
 import { showCustomToast } from '../../Utils/Toaster'
@@ -75,13 +76,15 @@ const CustomerManagement = () => {
   const [selectedPO, setSelectedPO] = useState(null)
   const pincodeTimer = useRef(null)
 
-  const { user } = useHospital()
+  const [branches, setBranches] = useState([]);
+  const { user, globalBranchId } = useHospital()
   const can = (feature, action) => user?.permissions?.[feature]?.includes(action)
+  const role = sessionStorage.getItem('role');
 
   const emptyForm = {
-    hospitalId: localStorage.getItem('HospitalId') || '',
-    hospitalName: localStorage.getItem('HospitalName') || '',
-    branchId: localStorage.getItem('branchId') || '',
+    hospitalId: sessionStorage.getItem('HospitalId') || '',
+    hospitalName: sessionStorage.getItem('HospitalName') || '',
+    branchId: sessionStorage.getItem('branchId') || '',
     customerId: '', title: '', firstName: '', lastName: '',
     fullName: '', mobileNumber: '', gender: '', email: '',
     dateOfBirth: '', referredBy: '', age: '',
@@ -122,16 +125,20 @@ const CustomerManagement = () => {
 
   useEffect(() => () => { if (pincodeTimer.current) clearTimeout(pincodeTimer.current) }, [])
 
-  const fetchCustomers = useCallback(async () => {
+  const fetchCustomers = useCallback(async (branchIdOverride = globalBranchId) => {
     setLoading(true); setError(null)
     try {
-      const data = await CustomerData()
+      const data = await CustomerData(branchIdOverride)
       setCustomerData(Array.isArray(data) ? data.filter(Boolean) : [])
     } catch { setError('Failed to fetch customer data.'); setCustomerData([]) }
     finally { setLoading(false) }
-  }, [])
+  }, [globalBranchId])
 
-  useEffect(() => { fetchCustomers() }, [fetchCustomers])
+  useEffect(() => {
+    if (globalBranchId) {
+      fetchCustomers(globalBranchId);
+    }
+  }, [globalBranchId, fetchCustomers])
 
   const TITLES = ['Mr.', 'Mrs.', 'Miss.', 'Ms.', 'Mx.', 'Dr.', 'Prof.', 'Rev.', 'Capt.', 'Col.']
 
@@ -178,9 +185,9 @@ const CustomerManagement = () => {
       dateOfBirth: formattedDate,
       referredBy: customer.referredBy || '',
       age: customer.age || '',
-      hospitalId: localStorage.getItem('HospitalId') || '',
-      hospitalName: localStorage.getItem('HospitalName') || '',
-      branchId: localStorage.getItem('branchId') || '',
+      hospitalId: sessionStorage.getItem('HospitalId') || '',
+      hospitalName: sessionStorage.getItem('HospitalName') || '',
+      branchId: sessionStorage.getItem('branchId') || '',
       address: {
         houseNo: customer.address?.houseNo || '',
         street: customer.address?.street || '',
@@ -270,9 +277,9 @@ const CustomerManagement = () => {
       const updated = {
         ...formData,
         fullName: [formData.title, formData.firstName, formData.lastName].filter(Boolean).join(' '),
-        hospitalId: localStorage.getItem('HospitalId') || formData.hospitalId,
-        hospitalName: localStorage.getItem('HospitalName') || formData.hospitalName,
-        branchId: localStorage.getItem('branchId') || formData.branchId,
+        hospitalId: sessionStorage.getItem('HospitalId') || formData.hospitalId,
+        hospitalName: sessionStorage.getItem('HospitalName') || formData.hospitalName,
+        branchId: globalBranchId || sessionStorage.getItem('branchId') || formData.branchId,
       }
       if (updated.dateOfBirth) {
         const d = new Date(updated.dateOfBirth)
@@ -287,7 +294,7 @@ const CustomerManagement = () => {
         await addCustomer(updated)
         showCustomToast('Customer added successfully', 'success')
       }
-      fetchCustomers(); handleCancel()
+      fetchCustomers(); handleCancel();
     } catch (error) {
       if (error?.response?.status === 409) showCustomToast('Customer already exists with this mobile or email', 'error')
       else showCustomToast('Something went wrong', 'error')
@@ -343,20 +350,24 @@ const CustomerManagement = () => {
                 <p className="cm-page-sub">{filteredData.length} Patient{filteredData.length !== 1 ? 's' : ''} found</p>
               </div>
             </div>
-            <div className="cm-search-wrapper">
-              <Search size={14} className="cm-search-icon-left" />
-              <input
-                type="text"
-                placeholder="Search patients..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="cm-search-input"
-              />
-              {searchQuery && (
-                <button className="cm-search-clear" onClick={() => setSearchQuery('')}>
-                  <X size={14} />
-                </button>
-              )}
+
+            <div className="d-flex align-items-center gap-3">
+
+              <div className="cm-search-wrapper" style={{ margin: 0 }}>
+                <Search size={14} className="cm-search-icon-left" />
+                <input
+                  type="text"
+                  placeholder="Search patients..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="cm-search-input"
+                />
+                {searchQuery && (
+                  <button className="cm-search-clear" onClick={() => setSearchQuery('')}>
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
             </div>
             {can('Patient Management', 'create') && (
               <button className="cm-add-btn" onClick={() => { setIsAdding(true); resetForm() }}>

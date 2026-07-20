@@ -25,7 +25,7 @@ import {
   CDropdownToggle,
   CDropdownMenu,
   CDropdownItem,
-
+  CFormSelect
 }
 
   from '@coreui/react'
@@ -41,10 +41,10 @@ import BookAppointmentModal from './BookAppointmentModal'
 import Select from 'react-select'
 import { COLORS } from '../../Constant/Themes'
 import { useGlobalSearch } from '../Usecontext/GlobalSearchContext'
+import { useHospital } from '../Usecontext/HospitalContext'
 import LoadingIndicator from '../../Utils/loader'
 import Pagination from '../../Utils/Pagination'
 import PrintLetterHead from '../../Utils/PrintLetterHead'
-
 import { Edit2, Eye, Loader, Printer, Trash2, Search, X } from "lucide-react"
 const appointmentManagement = () => {
   const [viewService, setViewService] = useState(null)
@@ -70,7 +70,7 @@ const appointmentManagement = () => {
   const itemsPerPage = 7
   const navigate = useNavigate()
   const [sortOrder, setSortOrder] = useState('asc')
-  const role = localStorage.getItem('role') // or from context/state
+  const role = sessionStorage.getItem('role') // or from context/state
   const [localSearch, setLocalSearch] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
 
@@ -87,10 +87,12 @@ const appointmentManagement = () => {
     { label: 'Dropped', value: 'Dropped' },
   ]
 
-  const fetchAppointments = async () => {
+  const { globalBranchId } = useHospital() || {};
+
+  const fetchAppointments = async (branchIdOverride = globalBranchId) => {
     try {
-      const hospitalId = localStorage.getItem('HospitalId')
-      console.log('Hospital ID from localStorage:', hospitalId)
+      const hospitalId = sessionStorage.getItem('HospitalId')
+      console.log('Hospital ID from sessionStorage:', hospitalId)
 
       if (!hospitalId) {
         setBookings([])
@@ -99,7 +101,7 @@ const appointmentManagement = () => {
       }
       console.log('Appointments for this Hospital:', hospitalId)
 
-      const filteredDataResponse = await GetBookingByClinicIdData(hospitalId)
+      const filteredDataResponse = await GetBookingByClinicIdData(hospitalId, branchIdOverride)
       console.log('Appointments for this Hospital:', filteredDataResponse)
 
       setBookings(filteredDataResponse.data || [])
@@ -137,11 +139,10 @@ const appointmentManagement = () => {
   // }
   const [printData, setPrintData] = useState(null)
   useEffect(() => {
-    const hospitalId = localStorage.getItem('HospitalId')
-    if (hospitalId) {
-      fetchAppointments()
+    if (globalBranchId) {
+      fetchAppointments(globalBranchId);
     }
-  }, [localStorage.getItem('HospitalId')])
+  }, [globalBranchId]);
 
   //filtering
   useEffect(() => {
@@ -385,7 +386,10 @@ const appointmentManagement = () => {
   return (
     <div style={{ overflow: 'hidden' }}>
       <div className="container ">
-        <h2 className='mb-4'>Appointments</h2>
+        <div className="d-flex align-items-center justify-content-between mb-4">
+          <h2>Appointments</h2>
+          {/* Global branch dropdown is in AppBreadcrumb now */}
+        </div>
         <div className="mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
 
 

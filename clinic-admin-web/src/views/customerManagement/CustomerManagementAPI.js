@@ -11,9 +11,9 @@ import {
 import { http } from '../../Utils/Interceptors'
 
 // Fetch all customers
-export const CustomerData = async () => {
-  const hospitalId = localStorage.getItem('HospitalId')
-  const branchId = localStorage.getItem('branchId')
+export const CustomerData = async (branchIdOverride) => {
+  const hospitalId = sessionStorage.getItem('HospitalId')
+  const branchId = branchIdOverride || sessionStorage.getItem('branchId')
   try {
     const url = `${BASE_URL}/${GetAllCustomers}/${hospitalId}/${branchId}`
     const response = await http.get(url) //TODO:chnage when apigetway call axios to http

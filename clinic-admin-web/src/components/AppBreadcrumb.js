@@ -1,12 +1,13 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import routes from '../routes'
-import { CBreadcrumb, CBreadcrumbItem } from '@coreui/react'
+import { CBreadcrumb, CBreadcrumbItem, CFormSelect } from '@coreui/react'
 import BackButton from '../views/widgets/BackButton'
+import { useHospital } from '../views/Usecontext/HospitalContext'
 
 const AppBreadcrumb = () => {
   const currentLocation = useLocation().pathname
-
+  const { globalBranchId, branches, changeBranch, role } = useHospital() || {}
   const getRouteName = (pathname, routes) => {
     const currentRoute = routes.find((route) => route.path === pathname)
     return currentRoute ? currentRoute.name : false
@@ -36,6 +37,7 @@ const AppBreadcrumb = () => {
     fontSize: '0.775rem',
     fontWeight: 400,
   })
+  // No local branch changes needed anymore since it is globally handled by useHospital context
 
   return (
     <div
@@ -117,6 +119,28 @@ const AppBreadcrumb = () => {
           )}
         </CBreadcrumb>
       </div>
+      {branches?.length > 1 && role?.toLowerCase() === 'admin' && (
+        <div style={{ width: "200px" }}>
+          <CFormSelect
+            value={globalBranchId}
+            onChange={(e) => changeBranch(e.target.value)}
+            style={{
+              fontSize: '13px',
+              borderRadius: '8px',
+              border: '0.5px solid #d0dce9',
+              color: '#374151',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+              padding: '6px 12px'
+            }}
+          >
+            {branches.map((branch) => (
+              <option key={branch.branchId} value={branch.branchId}>
+                {branch.branchName}
+              </option>
+            ))}
+          </CFormSelect>
+        </div>
+      )}
     </div>
   )
 }

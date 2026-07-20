@@ -6,6 +6,7 @@ import {
   CTableRow,
   CTableHeaderCell,
   CTableDataCell,
+  CFormSelect,
 } from '@coreui/react'
 import { AppointmentData } from '../AppointmentManagement/appointmentAPI'
 import { useNavigate } from 'react-router-dom'
@@ -13,6 +14,7 @@ import LoadingIndicator from '../../Utils/loader'
 import { useHospital } from '../Usecontext/HospitalContext'
 import Pagination from '../../Utils/Pagination'
 import { ClipboardList, SlidersHorizontal, Search, Calendar, X } from 'lucide-react'
+import { GetClinicBranches } from '../Doctors/DoctorAPI'
 
 const normalize = (value) => value?.toLowerCase().trim()
 
@@ -46,17 +48,17 @@ const ReportsManagement = () => {
   const [selectedAppointment] = useState([])
 
   const navigate = useNavigate()
-  const { user } = useHospital()
+  const { user, globalBranchId } = useHospital()
   const can = (feature, action) => user?.permissions?.[feature]?.includes(action)
+  const role = sessionStorage.getItem('role');
 
   // ── FETCH ──────────────────────────────────
-  const fetchAppointments = async (hospitalId) => {
+  const fetchAppointments = async (branchIdOverride = globalBranchId) => {
     try {
       setLoading(true)
-      const data = await AppointmentData()
+      const data = await AppointmentData(branchIdOverride)
       if (data?.data) {
-        const relevant = data.data
-        setBookings(relevant || [])
+        setBookings(data.data || [])
       }
     } catch (err) {
       console.error('Failed to fetch appointments:', err)
@@ -68,9 +70,10 @@ const ReportsManagement = () => {
   }
 
   useEffect(() => {
-    const hospitalId = localStorage.getItem('HospitalId')
-    fetchAppointments(hospitalId || null)
-  }, [])
+    if (globalBranchId) {
+      fetchAppointments(globalBranchId)
+    }
+  }, [globalBranchId]);
 
   // ── FILTER ─────────────────────────────────
   useEffect(() => {
@@ -140,6 +143,7 @@ const ReportsManagement = () => {
 
         {/* ── Filters ─────────────────────────── */}
         <div className="rp-filter-group">
+
           {/* Name Search */}
           <div className="rp-search-wrap">
             <Search size={14} className="rp-search-icon" />

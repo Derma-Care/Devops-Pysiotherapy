@@ -102,10 +102,12 @@ const DoctorManagement = () => {
     doctorData,
     errorMessage,
     setDoctorData,
-    fetchDoctors
+    fetchDoctors,
+    globalBranchId,
+    branches,
+    user,
   } = useHospital()
 
-  const { user } = useHospital()
   const can = (feature, action) => user?.permissions?.[feature]?.includes(action)
 
   const [modalVisible, setModalVisible] = useState(false)
@@ -123,8 +125,6 @@ const DoctorManagement = () => {
   const [serviceOptions, setServiceOptions] = useState([])
   const [serviceOptionsFormatted, setServiceOptionsFormatted] = useState([])
   const [category, setCategory] = useState([])
-  const [branchOptions, setBranchOptions] = useState([])
-  const [branchLoading, setBranchLoading] = useState(false)
   const [isSubServiceComplete, setIsSubServiceComplete] = useState(true)
   const [formErrors, setFormErrors] = useState({})
   const [errors, setErrors] = useState({})
@@ -139,6 +139,7 @@ const DoctorManagement = () => {
   const [enabledTypes, setEnabledTypes] = useState({
     inClinic: false, online: false, serviceTreatment: false,
   })
+  const role = sessionStorage.getItem('role');
 
   const [form, setForm] = useState(initialForm)
 
@@ -212,20 +213,10 @@ const DoctorManagement = () => {
   }
 
   useEffect(() => {
-    let mounted = true
-
-    const loadDoctors = async () => {
-      if (mounted) {
-        await fetchDoctors()
-      }
+    if (globalBranchId) {
+      fetchDoctors(globalBranchId)
     }
-
-    loadDoctors()
-
-    return () => {
-      mounted = false
-    }
-  }, [])
+  }, [globalBranchId, fetchDoctors])
 
   // const fetchSubServices = async (serviceIds) => {
   //   if (!Array.isArray(serviceIds) || serviceIds.length === 0) return
@@ -259,26 +250,13 @@ const DoctorManagement = () => {
   //   } catch { /* ignore */ }
   // }
 
-  useEffect(() => {
-    const fetchAll = async () => {
-      const clinicId = localStorage.getItem('HospitalId')
-      try {
-        setLoading(true)
-        // await fetchData()
-        setBranchLoading(true)
-        const res = await GetClinicBranches(clinicId)
-        const branches = res.data || []
-        setBranchOptions(branches.map((b) => ({ value: b.branchId || b.id || b.name, label: b.branchName || b.name })))
-      } catch { setShowErrorMessage('Failed to fetch data') }
-      finally { setLoading(false); setBranchLoading(false) }
-    }
-    fetchAll()
-  }, [])
+  // Cleaned up local branch API fetching since branches are supplied by HospitalContext
 
+  const branchOptions = (branches || []).map((b) => ({ value: b.branchId || b.id || b.name, label: b.branchName || b.name }))
   const categoryOptions = category.map((c) => ({ value: c.categoryId, label: c.categoryName }))
 
   const checkSubServiceDetails = async (ids) => {
-    const hospitalId = localStorage.getItem('HospitalId')
+    const hospitalId = sessionStorage.getItem('HospitalId')
     for (const id of ids) {
       const data = await getSubServiceById(hospitalId, id)
       if (!data || !data.price || !data.finalCost) { setIsSubServiceComplete(false); return }
@@ -385,8 +363,8 @@ const DoctorManagement = () => {
     if (!validateDoctorForm()) { setIsSaving(false); return }
 
     try {
-      const hospitalId = localStorage.getItem('HospitalId')
-      const hospitalName = localStorage.getItem('HospitalName')
+      const hospitalId = sessionStorage.getItem('HospitalId')
+      const hospitalName = sessionStorage.getItem('HospitalName')
       const validIds = subServiceOptions.map((s) => s.subServiceId)
       // const selectedSubServiceObjects = subServiceOptions
       //   .filter((s) => selectedSubService.includes(s.subServiceId) && validIds.includes(s.subServiceId))
@@ -420,8 +398,8 @@ const DoctorManagement = () => {
       }
 
       const payload = {
-        branchId: localStorage.getItem('branchId'),
-        createdBy: localStorage.getItem('staffId') || 'admin',
+        branchId: globalBranchId || sessionStorage.getItem('branchId'),
+        createdBy: sessionStorage.getItem('staffId') || 'admin',
         hospitalId,
         doctorPicture: uploadedDoctorPicture,
         doctorSignature: uploadedDoctorSignature,
@@ -471,7 +449,7 @@ const DoctorManagement = () => {
         showCustomToast(response.data.message || 'Doctor added successfully', 'success')
         resetForm()
         setModalVisible(false)
-        fetchDoctors()
+        fetchDoctors(globalBranchId)
       } else throw new Error(response.data?.message || 'Failed to add doctor')
     } catch (error) {
       showCustomToast(error?.response?.data?.message || error.message || 'Something went wrong', 'error')
@@ -562,7 +540,6 @@ const DoctorManagement = () => {
     <div className="dm-wrapper">
       {/* <ToastContainer /> */}
 
-      {/* Add Doctor button & Search bar */}
       <div className="dm-top-bar">
         <div className="dm-search-wrapper">
           <Search size={14} className="dm-search-icon-left" />

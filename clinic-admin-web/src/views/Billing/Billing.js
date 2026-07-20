@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import {
+  CButton,
   CCard,
   CCardBody,
   CCardHeader,
@@ -11,6 +12,9 @@ import { AppointmentData } from '../AppointmentManagement/appointmentAPI'
 import Select from 'react-select'
 import ProgramPayment from '../AppointmentManagement/PaymentProgram'
 import { COLORS } from '../../Constant/Themes'
+import LoadingIndicator from '../../Utils/loader'
+import { useHospital } from '../Usecontext/HospitalContext'
+import { useNavigate } from 'react-router-dom'
 
 /* ── status badge config ── */
 const STATUS_CONFIG = {
@@ -31,6 +35,8 @@ const formatDate = (dateStr) => {
 
 /* ── custom option renderer for react-select ── */
 const BookingOption = ({ data, innerRef, innerProps, isFocused, isSelected }) => {
+
+
   const b = data.value
   const s = statusStyle(b.status)
   return (
@@ -165,13 +171,20 @@ export default function Billing() {
   const [allData, setAllData] = useState([])      // all bookings (for stat counts)
   const [loading, setLoading] = useState(true)
   const [selectedBooking, setSelectedBooking] = useState(null)
+  const navigate = useNavigate()
+  const role = sessionStorage.getItem('role');
+  const { globalBranchId } = useHospital() || {};
 
-  useEffect(() => { fetchBookings() }, [])
+  useEffect(() => {
+    if (globalBranchId) {
+      fetchBookings(globalBranchId);
+    }
+  }, [globalBranchId]);
 
-  const fetchBookings = async () => {
+  const fetchBookings = async (branchIdOverride = globalBranchId) => {
     try {
       setLoading(true)
-      const res = await AppointmentData()
+      const res = await AppointmentData(branchIdOverride)
       const data = res?.data || []
       setAllData(data)                          // keep full list for counts
       setBookings(data)                         // show all in dropdown
@@ -240,32 +253,35 @@ export default function Billing() {
           </p>
         </div>
 
-        {!loading && (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'row',
-              gap: 12,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {[
-              { key: 'in-progress', label: 'In Progress' },
-              { key: 'due for investigation', label: 'Due for Investigation' },
-            ].map(({ key, label }) => {
-              const s = statusStyle(key);
+        <div className="d-flex align-items-center gap-3">
 
-              return (
-                <StatCard
-                  key={key}
-                  label={label}
-                  value={counts[key] || 0}
-                  accent={s.color}
-                />
-              );
-            })}
-          </div>
-        )}
+          {!loading && (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'row',
+                gap: 12,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {[
+                { key: 'in-progress', label: 'In Progress' },
+                { key: 'due for investigation', label: 'Due for Investigation' },
+              ].map(({ key, label }) => {
+                const s = statusStyle(key);
+
+                return (
+                  <StatCard
+                    key={key}
+                    label={label}
+                    value={counts[key] || 0}
+                    accent={s.color}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
       <div
         style={{
@@ -280,15 +296,14 @@ export default function Billing() {
       {/* <CCard style={{ border: '1px solid #d0dce9', borderRadius: 12, overflow: 'visible', marginBottom: 20, boxShadow: '0 2px 8px rgba(27,79,138,0.07)' }}> */}
 
       {/* <CCardBody style={{ padding: '20px' }}> */}
-      <CRow>
-        <CCol md={8} lg={6}>
-          {loading ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#666', fontSize: 13 }}>
-              <CSpinner size="sm" style={{ color: COLORS.primary }} />
-              Loading bookings...
-            </div>
-          ) : (
-            <>
+      <CRow style={{ alignItems: 'flex-start', marginBottom: 12 }}>
+        {loading ? (
+          <CCol xs={12}>
+            <LoadingIndicator message="Loading bookings..." />
+          </CCol>
+        ) : (
+          <>
+            <CCol xs={12} md={8} lg={8} xl={9}>
               <Select
                 options={bookingOptions}
                 onChange={(opt) => setSelectedBooking(opt ? opt.value : null)}
@@ -314,9 +329,41 @@ export default function Billing() {
               <p style={{ fontSize: 11, color: '#999', marginTop: 6, marginBottom: 0 }}>
                 {bookings.length} bookings available · search by name, ID, or phone
               </p>
-            </>
-          )}
-        </CCol>
+            </CCol>
+            {/* TODO: deploymenet next Underworking */}
+            {/* <CCol xs={12} md={4} lg={4} xl={3} style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => navigate('/manual-billing')}
+                style={{
+                  width: '100%',
+                  justifyContent: 'center',
+                  background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.sideColor || '#1a3a6b'})`,
+                  color: '#fff',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: 8,
+                  fontWeight: 600,
+                  fontSize: 14,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  boxShadow: '0 4px 12px rgba(27,79,138,0.2)',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  height: 44
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(27,79,138,0.3)'; }}
+                onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(27,79,138,0.2)'; }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Create Manual Bill
+              </button>
+            </CCol> */}
+          </>
+        )}
       </CRow>
 
       {/* Selected booking summary strip */}
