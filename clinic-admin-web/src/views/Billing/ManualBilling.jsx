@@ -11,7 +11,7 @@ import { http } from '../../Utils/Interceptors'
 import ConfirmationModal from '../../components/ConfirmationModal'
 import LoadingIndicator from '../../Utils/loader'
 import { CTable, CTableHead, CTableBody, CTableRow, CTableHeaderCell, CTableDataCell } from '@coreui/react'
-import { Edit, Printer, Download, Trash } from 'lucide-react'
+import { Edit, Printer, Download, Trash, Eye, Banknote } from 'lucide-react'
 import Pagination from '../../Utils/Pagination'
 
 // ---- Design tokens ----
@@ -71,18 +71,19 @@ export default function ManualBilling() {
         if (Array.isArray(doctorData)) {
             return doctorData.map(d => d.doctorName || d.name).filter(Boolean)
         }
-        return DOCTORS
+        return doctorData
     }, [doctorData])
 
     const branchList = useMemo(() => {
         if (branches && Array.isArray(branches)) {
             return branches.map(b => b.branchName || b.name).filter(Boolean)
         }
-        return BRANCHES
+        return branches
     }, [branches])
 
     // Tabs / View State
-    const [viewMode, setViewMode] = useState('create') // 'create' | 'list'
+    const [viewMode, setViewMode] = useState('create') // 'create' | 'list' | 'view'
+    const [viewBillingDetails, setViewBillingDetails] = useState(null)
     const [isEditMode, setIsEditMode] = useState(false)
     const [editBillingId, setEditBillingId] = useState(null)
 
@@ -94,7 +95,7 @@ export default function ManualBilling() {
 
     const [patientName, setPatientName] = useState('')
     const [mobile, setMobile] = useState('')
-
+    const [patientId, setPatientId] = useState('')
     // Core billing fields
     const [doctor, setDoctor] = useState(doctorList[0] || '')
     const [branch, setBranch] = useState(branchList[0] || '')
@@ -106,10 +107,11 @@ export default function ManualBilling() {
     ])
 
     // Payment Info
-    const [paymentMode, setPaymentMode] = useState('')
+    const [paymentMode, setPaymentMode] = useState(PAYMENT_MODES[0])
     const [transactionId, setTransactionId] = useState('')
     const [remarks, setRemarks] = useState('')
     const [paidAmount, setPaidAmount] = useState('')
+    const [previouslyPaidAmount, setPreviouslyPaidAmount] = useState(0)
 
     // Additional info — staffName if staffId present, otherwise role
     const [billingStaff, setBillingStaff] = useState(() => {
@@ -130,6 +132,7 @@ export default function ManualBilling() {
     const [isLoadingBillings, setIsLoadingBillings] = useState(false)
     const [currentPage, setCurrentPage] = useState(1)
     const [rowsPerPage, setRowsPerPage] = useState(10)
+    const [errors, setErrors] = useState({})
 
     const paginatedBillings = useMemo(() => {
         const start = (currentPage - 1) * rowsPerPage;
@@ -239,7 +242,7 @@ export default function ManualBilling() {
         return { subTotal: st, totalDiscount: td, totalTax: tt, grandTotal: gt };
     }, [services]);
 
-    const balance = grandTotal - (Number(paidAmount) || 0)
+    const balance = grandTotal - (Number(previouslyPaidAmount) + (Number(paidAmount) || 0))
 
     const resetForm = () => {
         setBillNo(makeBillingId())
@@ -255,12 +258,14 @@ export default function ManualBilling() {
         setDoctor(doctorList[0] || '')
         setBranch(branchList[0] || '')
         setVisitType('')
-        setPaymentMode('')
+        setPaymentMode(PAYMENT_MODES[0])
         setTransactionId('')
         setRemarks('')
         setPaidAmount('')
+        setPreviouslyPaidAmount(0)
         setNotes('')
         setInternalComments('')
+        setErrors({})
     }
 
     // Appointment Selection Handler
@@ -275,6 +280,7 @@ export default function ManualBilling() {
         setSelectedAppointmentOption(option)
         if (!option) return
         const b = option.value
+        setPatientId(b.patientId || '')
         setPatientName(b.name || b.patientName || '')
         setMobile(b.mobileNumber || b.patientMobileNumber || b.mobile || '')
         if (b.doctorName || b.doctor) setDoctor(b.doctorName || b.doctor)
@@ -290,20 +296,43 @@ export default function ManualBilling() {
                 taxPercent: ''
             }])
             setPaidAmount(val)
+            setPreviouslyPaidAmount(0)
         }
         showToast('Form pre-filled from appointment!')
     }
 
     // CRUD - Create & Update
     const handleSaveBilling = async () => {
-        if (!patientName.trim()) {
-            showToast('Patient Name is required', true)
+        const newErrs = {}
+        if (!patientName.trim()) newErrs.patientName = 'Patient Name is required'
+        if (!mobile.trim() || mobile.length < 10) newErrs.mobile = 'Valid Mobile Number is required'
+        if (!doctor) newErrs.doctor = 'Doctor Name is required'
+        if (!branch) newErrs.branch = 'Branch is required'
+        if (!visitType) newErrs.visitType = 'Visit Type is required'
+        if (!status) newErrs.status = 'Invoice Status is required'
+
+        if (!services || services.length === 0) {
+            showToast('At least one service is required', true)
             return
         }
-        if (!mobile.trim()) {
-            showToast('Mobile Number is required', true)
+        let servicesValid = true
+        for (let i = 0; i < services.length; i++) {
+            if (!services[i].serviceName.trim() || services[i].unitPrice === '' || Number(services[i].unitPrice) < 0) {
+                servicesValid = false
+            }
+        }
+        if (!servicesValid) newErrs.services = 'Service description and valid amount are required for all rows'
+
+        if (!paymentMode) newErrs.paymentMode = 'Payment Mode is required'
+        if (paidAmount === '' || Number(paidAmount) < 0) newErrs.paidAmount = 'Valid Paid Amount is required'
+
+        if (Object.keys(newErrs).length > 0) {
+            setErrors(newErrs)
+            showToast('Please fix the highlighted errors', true)
             return
         }
+        setErrors({})
+
         setIsSaving(true)
         try {
             const cId = sessionStorage.getItem('HospitalId') || '0001'
@@ -315,6 +344,7 @@ export default function ManualBilling() {
                 clinicId: cId,
                 branchId: bId,
                 patient: {
+                    patientId,
                     patientName,
                     mobileNumber: mobile,
                 },
@@ -332,9 +362,26 @@ export default function ManualBilling() {
                 payment: {
                     paymentMode,
                     transactionId,
-                    paidAmount: Number(paidAmount) || 0,
+                    paidAmount: Number(previouslyPaidAmount) + (Number(paidAmount) || 0), // Legacy fallback
                     dueAmount: Math.max(0, balance),
                     remarks,
+                },
+                // New transaction object for backend to append to transaction history
+                newTransaction: Number(paidAmount) > 0 ? {
+                    receiptNo: makeBillingId().replace('BILL-', 'REC-'),
+                    paymentDate: todayStr(),
+                    paymentMode,
+                    transactionId,
+                    amount: Number(paidAmount) || 0,
+                    remarks
+                } : null,
+                paymentSummary: {
+                    subTotal: subTotal,
+                    totalDiscount: totalDiscount,
+                    totalTax: totalTax,
+                    totalAmount: grandTotal,
+                    totalPaid: Number(previouslyPaidAmount) + (Number(paidAmount) || 0),
+                    dueAmount: Math.max(0, balance)
                 },
                 additionalDetails: {
                     billingStaff,
@@ -357,6 +404,7 @@ export default function ManualBilling() {
             setTimeout(() => {
                 resetForm()
                 fetchBillings()
+                setViewMode('list')
             }, 1500)
         } catch (err) {
             console.error('Error saving billing:', err)
@@ -367,7 +415,7 @@ export default function ManualBilling() {
     }
 
     // CRUD - Edit Action — reads from nested API response structure
-    const handleEditBilling = async (bId) => {
+    const handleEditBilling = async (bId, isPayAction = false) => {
         try {
             showToast('Loading billing details...')
             const res = await http.get(`/getBillingById/${bId}`)
@@ -394,10 +442,26 @@ export default function ManualBilling() {
                 setStatus(data.invoiceStatus || 'Draft')
                 setBillDate(data.billDate || todayStr())
                 setInvoiceDate(data.invoiceDate || todayStr())
-                setPaymentMode(data.payment?.paymentMode || '')
-                setTransactionId(data.payment?.transactionId || '')
-                setRemarks(data.payment?.remarks || '')
-                setPaidAmount(data.payment?.paidAmount || 0)
+
+                const totalPaidSoFar = data.paymentSummary?.totalPaid ?? data.payment?.paidAmount ?? 0
+                const currentDue = data.paymentSummary?.dueAmount ?? data.payment?.dueAmount ?? 0
+
+                if (isPayAction) {
+                    // For Pay Action: record previously paid, and default the new payment to the due balance
+                    setPreviouslyPaidAmount(totalPaidSoFar)
+                    setPaidAmount(currentDue)
+                    setPaymentMode(PAYMENT_MODES[0]) // reset to default for new payment
+                    setTransactionId('')
+                    setRemarks('')
+                } else {
+                    // For Edit Action: load existing values
+                    setPreviouslyPaidAmount(0)
+                    setPaidAmount(totalPaidSoFar)
+                    setPaymentMode(data.payment?.paymentMode || PAYMENT_MODES[0])
+                    setTransactionId(data.payment?.transactionId || '')
+                    setRemarks(data.payment?.remarks || '')
+                }
+
                 setBillingStaff(data.additionalDetails?.billingStaff || '')
                 setNotes(data.additionalDetails?.notes || '')
                 setInternalComments(data.additionalDetails?.internalComments || '')
@@ -540,16 +604,18 @@ export default function ManualBilling() {
         }
     }
 
-    const inputStyle = {
+    const inputStyle = (hasError = false) => ({
         width: '100%',
         fontSize: 14.5,
         padding: '10px 14px',
-        border: '1px solid rgba(14,42,50,0.16)',
+        border: `1px solid ${hasError ? CORAL : 'rgba(14,42,50,0.16)'}`,
         borderRadius: 8,
         background: '#fff',
         color: INK,
         outline: 'none',
-    }
+    })
+
+    const ErrorLabel = ({ msg }) => msg ? <div style={{ color: CORAL, fontSize: 11, marginTop: 4, fontWeight: 500 }}>{msg}</div> : null
 
     const cardStyle = {
         background: '#fff',
@@ -733,10 +799,12 @@ export default function ManualBilling() {
                             </div>
                             <div style={{ padding: 20 }} className="mbp-grid">
                                 <Field label="Patient Name" span={6}>
-                                    <input className="mbp-input" style={inputStyle} placeholder="Enter patient full name" value={patientName} onChange={(e) => setPatientName(e.target.value)} />
+                                    <input className="mbp-input" style={inputStyle(errors.patientName)} placeholder="Enter patient full name" value={patientName} onChange={(e) => { setPatientName(e.target.value); if (errors.patientName) setErrors({ ...errors, patientName: null }) }} />
+                                    <ErrorLabel msg={errors.patientName} />
                                 </Field>
                                 <Field label="Mobile Number" span={6}>
-                                    <input className="mbp-input" style={inputStyle} placeholder="10-digit mobile number" value={mobile} onChange={(e) => setMobile(e.target.value)} />
+                                    <input className="mbp-input" style={inputStyle(errors.mobile)} placeholder="10-digit mobile number" value={mobile} onChange={(e) => { setMobile(e.target.value); if (errors.mobile) setErrors({ ...errors, mobile: null }) }} />
+                                    <ErrorLabel msg={errors.mobile} />
                                 </Field>
                             </div>
                         </div>
@@ -750,39 +818,43 @@ export default function ManualBilling() {
                             </div>
                             <div style={{ padding: 20 }} className="mbp-grid">
                                 <Field label="Doctor Name" span={3}>
-                                    <select className="mbp-select" style={inputStyle} value={doctor} onChange={(e) => setDoctor(e.target.value)}>
+                                    <select className="mbp-select" style={inputStyle(errors.doctor)} value={doctor} onChange={(e) => { setDoctor(e.target.value); if (errors.doctor) setErrors({ ...errors, doctor: null }) }}>
                                         <option value="">-- Select Doctor --</option>
                                         {doctorList.map((d) => (
                                             <option key={d}>{d}</option>
                                         ))}
                                     </select>
+                                    <ErrorLabel msg={errors.doctor} />
                                 </Field>
                                 <Field label="Branch" span={3}>
-                                    <select className="mbp-select" style={inputStyle} value={branch} onChange={(e) => setBranch(e.target.value)}>
+                                    <select className="mbp-select" style={inputStyle(errors.branch)} value={branch} onChange={(e) => { setBranch(e.target.value); if (errors.branch) setErrors({ ...errors, branch: null }) }}>
                                         <option value="">-- Select Branch --</option>
                                         {branchList.map((b) => (
                                             <option key={b}>{b}</option>
                                         ))}
                                     </select>
+                                    <ErrorLabel msg={errors.branch} />
                                 </Field>
                                 <Field label="Visit Type" span={3}>
-                                    <select className="mbp-select" style={inputStyle} value={visitType} onChange={(e) => setVisitType(e.target.value)}>
+                                    <select className="mbp-select" style={inputStyle(errors.visitType)} value={visitType} onChange={(e) => { setVisitType(e.target.value); if (errors.visitType) setErrors({ ...errors, visitType: null }) }}>
                                         <option value="">-- Select Type --</option>
                                         {VISIT_TYPES.map((v) => (
                                             <option key={v}>{v}</option>
                                         ))}
                                     </select>
+                                    <ErrorLabel msg={errors.visitType} />
                                 </Field>
                                 <Field label="Bill Date" span={3}>
-                                    <input type="date" className="mbp-input" style={inputStyle} value={billDate} onChange={(e) => setBillDate(e.target.value)} />
+                                    <input type="date" className="mbp-input" style={inputStyle()} value={billDate} onChange={(e) => setBillDate(e.target.value)} />
                                 </Field>
                                 <Field label="Invoice Status" span={4}>
-                                    <select className="mbp-select" style={inputStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
+                                    <select className="mbp-select" style={inputStyle(errors.status)} value={status} onChange={(e) => { setStatus(e.target.value); if (errors.status) setErrors({ ...errors, status: null }) }}>
                                         <option value="">-- Select Status --</option>
                                         {STATUSES.map((s) => (
                                             <option key={s}>{s}</option>
                                         ))}
                                     </select>
+                                    <ErrorLabel msg={errors.status} />
                                 </Field>
                             </div>
                         </div>
@@ -818,13 +890,14 @@ export default function ManualBilling() {
                                                 <CTableDataCell>
                                                     <input
                                                         className="mbp-input"
-                                                        style={inputStyle}
+                                                        style={inputStyle(errors.services && !s.serviceName.trim())}
                                                         placeholder="e.g. Spine Rehab"
                                                         value={s.serviceName}
                                                         onChange={(e) => {
                                                             const newS = [...services];
                                                             newS[idx].serviceName = e.target.value;
                                                             setServices(newS);
+                                                            if (errors.services) setErrors({ ...errors, services: null });
                                                         }}
                                                     />
                                                 </CTableDataCell>
@@ -833,12 +906,13 @@ export default function ManualBilling() {
                                                         type="number"
                                                         min={0}
                                                         className="mbp-input"
-                                                        style={inputStyle}
+                                                        style={inputStyle(errors.services && (s.unitPrice === '' || Number(s.unitPrice) < 0))}
                                                         value={s.unitPrice}
                                                         onChange={(e) => {
                                                             const newS = [...services];
                                                             newS[idx].unitPrice = e.target.value;
                                                             setServices(newS);
+                                                            if (errors.services) setErrors({ ...errors, services: null });
                                                         }}
                                                     />
                                                 </CTableDataCell>
@@ -847,7 +921,7 @@ export default function ManualBilling() {
                                                         type="number"
                                                         min={0} max={100}
                                                         className="mbp-input"
-                                                        style={inputStyle}
+                                                        style={inputStyle()}
                                                         value={s.discountPercent}
                                                         onChange={(e) => {
                                                             const newS = [...services];
@@ -861,7 +935,7 @@ export default function ManualBilling() {
                                                         type="number"
                                                         min={0} max={100}
                                                         className="mbp-input"
-                                                        style={inputStyle}
+                                                        style={inputStyle()}
                                                         value={s.taxPercent}
                                                         onChange={(e) => {
                                                             const newS = [...services];
@@ -887,6 +961,7 @@ export default function ManualBilling() {
                                         ))}
                                     </CTableBody>
                                 </CTable>
+                                <ErrorLabel msg={errors.services} />
                             </div>
                         </div>
 
@@ -934,9 +1009,16 @@ export default function ManualBilling() {
                                         <span>{currency(grandTotal)}</span>
                                     </div>
 
+                                    {previouslyPaidAmount > 0 && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, paddingTop: '12px', color: '#8FE3C0' }}>
+                                            <span>Previously Paid</span>
+                                            <span style={{ fontWeight: 600 }}>{currency(previouslyPaidAmount)}</span>
+                                        </div>
+                                    )}
+
                                     <div
                                         style={{
-                                            marginTop: 14,
+                                            marginTop: previouslyPaidAmount > 0 ? 8 : 14,
                                             borderRadius: 10,
                                             padding: '10px 14px',
                                             background: 'rgba(243,247,246,0.08)',
@@ -954,25 +1036,26 @@ export default function ManualBilling() {
                                                     color: '#383636',
                                                 }}
                                             >
-                                                Paid Amount
+                                                {previouslyPaidAmount > 0 ? 'New Payment' : 'Paid Amount'}
                                             </div>
 
                                             <input
                                                 type="number"
                                                 min={0}
                                                 value={paidAmount}
-                                                onChange={(e) => setPaidAmount(Number(e.target.value) || 0)}
+                                                onChange={(e) => { setPaidAmount(Number(e.target.value) || 0); if (errors.paidAmount) setErrors({ ...errors, paidAmount: null }) }}
                                                 style={{
                                                     width: 110,
                                                     fontSize: 13,
                                                     padding: '6px 8px',
                                                     borderRadius: 6,
-                                                    border: '1px solid #ced4da',
+                                                    border: `1px solid ${errors.paidAmount ? CORAL : '#ced4da'}`,
                                                     background: '#fff',
                                                     color: '#212529',
                                                     outline: 'none',
                                                 }}
                                             />
+                                            {errors.paidAmount && <div style={{ color: CORAL, fontSize: 10, marginTop: 4 }}>Required</div>}
                                         </div>
                                         <div style={{ textAlign: 'right' }}>
                                             <div style={{ fontSize: 11, opacity: 0.7 }}>{balance > 0 ? 'Balance Due' : 'Change Due'}</div>
@@ -1000,16 +1083,17 @@ export default function ManualBilling() {
                                     </div>
                                     <div style={{ padding: 20 }} className="mbp-grid">
                                         <Field label="Payment Mode" span={6}>
-                                            <select className="mbp-select" style={inputStyle} value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
+                                            <select className="mbp-select" style={inputStyle(errors.paymentMode)} value={paymentMode} onChange={(e) => { setPaymentMode(e.target.value); if (errors.paymentMode) setErrors({ ...errors, paymentMode: null }) }}>
                                                 {PAYMENT_MODES.map((m) => (
                                                     <option key={m}>{m}</option>
                                                 ))}
                                             </select>
+                                            <ErrorLabel msg={errors.paymentMode} />
                                         </Field>
                                         <Field label="Transaction ID" span={6}>
                                             <input
                                                 className="mbp-input"
-                                                style={inputStyle}
+                                                style={inputStyle()}
                                                 placeholder="Transaction reference number"
                                                 value={transactionId}
                                                 onChange={(e) => setTransactionId(e.target.value)}
@@ -1019,7 +1103,7 @@ export default function ManualBilling() {
                                             <textarea
                                                 className="mbp-textarea"
                                                 rows={3}
-                                                style={{ ...inputStyle, resize: 'vertical' }}
+                                                style={{ ...inputStyle(), resize: 'vertical' }}
                                                 placeholder="Enter payment logs or remarks"
                                                 value={remarks}
                                                 onChange={(e) => setRemarks(e.target.value)}
@@ -1039,13 +1123,13 @@ export default function ManualBilling() {
                             </div>
                             <div style={{ padding: 20 }} className="mbp-grid">
                                 <Field label="Billing Staff (Dynamic)" span={4}>
-                                    <input className="mbp-input" style={{ ...inputStyle, background: '#f8fafc' }} value={billingStaff} disabled />
+                                    <input className="mbp-input" style={{ ...inputStyle(), background: '#f8fafc' }} value={billingStaff} disabled />
                                 </Field>
                                 <Field label="Public Notes (Prints on Bill)" span={4}>
-                                    <input className="mbp-input" style={inputStyle} value={notes} onChange={(e) => setNotes(e.target.value)} />
+                                    <input className="mbp-input" style={inputStyle()} value={notes} onChange={(e) => setNotes(e.target.value)} />
                                 </Field>
                                 <Field label="Internal Comments" span={4}>
-                                    <input className="mbp-input" style={inputStyle} value={internalComments} onChange={(e) => setInternalComments(e.target.value)} />
+                                    <input className="mbp-input" style={inputStyle()} value={internalComments} onChange={(e) => setInternalComments(e.target.value)} />
                                 </Field>
                             </div>
                         </div>
@@ -1086,6 +1170,93 @@ export default function ManualBilling() {
                             </div>
                         </div>
                     </>
+                ) : viewMode === 'view' && viewBillingDetails ? (
+                    /* Billing View Mode */
+                    <div style={cardStyle}>
+                        <div style={cardHeaderStyle}>
+                            <span style={cardTitleStyle}>
+                                <span style={dot(TEAL)} /> Billing Details & Transaction History
+                            </span>
+                            <button className="mbp-btn" onClick={() => setViewMode('list')} style={{ ...btnBase, background: '#f8fafc', color: SLATE, border: '1px solid #e2e8f0' }}>
+                                ← Back to List
+                            </button>
+                        </div>
+                        <div style={{ padding: 20 }}>
+                            <div className="mbp-grid" style={{ marginBottom: 20 }}>
+                                <div style={{ gridColumn: 'span 4' }}>
+                                    <div style={{ fontSize: 11, color: SLATE, textTransform: 'uppercase', fontWeight: 600 }}>Bill No.</div>
+                                    <div style={{ fontSize: 16, fontWeight: 700, color: TEAL }}>{viewBillingDetails.billingId}</div>
+                                </div>
+                                <div style={{ gridColumn: 'span 4' }}>
+                                    <div style={{ fontSize: 11, color: SLATE, textTransform: 'uppercase', fontWeight: 600 }}>Patient Id</div>
+                                    <div style={{ fontSize: 14, fontWeight: 600, color: INK }}>{viewBillingDetails.patient?.patientId || '-'}</div>
+                                </div>
+                                <div style={{ gridColumn: 'span 4' }}>
+                                    <div style={{ fontSize: 11, color: SLATE, textTransform: 'uppercase', fontWeight: 600 }}>Patient Name</div>
+                                    <div style={{ fontSize: 14, fontWeight: 600, color: INK }}>{viewBillingDetails.patient?.patientName || '-'}</div>
+                                </div>
+                                <div style={{ gridColumn: 'span 4' }}>
+                                    <div style={{ fontSize: 11, color: SLATE, textTransform: 'uppercase', fontWeight: 600 }}>Total Amount</div>
+                                    <div style={{ fontSize: 14, fontWeight: 600, color: INK }}>{currency(Number(viewBillingDetails.paymentSummary?.subTotal))}</div>
+                                </div>
+                                <div style={{ gridColumn: 'span 4' }}>
+                                    <div style={{ fontSize: 11, color: SLATE, textTransform: 'uppercase', fontWeight: 600 }}>Total Discount</div>
+                                    <div style={{ fontSize: 14, fontWeight: 600, color: INK }}>{currency(Number(viewBillingDetails.paymentSummary?.totalDiscount))}</div>
+                                </div>
+                                <div style={{ gridColumn: 'span 4' }}>
+                                    <div style={{ fontSize: 11, color: SLATE, textTransform: 'uppercase', fontWeight: 600 }}>Final Amount</div>
+                                    <div style={{ fontSize: 14, fontWeight: 600, color: INK }}>{currency(Number(viewBillingDetails.paymentSummary?.totalAmount))}</div>
+                                </div>
+                                <div style={{ gridColumn: 'span 4' }}>
+                                    <div style={{ fontSize: 11, color: SLATE, textTransform: 'uppercase', fontWeight: 600 }}>Total Paid</div>
+                                    <div style={{ fontSize: 16, fontWeight: 700, color: INK }}>{currency(Number(viewBillingDetails.paymentSummary?.totalPaid))}</div>
+                                </div>
+                                <div style={{ gridColumn: 'span 4' }}>
+                                    <div style={{ fontSize: 11, color: SLATE, textTransform: 'uppercase', fontWeight: 600 }}>Balance Due</div>
+                                    <div style={{ fontSize: 16, fontWeight: 700, color: INK }}>{currency(Number(viewBillingDetails.paymentSummary?.dueAmount))}</div>
+                                </div>
+                            </div>
+                            <h5 style={{ fontSize: 14, fontWeight: 700, color: TEAL_DEEP, marginBottom: 10, borderBottom: '1px solid #eee', paddingBottom: 5 }}>Transaction History</h5>
+                            <CTable striped responsive>
+                                <CTableHead className="pink-table">
+                                    <CTableRow>
+                                        <CTableHeaderCell>Date</CTableHeaderCell>
+                                        <CTableHeaderCell>Receipt No.</CTableHeaderCell>
+                                        <CTableHeaderCell>Payment Mode</CTableHeaderCell>
+                                        <CTableHeaderCell>Transaction ID</CTableHeaderCell>
+                                        <CTableHeaderCell>Paid Amount</CTableHeaderCell>
+                                        {/* <CTableHeaderCell>Due Amount</CTableHeaderCell> */}
+                                        <CTableHeaderCell>Status</CTableHeaderCell>
+                                    </CTableRow>
+                                </CTableHead>
+                                <CTableBody>
+                                    {viewBillingDetails.transactions && viewBillingDetails.transactions.length > 0 ? (
+                                        viewBillingDetails.transactions.map((txn, i) => (
+                                            <CTableRow key={i}>
+                                                <CTableDataCell>{txn.paymentDate || viewBillingDetails.billDate}</CTableDataCell>
+                                                <CTableDataCell style={{ fontWeight: 600 }}>{txn.receiptNo || '-'}</CTableDataCell>
+                                                <CTableDataCell>{txn.paymentMode || '-'}</CTableDataCell>
+                                                <CTableDataCell>{txn.transactionId || '-'}</CTableDataCell>
+                                                <CTableDataCell style={{ color: SAGE, fontWeight: 600 }}>{currency(txn.amount || txn.paidAmount)}</CTableDataCell>
+                                                {/* <CTableDataCell>-</CTableDataCell> */}
+                                                <CTableDataCell>Success</CTableDataCell>
+                                            </CTableRow>
+                                        ))
+                                    ) : (
+                                        <CTableRow>
+                                            <CTableDataCell>{viewBillingDetails.billDate}</CTableDataCell>
+                                            <CTableDataCell style={{ fontWeight: 600 }}>-</CTableDataCell>
+                                            <CTableDataCell>{viewBillingDetails.payment?.paymentMode || '-'}</CTableDataCell>
+                                            <CTableDataCell>{viewBillingDetails.payment?.transactionId || '-'}</CTableDataCell>
+                                            <CTableDataCell style={{ color: SAGE, fontWeight: 600 }}>{currency(viewBillingDetails.payment?.paidAmount)}</CTableDataCell>
+                                            <CTableDataCell style={{ color: CORAL, fontWeight: 600 }}>{currency(viewBillingDetails.payment?.dueAmount)}</CTableDataCell>
+                                            <CTableDataCell>{viewBillingDetails.invoiceStatus || viewBillingDetails.status || 'Draft'}</CTableDataCell>
+                                        </CTableRow>
+                                    )}
+                                </CTableBody>
+                            </CTable>
+                        </div>
+                    </div>
                 ) : (
                     /* Billings History List View */
                     <div style={cardStyle}>
@@ -1109,7 +1280,6 @@ export default function ManualBilling() {
                                     <CTable striped hover responsive>
                                         <CTableHead className="pink-table w-auto">
                                             <CTableRow>
-                                                <CTableHeaderCell>Bill No.</CTableHeaderCell>
                                                 <CTableHeaderCell>Patient Name</CTableHeaderCell>
                                                 <CTableHeaderCell>Mobile</CTableHeaderCell>
                                                 <CTableHeaderCell>Date</CTableHeaderCell>
@@ -1152,7 +1322,7 @@ export default function ManualBilling() {
                                                     setPaymentMode(b.payment?.paymentMode || '')
                                                     setTransactionId(b.payment?.transactionId || '')
                                                     setRemarks(b.payment?.remarks || '')
-                                                    setPaidAmount(b.payment?.paidAmount || 0)
+                                                    setPaidAmount(b.paymentSummary?.totalPaid || 0)
                                                     setBillingStaff(b.additionalDetails?.billingStaff || '')
                                                     setNotes(b.additionalDetails?.notes || '')
                                                     setInternalComments(b.additionalDetails?.internalComments || '')
@@ -1160,14 +1330,13 @@ export default function ManualBilling() {
 
                                                 return (
                                                     <CTableRow key={b.billingId} className="pink-table">
-                                                        <CTableDataCell style={{ fontWeight: 700, color: TEAL, whiteSpace: 'nowrap' }}>{b.billingId}</CTableDataCell>
                                                         <CTableDataCell style={{ fontWeight: 600 }}>{b.patient?.patientName || '-'}</CTableDataCell>
                                                         <CTableDataCell>{b.patient?.mobileNumber || '-'}</CTableDataCell>
                                                         <CTableDataCell style={{ whiteSpace: 'nowrap' }}>{b.billDate}</CTableDataCell>
                                                         <CTableDataCell>{svc.serviceName || '-'}</CTableDataCell>
-                                                        <CTableDataCell style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{currency(b.payment?.paidAmount + b.payment?.dueAmount)}</CTableDataCell>
-                                                        <CTableDataCell style={{ color: SAGE, fontWeight: 600, whiteSpace: 'nowrap' }}>{currency(b.payment?.paidAmount)}</CTableDataCell>
-                                                        <CTableDataCell style={{ color: Number(b.payment?.dueAmount) > 0 ? CORAL : INK, fontWeight: 600, whiteSpace: 'nowrap' }}>{currency(b.payment?.dueAmount)}</CTableDataCell>
+                                                        <CTableDataCell style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{currency(b.paymentSummary?.totalAmount ?? (b.payment?.paidAmount + b.payment?.dueAmount))}</CTableDataCell>
+                                                        <CTableDataCell style={{ color: SAGE, fontWeight: 600, whiteSpace: 'nowrap' }}>{currency(b.paymentSummary?.totalPaid ?? b.payment?.paidAmount)}</CTableDataCell>
+                                                        <CTableDataCell style={{ color: Number(b.paymentSummary?.dueAmount ?? b.payment?.dueAmount) > 0 ? CORAL : INK, fontWeight: 600, whiteSpace: 'nowrap' }}>{currency(b.paymentSummary?.dueAmount ?? b.payment?.dueAmount)}</CTableDataCell>
                                                         <CTableDataCell>
                                                             <span style={{
                                                                 fontSize: '11px',
@@ -1186,7 +1355,26 @@ export default function ManualBilling() {
                                                         <CTableDataCell className="text-center">
                                                             <div style={{ display: 'flex', gap: 5, justifyContent: 'center', flexWrap: 'nowrap' }}>
                                                                 <button
-                                                                    onClick={() => handleEditBilling(b.billingId)}
+                                                                    onClick={() => {
+                                                                        setViewBillingDetails(b);
+                                                                        setViewMode('view');
+                                                                    }}
+                                                                    title="View"
+                                                                    style={{ border: 'none', background: '#e0e7ff', color: '#3730a3', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}
+                                                                >
+                                                                    <Eye size={14} style={{ marginRight: 4 }} /> View
+                                                                </button>
+                                                                {Number(b.paymentSummary?.dueAmount ?? b.payment?.dueAmount) > 0 && (
+                                                                    <button
+                                                                        onClick={() => handleEditBilling(b.billingId, true)}
+                                                                        title="Pay"
+                                                                        style={{ border: 'none', background: '#dcfce7', color: '#166534', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}
+                                                                    >
+                                                                        <Banknote size={14} style={{ marginRight: 4 }} /> Pay
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => handleEditBilling(b.billingId, false)}
                                                                     title="Edit"
                                                                     style={{ border: 'none', background: `${TEAL}18`, color: TEAL_DEEP, padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}
                                                                 >
