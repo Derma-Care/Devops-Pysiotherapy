@@ -1,49 +1,111 @@
-# Conversion to YAML from Properties formar report
-# Warnings:
-# - The yaml file had comments which are lost in the refactoring!
-
 spring:
   application:
     name: bookingservice
+
   data:
     mongodb:
-      uri: mongodb://mongodb:27017/customerAppointments
-  kafka:
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
-    bootstrap-servers: kafka:9092
+      uri: ${SPRING_DATA_MONGODB_URI}
+      auto-index-creation: false   # ✅ keep false in production
+
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 3000
+            readTimeout: 8000
+            loggerLevel: BASIC
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
 
 server:
   port: 9900
   servlet:
     context-path: /api
+  shutdown: graceful
 
+# =========================================================
+# WHATSAPP (secrets injected via env)
+# =========================================================
+whatsapp:
+  base-url: ${WHATSAPP_BASE_URL}
+  auth-key: ${WHATSAPP_AUTH_KEY}
+  phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID}
+  booking-confirmation-template-id: ${WHATSAPP_BOOKING_CONFIRMATION_TEMPLATE_ID}
+
+# =========================================================
+# AWS S3 (prod bucket, secrets injected)
+# =========================================================
+aws:
+  accessKeyId: ${AWS_ACCESS_KEY_ID}
+  secretAccessKey: ${AWS_SECRET_ACCESS_KEY}
+  region: ap-south-1
+  s3:
+    bucket: physiocare-prod-storage
+
+# =========================================================
+# EUREKA (prod stability)
+# =========================================================
 eureka:
   client:
     register-with-eureka: true
     fetch-registry: true
     service-url:
-      defaultZone: http://eureka-server:8761/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE}
   instance:
     prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 60
+    lease-expiration-duration-in-seconds: 180
 
+# =========================================================
+# RESILIENCE4J (stricter thresholds for prod)
+# =========================================================
+resilience4j:
+  circuitbreaker:
+    instances:
+      bookingService:
+        register-health-indicator: true
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        permitted-number-of-calls-in-half-open-state: 2
+        wait-duration-in-open-state: 10s
+        failure-rate-threshold: 50
+  timelimiter:
+    instances:
+      bookingService:
+        timeout-duration: 30s
+
+# =========================================================
+# ACTUATOR (prod monitoring)
+# =========================================================
 management:
-  endpoint:
-    shutdown:
-      enabled: true
-  info:
-    env:
-      enabled: true
+  server:
+    base-path: /
   endpoints:
     web:
       exposure:
-        include: "*"
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+# =========================================================
+# INFO
+# =========================================================
 info:
   app:
     name: bookingservice
     description: Service responsible for booking appointments
     version: 1.0.0
 
-
-        
+# =========================================================
+# LOGGING (INFO for prod)
+# =========================================================
+logging:
+  level:
+    root: INFO
+    org.springframework.web: INFO
+    com.dermaCare.bookingService: INFO

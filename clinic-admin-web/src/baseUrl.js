@@ -1,7 +1,9 @@
-// export const BASE_URL = 'http://alb-dev-sc-197990416.ap-south-1.elb.amazonaws.com/api'
-// export let wifiUrl = 'localhost'
-export let wifiUrl = 'http://3.111.28.174:9090'
-// export let wifiUrl = 'http://3.6.119.57:9090'
+//Testing
+// export let wifiUrl = 'http://3.7.216.95:9090'
+
+//Dev
+export let wifiUrl = 'https://api.ccmstestserver.online'
+// export let wifiUrl = 'https://api.ccmsphysioelite.com'
 export let splrUrl = 'http:/localhost:8801'
 // export let wifiUrl = '192.168.1.5'
 // http://3.6.119.57:9090
@@ -155,7 +157,7 @@ export const service = 'subService/getAllSubServies'
 export const getservice = 'getServiceByCategoryId'
 export const getService_ByClinicId = 'getSubServiceByHospitalId'
 
-export const Category = 'getAllCategories'
+// export const Category = 'getAllCategories'
 //main
 export const AddSubService = 'addSubService'
 export const updateService = 'updateSubService'
@@ -218,3 +220,11 @@ export const GetVitalsByPatientId = '/getVitals'
 export const AddVitals = 'addingVitals'
 export const UpdateVitals = '/updateVitals'
 export const DeleteVitals = '/deleteVitals'
+// Attendance Report
+export const GetAllUsersDailyByClinicAndBranch = 'getAllUsersDailyByClinicAndBranch'
+export const GetAllUsersMonthlyByClinicAndBranch = 'getAllUsersMonthlyByClinicAndBranch'
+export const GetUserDailyAttendence = 'getUserDailyAttendence'
+export const GetUserMonthlyAttendence = 'getUserMonthlyAttendence'
+export const GetTherapistPerformanceSummary = 'getTherapistPerformanceSummary'
+export const SaveUserAttendence = 'saveUserAttendence'
+export const UpdateUserAttendence = 'updateUserAttendence'

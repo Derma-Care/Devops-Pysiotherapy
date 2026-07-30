@@ -1,20 +1,23 @@
 package com.dermacare.notification_service.service;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 
 import com.dermacare.notification_service.dto.BookingResponse;
+import com.dermacare.notification_service.dto.ExerciseInfo;
 import com.dermacare.notification_service.dto.NotificationDTO;
 import com.dermacare.notification_service.dto.NotificationResponse;
 import com.dermacare.notification_service.dto.NotificationToCustomer;
 import com.dermacare.notification_service.dto.PriceDropAlertDto;
 import com.dermacare.notification_service.dto.ResBody;
+import com.dermacare.notification_service.dto.Response;
 
 
 public interface ServiceInterface {
 
-	public void createNotification(BookingResponse booking);
+	public ResponseEntity<Response> createNotification(BookingResponse booking);
 
 	public ResBody<List<NotificationDTO>> notificationtodoctor( String hospitalId,
 			 String doctorId);
@@ -30,7 +33,7 @@ public interface ServiceInterface {
     public ResponseEntity<ResBody<List<NotificationToCustomer>>> notificationToCustomer(
 			 String customerMobileNumber);
     
-    public void sendAlertNotifications();
+   // public void sendAlertNotifications();
     
     public ResponseEntity<?> sendImageNotifications(PriceDropAlertDto priceDropAlertDto);
    
@@ -46,5 +49,19 @@ public interface ServiceInterface {
 	         String clinicId,
 	        String branchId,
 	        String id);
+    
+    public void sendNotificationToTherapist(Map<String, String> data);
+    
+    public void sendOverallFeedbackNotificationToTherapist(Map<String, String> data) ;
+    
+    public void sendSessionFeedbackNotificationToTherapist(Map<String, String> data);
+    
+    public void sendSessionReassignNotificationToTherapist(Map<String, String> data);
+    
+    public void sendSessionWithdrawNotificationToTherapist(Map<String, String> data);	  
+    
+    public void sendBulkExerciseReminders(
+	        List<ExerciseInfo> reminders);
+
     	
 }

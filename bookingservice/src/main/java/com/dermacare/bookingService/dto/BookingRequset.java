@@ -17,6 +17,7 @@ public class BookingRequset {
 	private String bookingFor;
 	private String relation;
 	private String patientMobileNumber;
+	private String dob;
 	private String visitType;
 	private Integer freeFollowUps;
 	private String patientAddress;
@@ -45,15 +46,18 @@ public class BookingRequset {
 	private String servicetime;
 	private String followupDate;
 	private String consultationType;
-	private double consultationFee;
-	private double totalFee;
+	private List<ConsultationFeesDTO> listOfConsultationFee;	
+	private Double consultationFee;
+	private double totalFee;    ///theraphy fee
 	private String paymentType;
 	private List<String> attachments;
+	private String status;
 	private String consentFormPdf;
 	private String doctorRefCode;
 	private String bookedAt;
 	private String followupStatus;
 	private String foc;
+	private String focReason;
 	private String bodyPartId;
 	private String bodyPartName;
 	private String partImage;
@@ -61,5 +65,27 @@ public class BookingRequset {
 	private List<String> parts;
 	private double partAmount;	
 	private double dueAmount;
+	private String referredByType;
+	private String referredByName;
+	private String paymentStatus;
+	private String previousInjuries;
+	private String currentMedications;
+	private String allergies;
+	private String occupation;
+	private String insuranceProvider;
+	private String policyNumber;
+	private List<String> activityLevels;
+	private String reasonforVisit;
+	private boolean isFollowupStatus;
+	private List<ReportsDtoList> reports;
+	private String referredDoctorId;
+	private String transactionId;
+	public void setIsFollowupStatus(boolean followupStatus) {
+	    isFollowupStatus = followupStatus;
+	}
+	
+	public boolean getIsFollowupStatus() {
+	    return isFollowupStatus;
+	}
 	
 }

@@ -13,11 +13,11 @@ const AppHeaderDropdown = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   const handleLogout = () => {
-    localStorage.removeItem('authToken')
-    localStorage.removeItem('user')
-    localStorage.removeItem('HospitalId')
-    localStorage.removeItem('HospitalName')
-    localStorage.clear()
+    sessionStorage.removeItem('authToken')
+    sessionStorage.removeItem('user')
+    sessionStorage.removeItem('HospitalId')
+    sessionStorage.removeItem('HospitalName')
+    sessionStorage.clear()
     navigate('/login')
   }
 
@@ -68,12 +68,12 @@ const AppHeaderDropdown = () => {
         </CDropdownToggle>
 
         <CDropdownMenu className="pt-0" placement="bottom-end">
-          <CDropdownItem>
+          {/* <CDropdownItem>
             <CIcon icon={cilSettings} className="me-2" />
             Settings
-          </CDropdownItem>
+          </CDropdownItem> */}
 
-          <CDropdownItem onClick={() => setShowLogoutModal(true)}>
+          <CDropdownItem onClick={() => setShowLogoutModal(true)} style={{ cursor: "pointer" }}>
             <CIcon icon={cilAccountLogout} className="me-2" />
             Logout
           </CDropdownItem>

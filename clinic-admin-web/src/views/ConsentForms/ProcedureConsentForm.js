@@ -19,7 +19,7 @@ import {
 } from '@coreui/react'
 import { FaPlus, FaTrash, FaEdit } from 'react-icons/fa'
 import {
-  CategoryData,
+  // CategoryData,
   serviceData, // This API function needs to be updated to accept a categoryId
   subServiceData,
   getSubServiceById,
@@ -68,7 +68,7 @@ const ProcedureConsentForm = () => {
   const [qaList, setQaList] = useState([])
   const [editIndex, setEditIndex] = useState(null)
   const [errors, setErrors] = useState({}) // State for form validation errors
-  const hospitalId = localStorage.getItem('HospitalId')
+  const hospitalId = sessionStorage.getItem('HospitalId')
   const consentFormType = '2' // from your Postman example
   const [currentPage, setCurrentPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(5)
@@ -79,19 +79,19 @@ const ProcedureConsentForm = () => {
   const [delloading, setDelLoading] = useState(false)
   // Refactored API fetching to use the correct IDs
   // Fetch categories
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const res = await CategoryData()
-        if (Array.isArray(res.data)) setCategory(res.data)
-        else if (Array.isArray(res.data?.data)) setCategory(res.data.data)
-        else setCategory([])
-      } catch (err) {
-        console.error('Error fetching categories:', err)
-      }
-    }
-    fetchCategories()
-  }, [])
+  // useEffect(() => {
+  //   const fetchCategories = async () => {
+  //     try {
+  //       const res = await CategoryData()
+  //       if (Array.isArray(res.data)) setCategory(res.data)
+  //       else if (Array.isArray(res.data?.data)) setCategory(res.data.data)
+  //       else setCategory([])
+  //     } catch (err) {
+  //       console.error('Error fetching categories:', err)
+  //     }
+  //   }
+  //   fetchCategories()
+  // }, [])
 
   useEffect(() => {
     const fetchProcedureForms = async () => {
@@ -129,42 +129,42 @@ const ProcedureConsentForm = () => {
   }, [newService.categoryId])
 
   // Fetch subServices based on serviceId
-  useEffect(() => {
-  if (!newService.serviceId) {
-    setSubServiceOptions([])
-    return
-  }
+  //   useEffect(() => {
+  //   if (!newService.serviceId) {
+  //     setSubServiceOptions([])
+  //     return
+  //   }
 
-  const fetchSubServices = async () => {
-    try {
-      const res = await subServiceData(newService.serviceId)
-      const subList = res?.data || []
+  //   const fetchSubServices = async () => {
+  //     try {
+  //       const res = await subServiceData(newService.serviceId)
+  //       const subList = res?.data || []
 
-      // 🔹 Flatten all subservices
-      let allSubServices = []
-      if (Array.isArray(subList)) {
-        allSubServices = subList.flatMap((item) => item.subServices || [])
-      } else if (subList?.subServices) {
-        allSubServices = subList.subServices
-      }
+  //       // 🔹 Flatten all subservices
+  //       let allSubServices = []
+  //       if (Array.isArray(subList)) {
+  //         allSubServices = subList.flatMap((item) => item.subServices || [])
+  //       } else if (subList?.subServices) {
+  //         allSubServices = subList.subServices
+  //       }
 
-      // ✅ SET OPTIONS HERE (THIS WAS MISSING)
-      setSubServiceOptions(allSubServices)
+  //       // ✅ SET OPTIONS HERE (THIS WAS MISSING)
+  //       setSubServiceOptions(allSubServices)
 
-      // optional: validate already selected ones
-      if (selectedSubService.length > 0) {
-        checkSubServiceDetails(selectedSubService)
-      }
+  //       // optional: validate already selected ones
+  //       if (selectedSubService.length > 0) {
+  //         checkSubServiceDetails(selectedSubService)
+  //       }
 
-      console.log('All SubServices:', allSubServices)
-    } catch (e) {
-      console.error('Error fetching subServices', e)
-      setSubServiceOptions([])
-    }
-  }
+  //       console.log('All SubServices:', allSubServices)
+  //     } catch (e) {
+  //       console.error('Error fetching subServices', e)
+  //       setSubServiceOptions([])
+  //     }
+  //   }
 
-  fetchSubServices()
-}, [newService.serviceId])
+  //   fetchSubServices()
+  // }, [newService.serviceId])
 
 
   useEffect(() => {
@@ -202,24 +202,24 @@ const ProcedureConsentForm = () => {
       return updatedState
     })
   }
- const checkSubServiceDetails = async (ids) => {
-  let incomplete = false
+  const checkSubServiceDetails = async (ids) => {
+    let incomplete = false
 
-  const detailsArray = await Promise.all(
-    ids.map((id) => getSubServiceById(hospitalId, id))
-  )
+    const detailsArray = await Promise.all(
+      ids.map((id) => getSubServiceById(hospitalId, id))
+    )
 
-  detailsArray.forEach((data) => {
-    const arr = Array.isArray(data) ? data : [data]
-    arr.forEach((sub) => {
-      if (!sub.price || !sub.finalCost) {
-        incomplete = true
-      }
+    detailsArray.forEach((data) => {
+      const arr = Array.isArray(data) ? data : [data]
+      arr.forEach((sub) => {
+        if (!sub.price || !sub.finalCost) {
+          incomplete = true
+        }
+      })
     })
-  })
 
-  setIsSubServiceComplete(!incomplete)
-}
+    setIsSubServiceComplete(!incomplete)
+  }
 
 
   console.log(subServiceOptions)
@@ -521,7 +521,7 @@ const ProcedureConsentForm = () => {
                 setEditIndex(null)
               }}
             >
-              + Add Procedure Form
+              + Add Therapy Form
             </CButton>
           </div>
           // <CButton
@@ -642,7 +642,7 @@ const ProcedureConsentForm = () => {
                   <div className="text-danger mt-2">
                     Some selected Procedures are missing details like price or final cost.
                     <br />
-                    <a href="/procedure-Management" className="text-primary">
+                    <a href="/therapy-Management" className="text-primary">
                       Please add Procedure details
                     </a>
                   </div>
@@ -785,7 +785,7 @@ const ProcedureConsentForm = () => {
         )}
         {procedureForms.length > 0 && (
           <>
-            <h6>Saved Procedure Forms</h6>
+            <h6>Saved Therapy Forms</h6>
             <CAccordion>
               {currentForms.map((form, i) => (
                 <>

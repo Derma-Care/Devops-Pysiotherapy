@@ -1,6 +1,5 @@
 package com.clinicadmin.repository;
 
-
 import java.util.List;
 import java.util.Optional;
 
@@ -18,10 +17,19 @@ public interface TherapyExercisesRepository extends MongoRepository<TherapyExerc
 
     Optional<TherapyExercises> findByTherapyExercisesId(String therapyExercisesId);
 
+    List<TherapyExercises> findByTherapyExercisesId(List<String> therapyExerciseIds);
+
     boolean existsByTherapyExercisesId(String therapyExercisesId);
 
     void deleteByTherapyExercisesId(String therapyExercisesId);
 
-	Optional<TherapyExercises> findByClinicIdAndBranchIdAndTherapyExercisesId(String clinicId, String branchId,
-			String therapyExercisesId);
+    Optional<TherapyExercises> findByClinicIdAndBranchIdAndTherapyExercisesId(
+            String clinicId,
+            String branchId,
+            String therapyExercisesId);
+
+    List<TherapyExercises> findByTherapyExercisesIdInAndClinicIdAndBranchId(
+            List<String> therapyExerciseIds,
+            String clinicId,
+            String branchId);
 }

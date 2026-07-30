@@ -1,34 +1,39 @@
 package com.AdminService.service;
 
-import java.util.List;
 import org.springframework.http.ResponseEntity;
+
 import com.AdminService.dto.AdminHelper;
-import com.AdminService.dto.CategoryDto;
+//import com.AdminService.dto.CategoryDto;
 import com.AdminService.dto.ClinicCredentialsDTO;
 import com.AdminService.dto.ClinicDTO;
 import com.AdminService.dto.CustomerDTO;
-import com.AdminService.dto.ServicesDto;
-import com.AdminService.dto.SubServicesDto;
-import com.AdminService.dto.SubServicesInfoDto;
+import com.AdminService.dto.ResetPasswordDTO;
+//import com.AdminService.dto.ServicesDto;
+//import com.AdminService.dto.SubServicesDto;
+//import com.AdminService.dto.SubServicesInfoDto;
 import com.AdminService.dto.UpdateClinicCredentials;
+import com.AdminService.dto.UpdateClinicCredentialsWithUserNameAndRole;
 import com.AdminService.util.Response;
-import com.AdminService.util.ResponseStructure;
 
 public interface AdminService {
 
 //ADMIN
-	
-public Response adminRegister(AdminHelper helperAdmin);
-	
-public Response adminLogin(String userName,String password);
-	
-//CLINIC MANAGEMENT
-public Response createClinic(ClinicDTO clinic);
-Response getClinicById(String clinicId);
-public Response getAllClinics();
-Response updateClinic(String clinicId, ClinicDTO clinic);
-Response deleteClinic(String clinicId);
 
+	public Response adminRegister(AdminHelper helperAdmin);
+
+	public Response adminLogin(String userName, String password);
+
+//CLINIC MANAGEMENT
+	public Response createClinic(ClinicDTO clinic);
+
+	Response getClinicById(String clinicId);
+
+	public Response getAllClinics();
+
+	Response updateClinic(String clinicId, ClinicDTO clinic);
+
+	Response deleteClinic(String clinicId);
+///public String findEmailByMobileNumber(String mobileNumber);
 ////================= CLINIC VERIFICATION FLOW =================
 //
 ////Start verification (Admin action)
@@ -41,87 +46,52 @@ Response deleteClinic(String clinicId);
 //Response rejectClinic(String clinicId, String reason);
 
 //CLINIC CREDENTIALS
-public Response getClinicCredentials(String userName);
+	public Response getClinicCredentials(String userName);
 
-public Response updateClinicCredentials(UpdateClinicCredentials credentials,String userName) ;
+	public Response updateClinicCredentials(UpdateClinicCredentials credentials, String userName);
 
-public Response deleteClinicCredentials(String userName );
+	public Response deleteClinicCredentials(String userName);
 
-public Response login(ClinicCredentialsDTO credentials);
-
-//category
-public Response addNewCategory(CategoryDto dto);
-
-public Response getAllCategory();
-
-public Response deleteCategoryById(
-		 String categoryId);
-
-public Response updateCategory(String categoryId,CategoryDto updatedCategory);
-public Response getCategoryById(String CategoryId);
-
-//SERVICE MANAGEMENT
-public Response addService( ServicesDto dto);
-public Response getServiceById( String categoryId);
-public Response getServiceByServiceId( String serviceId);
-public Response deleteService( String serviceId);
-public Response updateByServiceId( String serviceId,
-	 ServicesDto domainServices);
-public Response getAllServices();
-
-//SUBSERVICE MANAGEMENT
-public  Response addSubService( SubServicesInfoDto dto);
-public Response getSubServiceByIdCategory(String categoryId);
-public Response getSubServicesByServiceId(String serviceId);
-public Response getSubServiceBySubServiceId(String subServiceId);
-public Response deleteSubService(String subServiceId);
-public Response updateBySubServiceId(String subServiceId, SubServicesInfoDto domainServices);
-public Response getAllSubServices();
+	public Response login(ClinicCredentialsDTO credentials);
 
 //CUSTOMER MANAGEMENT
-public Response saveCustomerBasicDetails(CustomerDTO customerDTO );
-public ResponseEntity<?> getCustomerByUsernameMobileEmail(String input);
-public Response getCustomerBasicDetails(String mobileNumber );
-public Response getAllCustomers();
-public Response updateCustomerBasicDetails(CustomerDTO customerDTO,String mobileNumber );
-public Response deleteCustomerBasicDetails(String mobileNumber);
+	public Response saveCustomerBasicDetails(CustomerDTO customerDTO);
+
+	public ResponseEntity<?> getCustomerByUsernameMobileEmail(String input);
+
+	public Response getCustomerBasicDetails(String mobileNumber);
+
+	public Response getAllCustomers();
+
+	public Response updateCustomerBasicDetails(CustomerDTO customerDTO, String mobileNumber);
+
+	public Response deleteCustomerBasicDetails(String mobileNumber);
 
 //SUBSERVICES
-public Response getAllSubServicesFromClincAdmin();
+//public Response getAllSubServicesFromClincAdmin();
 
 //BOOKINGS
 
-
 //DOCTORS
-public Response getDoctorInfoByDoctorId(String doctorId);
+	public Response getDoctorInfoByDoctorId(String doctorId);
 
-public Response getClinicsByRecommondation();
+	public Response getClinicsByRecommondation();
 
-Response getAllRecommendClinicThenAnotherClincs();
+	Response getAllRecommendClinicThenAnotherClincs();
 
-//SUBSERVICES DETAILS
+	Response rejectClinic(String clinicId, String reason);
 
-ResponseEntity<ResponseStructure<SubServicesDto>> addService(String subServiceId, SubServicesDto dto);
+	Response verifyClinic(String clinicId);
 
+	Response startVerificationProcess(String clinicId);
 
-ResponseEntity<ResponseStructure<SubServicesDto>> getSubServiceByServiceId(String subServiceId);
+//---------------Forgot Password---------------------------------------
 
-ResponseEntity<ResponseStructure<SubServicesDto>> deleteSubService(String hospitalId, String subServiceId);
+	Response resetPasswordWithOtp(ResetPasswordDTO dto);
 
-ResponseEntity<ResponseStructure<SubServicesDto>> updateBySubServiceId(String hospitalId, String serviceId,
-		SubServicesDto domainServices);
-ResponseEntity<ResponseStructure<SubServicesDto>> getSubServiceByServiceId( String hospitalId, String subServiceId);
+	Response forgotPassword(String mobileNumber, String role);
 
-ResponseEntity<ResponseStructure<List<SubServicesDto>>> getSubServiceByHospitalId(String hospitalId);
+	Response verifyForgotPasswordOtp(String mobileNumber, String otp, String role);
 
-Response rejectClinic(String clinicId, String reason);
-
-Response verifyClinic(String clinicId);
-
-Response startVerificationProcess(String clinicId);
-
-
+	Response updateClinicCredentialsWithUserNameAndRole(UpdateClinicCredentialsWithUserNameAndRole credentials);
 }
-
-
-

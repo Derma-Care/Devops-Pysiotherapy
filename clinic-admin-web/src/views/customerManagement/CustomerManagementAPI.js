@@ -11,10 +11,11 @@ import {
 import { http } from '../../Utils/Interceptors'
 
 // Fetch all customers
-export const CustomerData = async () => {
-  const hospitalId = localStorage.getItem('HospitalId')
+export const CustomerData = async (branchIdOverride) => {
+  const hospitalId = sessionStorage.getItem('HospitalId')
+  const branchId = branchIdOverride || sessionStorage.getItem('branchId')
   try {
-    const url = `${BASE_URL}/${GetAllCustomers}/${hospitalId}`
+    const url = `${BASE_URL}/${GetAllCustomers}/${hospitalId}/${branchId}`
     const response = await http.get(url) //TODO:chnage when apigetway call axios to http
     // Assuming backend wraps list in response.data.data
     return Array.isArray(response.data.data) ? response.data.data : [response.data.data]
@@ -41,7 +42,7 @@ export const addCustomer = async (customerDTO) => {
 // Update existing customer
 export const updateCustomerData = async (customerId, customerDTO) => {
   try {
-    const url = `${BASE_URL}/${Customer}/${customerId}`
+    const url = `${BASE_URL}/customers/updatecustomer/${customerId}`
     const response = await axios.put(url, customerDTO, {
       //TODO:chnage when apigetway call axios to http
       headers: { 'Content-Type': 'application/json' },
@@ -56,7 +57,7 @@ export const updateCustomerData = async (customerId, customerDTO) => {
 // Delete a customer
 export const deleteCustomerData = async (customerId) => {
   try {
-    const url = `${BASE_URL}/${Customer}/${customerId}`
+    const url = `${BASE_URL}/customers/deletecustomer/${customerId}`
     const response = await axios.delete(url) //TODO:chnage when apigetway call axios to http
     return response.data
   } catch (error) {
@@ -111,4 +112,4 @@ export const CustomerByClinicNdBranchId = async (hospitalId, branchId) => {
     throw error
   }
 }
-export const getCustomerByMobile = async (mobileNumber) => {}
+export const getCustomerByMobile = async (mobileNumber) => { }

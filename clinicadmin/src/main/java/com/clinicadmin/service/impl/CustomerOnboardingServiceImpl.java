@@ -3,12 +3,19 @@ package com.clinicadmin.service.impl;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import com.clinicadmin.dto.BookingInfoByInput;
 import com.clinicadmin.dto.CustomerLoginDTO;
 import com.clinicadmin.dto.CustomerOnbordingDTO;
 import com.clinicadmin.dto.CustomerResponseDTO;
@@ -19,6 +26,7 @@ import com.clinicadmin.repository.CustomerCredentialsRepository;
 import com.clinicadmin.repository.CustomerOnboardingRepository;
 import com.clinicadmin.service.CustomerOnboardingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import feign.FeignException;
 
 @Service
@@ -32,6 +40,9 @@ public class CustomerOnboardingServiceImpl implements CustomerOnboardingService 
 
 	@Autowired
 	private SequenceGeneratorService sequenceGeneratorService;
+	
+//	@Autowired
+//	private MongoTemplate mongoTemplate;
 
 	private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -41,6 +52,15 @@ public class CustomerOnboardingServiceImpl implements CustomerOnboardingService 
 		Response response = new Response();
 
 		try {
+			Optional<CustomerOnbording> existingCustomer =
+	                onboardingRepository.findByMobileNumber(dto.getMobileNumber());
+
+	        if (existingCustomer.isPresent()) {
+	            response.setSuccess(false);
+	            response.setMessage("Mobile number already exists");
+	            response.setStatus(400);
+	            return response;
+	        }
 			// Generate unique IDs
 			long customerSeq = sequenceGeneratorService.getNextSequence(dto.getBranchId() + "_customer");
 			long patientSeq = sequenceGeneratorService
@@ -139,6 +159,26 @@ public class CustomerOnboardingServiceImpl implements CustomerOnboardingService 
 
 	
 	@Override
+	public Map<String,String> getCustomerByMobilenumberAndName(String mobilenumber,String name) {		
+		Map<String,String> details = new LinkedHashMap<>();
+		try {
+			Optional<CustomerOnbording> optional = onboardingRepository.findByMobileNumberAndFullName(mobilenumber, name);
+			if (optional.isPresent()) {
+				details.put("customerId", optional.get().getCustomerId());
+				details.put("patientId", optional.get().getPatientId());
+				////System.out.println(details); 
+				return details;
+			} else {
+				return null;
+			}
+		} catch (Exception e) {
+			return null;
+		}
+		
+	}
+
+	
+	@Override
 	public Response getCustomerByMobiileNumber(String mobilenumber) {
 		Response response = new Response();
 		try {
@@ -160,6 +200,23 @@ public class CustomerOnboardingServiceImpl implements CustomerOnboardingService 
 		}
 		return response;
 	}
+	
+	@Override
+	public CustomerOnbordingDTO getCustomerByMobileNumberAndClinicId(String mobilenumber,String clinicId) {	
+		try {
+			CustomerOnbording optional = onboardingRepository.findByMobileNumberAndHospitalId(mobilenumber,clinicId);
+			//System.out.println(optional);
+			if (optional != null) {
+				return convertToDTO(optional);
+			} else {
+				return null;
+			}
+		} catch (Exception e) {
+			return null;
+		}}
+	
+	
+	
 	// ----------------- UPDATE -----------------
 	@Override
 	public Response updateCustomer(String customerId, CustomerOnbordingDTO dto) {
@@ -265,10 +322,10 @@ public class CustomerOnboardingServiceImpl implements CustomerOnboardingService 
 	}
 
 	@Override
-	public Response getCustomersByHospitalId(String hospitalId) {
+	public Response getCustomersByHospitalId(String hospitalId,String branchId) {
 	    Response response = new Response();
 	    try {
-	        List<CustomerOnbordingDTO> customers = onboardingRepository.findByHospitalId(hospitalId)
+	        List<CustomerOnbordingDTO> customers = onboardingRepository.findByHospitalIdAndBranchId(hospitalId, branchId)
 	                .stream()
 	                .map(this::convertToDTO)
 	                .collect(Collectors.toList());
@@ -290,7 +347,8 @@ public class CustomerOnboardingServiceImpl implements CustomerOnboardingService 
 	public Response getCustomersByPatientId(String patientId,String clinicId) {
 	    Response response = new Response();
 	    try {
-	        CustomerOnbording customers = onboardingRepository.findByPatientIdAndBranchId(patientId,clinicId);
+	        CustomerOnbording customers = onboardingRepository.findByPatientIdAndHospitalId(patientId,clinicId);
+	      //  System.out.println(customers);
 	        if(customers != null) {      
 	        response.setSuccess(true);
 	        response.setMessage("Customers retrieved successfully");
@@ -423,6 +481,19 @@ public class CustomerOnboardingServiceImpl implements CustomerOnboardingService 
 		return response;
 	}
 
+	
+	public String customerDeviceId(String customerId) {
+		try {
+			Optional<CustomerOnbording> cs = onboardingRepository.findByCustomerId(customerId);	
+			if(cs.isPresent()) {
+				return cs.get().getDeviceId();
+			}else {
+				return null;
+			}
+		}catch(Exception e) {
+			return null;
+		}
+	}
 	// ----------------- RESET PASSWORD -----------------
 //	@Override
 //	public Response resetPassword(ChangeDoctorPasswordDTO dto) {
@@ -461,53 +532,82 @@ public class CustomerOnboardingServiceImpl implements CustomerOnboardingService 
 //
 //		return response;
 //	}
+	
+	
+	private String getIndianDateTime() {
+	    DateTimeFormatter formatter =
+	            DateTimeFormatter.ofPattern("dd/MM/yyyy hh:mm:ss a");
+
+	    return LocalDateTime
+	            .now(ZoneId.of("Asia/Kolkata"))
+	            .format(formatter);
+	}
 
 	// ------------------ DTO ↔ Entity Conversion ------------------
 	private CustomerOnbording convertToEntity(CustomerOnbordingDTO dto) {
-		CustomerOnbording entity = new CustomerOnbording();
-		entity.setId(dto.getId());
-		entity.setMobileNumber(dto.getMobileNumber());
-		entity.setEmail(dto.getEmail());
-		entity.setFullName(dto.getFullName());
-		entity.setDateOfBirth(dto.getDateOfBirth());
-		entity.setGender(dto.getGender());
-		entity.setAge(dto.getAge());
-		entity.setAddress(dto.getAddress());
-		entity.setHospitalId(dto.getHospitalId());
-		entity.setHospitalName(dto.getHospitalName());
-		entity.setBranchId(dto.getBranchId());
-		entity.setCustomerId(dto.getCustomerId());
-		entity.setPatientId(dto.getPatientId());
-		entity.setDeviceId(dto.getDeviceId());
-//		entity.setReferralCode(dto.getReferralCode());
-		entity.setReferredBy(dto.getReferredBy());
-		entity.setCreatedBy(dto.getCreatedBy());
-		entity.setCreatedAt(LocalDateTime.now(ZoneId.of("Asia/Kolkata")).toString());
-		return entity;
+
+	    CustomerOnbording entity = new CustomerOnbording();
+
+	    entity.setId(dto.getId());
+	    entity.setMobileNumber(dto.getMobileNumber());
+	    entity.setEmail(dto.getEmail());
+	    entity.setFullName(dto.getFullName());
+	    entity.setGender(dto.getGender());
+	    entity.setDateOfBirth(dto.getDateOfBirth());
+	    entity.setAge(dto.getAge());
+	    entity.setAddress(dto.getAddress());
+
+	    entity.setHospitalId(dto.getHospitalId());
+	    entity.setHospitalName(dto.getHospitalName());
+	    entity.setBranchId(dto.getBranchId());
+
+	    entity.setCustomerId(dto.getCustomerId());
+	    entity.setPatientId(dto.getPatientId());
+
+	    entity.setDeviceId(dto.getDeviceId());
+
+	    entity.setReferralCode(dto.getReferralCode());
+	    entity.setReferredBy(dto.getReferredBy());
+
+	    entity.setCreatedBy(dto.getCreatedBy());
+
+	    // Store Indian Date & Time
+	    entity.setCreatedAt(getIndianDateTime());
+
+	    return entity;
 	}
+	
 
 	private CustomerOnbordingDTO convertToDTO(CustomerOnbording entity) {
-		CustomerOnbordingDTO dto = new CustomerOnbordingDTO();
-		dto.setId(entity.getId());
-		dto.setMobileNumber(entity.getMobileNumber());
-		dto.setEmail(entity.getEmail());
-		dto.setFullName(entity.getFullName());
-		dto.setGender(entity.getGender());
-		dto.setDateOfBirth(entity.getDateOfBirth());
-		dto.setAge(entity.getAge());
-		dto.setAddress(entity.getAddress());
-		dto.setHospitalId(entity.getHospitalId());
-		dto.setHospitalName(entity.getHospitalName());
-		dto.setBranchId(entity.getBranchId());
-		dto.setCustomerId(entity.getCustomerId());
-		dto.setPatientId(entity.getPatientId());
-		dto.setDeviceId(entity.getDeviceId());
-		dto.setReferralCode(entity.getReferralCode());
-		dto.setReferredBy(entity.getReferredBy());
-		dto.setCreatedAt(entity.getCreatedAt());
-        dto.setCreatedBy(entity.getCreatedBy());
-        dto.setUpdatedDate(entity.getUpdatedDate());
-		return dto;
+
+	    CustomerOnbordingDTO dto = new CustomerOnbordingDTO();
+
+	    dto.setId(entity.getId());
+	    dto.setMobileNumber(entity.getMobileNumber());
+	    dto.setEmail(entity.getEmail());
+	    dto.setFullName(entity.getFullName());
+	    dto.setGender(entity.getGender());
+	    dto.setDateOfBirth(entity.getDateOfBirth());
+	    dto.setAge(entity.getAge());
+	    dto.setAddress(entity.getAddress());
+
+	    dto.setHospitalId(entity.getHospitalId());
+	    dto.setHospitalName(entity.getHospitalName());
+	    dto.setBranchId(entity.getBranchId());
+
+	    dto.setCustomerId(entity.getCustomerId());
+	    dto.setPatientId(entity.getPatientId());
+
+	    dto.setDeviceId(entity.getDeviceId());
+
+	    dto.setReferralCode(entity.getReferralCode());
+	    dto.setReferredBy(entity.getReferredBy());
+
+	    dto.setCreatedBy(entity.getCreatedBy());
+	    dto.setCreatedAt(entity.getCreatedAt());
+	    dto.setUpdatedDate(entity.getUpdatedDate());
+
+	    return dto;
 	}
 	
 	
@@ -523,4 +623,93 @@ public class CustomerOnboardingServiceImpl implements CustomerOnboardingService 
 		}catch(FeignException e) {	
 			return null;	
 		}}
+	
+	public String getCustomername(String patientId){
+		try {	
+			CustomerOnbording cstmr = onboardingRepository.findByPatientId(patientId);
+			if(cstmr != null) {
+		   	return cstmr.getFullName() ;}
+			else {
+				return null;
+			}
+		}catch(FeignException e) {	
+			return null;	
+		}}
+	
+	
+	@Override
+	public List<BookingInfoByInput> bookingByInput(String input,String clinicId) {
+		   BookingInfoByInput bkng = new BookingInfoByInput();
+		   CustomerOnbordingDTO b = null;
+		   List<BookingInfoByInput> lst = new ArrayList<>();
+		   List<CustomerOnbordingDTO> customerOnbordingDTO = null;
+	       try {	        	
+	        	b = getCustomerByMobileNumberAndClinicId(input,clinicId);
+	   		   //Sysout
+	        	if(b != null) {
+	        	bkng.setAge(b.getAge());
+		        bkng.setClinicId(b.getHospitalId());
+				bkng.setBranchId(b.getBranchId());
+		        bkng.setCustomerId(b.getCustomerId());
+		        bkng.setGender(b.getGender());
+		        bkng.setMobileNumber(b.getMobileNumber());
+		        bkng.setName(b.getFullName());
+		        bkng.setPatientAddress(b.getAddress());
+		        bkng.setPatientId(b.getPatientId());
+		        bkng.setPatientMobileNumber(b.getMobileNumber());
+		        bkng.setDob(b.getDateOfBirth());
+		        bkng.setRelation(null);	
+		        lst.add(bkng);}	       
+		    	if(b == null){
+	        	 Response res = getCustomersByPatientId(input,clinicId);			   
+			      b = new ObjectMapper().convertValue(res.getData(), CustomerOnbordingDTO.class);		    	     
+			      if(b != null) {
+			        bkng.setAge(b.getAge());
+			        bkng.setClinicId(b.getHospitalId());
+					bkng.setBranchId(b.getBranchId());
+			        bkng.setCustomerId(b.getCustomerId());
+			        bkng.setGender(b.getGender());
+			        bkng.setMobileNumber(b.getMobileNumber());
+			        bkng.setName(b.getFullName());
+			        bkng.setPatientAddress(b.getAddress());
+			        bkng.setPatientId(b.getPatientId());
+			        bkng.setPatientMobileNumber(b.getMobileNumber());
+			        bkng.setDob(b.getDateOfBirth());
+			        bkng.setRelation(null);
+			        lst.add(bkng);}		       
+		        }if(b == null){	
+		        customerOnbordingDTO = onboardingRepository.findByFullNameContainingIgnoreCaseAndHospitalId(input,clinicId);
+		        ///System.out.println(customerOnbordingDTO);
+		        for(CustomerOnbordingDTO dto : customerOnbordingDTO) {
+		        BookingInfoByInput bookingInfoByInput = new BookingInfoByInput();
+		        bookingInfoByInput.setAge(dto.getAge());
+				bookingInfoByInput.setBranchId(dto.getBranchId());
+		        bookingInfoByInput.setClinicId(dto.getHospitalId());
+		        bookingInfoByInput.setCustomerId(dto.getCustomerId());
+		        bookingInfoByInput.setGender(dto.getGender());
+		        bookingInfoByInput.setMobileNumber(dto.getMobileNumber());
+		        bookingInfoByInput.setName(dto.getFullName());
+		        bookingInfoByInput.setPatientAddress(dto.getAddress());
+		        bookingInfoByInput.setPatientId(dto.getPatientId());
+		        bookingInfoByInput.setPatientMobileNumber(dto.getMobileNumber());
+		        bookingInfoByInput.setDob(dto.getDateOfBirth());
+		        bookingInfoByInput.setRelation(null);
+		        lst.add(bookingInfoByInput);}}
+	       }catch (Exception e) {
+	        //System.err.println("Error fetching bookings: " + e.getMessage());
+	        System.out.println(e.getMessage());; // safe fallback
+	    }
+	    return lst;
+	}
+
+
+	public String retrievePatientName(String patientId){
+		String name = null;
+		try{
+			 name = onboardingRepository.findByPatientId(patientId).getFullName();
+		}catch(Exception e){
+			return null;
+		}
+		return name;
+	}
 }
