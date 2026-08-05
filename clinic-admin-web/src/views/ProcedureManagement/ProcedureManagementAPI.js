@@ -3,15 +3,15 @@ import axios from 'axios'
 import {
   BASE_URL,
   service,
-  Category,
+  // Category,
   AddSubService,
   updateService,
   deleteService,
   MainAdmin_URL,
-  // subService_URL,
+  // subService_URL,  
   subservice,
   getadminSubServicesbyserviceId,
-  getService_ByClinicId,
+  // getService_ByClinicId,
   getservice,
 } from '../../baseUrl'
 import { toast } from 'react-toastify'
@@ -82,38 +82,39 @@ export const getSubServiceById = async (hospitalId, subServiceId) => {
     return null
   }
 }
-export const GetSubServices_ByClinicId = async (hospitalId) => {
-  try {
-    const response = await http.get(`/${getService_ByClinicId}/${hospitalId}`)
-    return response.data?.data
-  } catch (error) {
-    if (error.response) {
-      console.error('Server responded with status:', error.response.status, error.response.data)
-    } else if (error.request) {
-      console.error('No response received:', error.request)
-    } else {
-      console.error('Axios error:', error.message)
-    }
-    return null
-  }
-}
+// export const GetSubServices_ByClinicId = async (hospitalId) => {
+//   try {
+//     const response = await http.get(`/${getService_ByClinicId}/${hospitalId}`)
+//     console.log(response.data?.data)
+//     return response.data?.data
+//   } catch (error) {
+//     if (error.response) {
+//       console.error('Server responded with status:', error.response.status, error.response.data)
+//     } else if (error.request) {
+//       console.error('No response received:', error.request)
+//     } else {
+//       console.error('Axios error:', error.message)
+//     }
+//     return null
+//   }
+// }
 
-export const CategoryData = async () => {
-  try {
-    const response = await http.get(`/${Category}`)
+// export const CategoryData = async () => {
+//   try {
+//     const response = await http.get(`/${Category}`)
 
-    return response.data
-  } catch (error) {
-    console.error('Error fetching service data:', error.message)
+//     return response.data
+//   } catch (error) {
+//     console.error('Error fetching service data:', error.message)
 
-    if (error.response) {
-      console.error('Error Response Data:', error.response.data)
-      console.error('Error Response Status:', error.response.status)
-    }
+//     if (error.response) {
+//       console.error('Error Response Data:', error.response.data)
+//       console.error('Error Response Status:', error.response.status)
+//     }
 
-    throw error
-  }
-}
+//     throw error
+//   }
+// }
 
 export const postServiceData = async (serviceData, id) => {
   console.log('Sending data to id:', id)
@@ -130,7 +131,7 @@ export const postServiceData = async (serviceData, id) => {
     return response
   } catch (error) {
     console.error('Error response:', error.response)
-  //  showCustomToast(`${error.response.data.message || error.response.statusText}`,'error')
+    //  showCustomToast(`${error.response.data.message || error.response.statusText}`,'error')
   }
 }
 

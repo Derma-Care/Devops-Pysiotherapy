@@ -18,8 +18,8 @@ import './header/sidebar.css'
 import navigation from '../_nav'
 import { COLORS, SIZES } from '../Themes'
 import doctor from '../assets/images/doctor.jpg'
-import male from '../assets/images/male.png'
-import female from '../assets/images/female.png'
+import male from '../assets/images/male1.png'
+import female from '../assets/images/female1.png'
 import { useDoctorContext } from '../Context/DoctorContext'
 import { getClinicDetails, getDoctorDetails, averageRatings, getPatientVitals } from '../Auth/Auth'
 import { capitalizeEachWord, capitalizeFirst, capitalizeWords } from '../utils/CaptalZeWord'
@@ -30,9 +30,9 @@ const AppSidebar = () => {
   const sidebarShow = useSelector((state) => state.sidebarShow)
   const [doctorDetails, setDoctorDetails] = useState(null)
   const [clinicDetails, setClinicDetails] = useState(null)
+  const [isLoadingDoctor, setIsLoadingDoctor] = useState(true)
   const { patientData, isPatientLoading, setPatientData } = useDoctorContext()
   const hasPatient = !!patientData
-  const [ratings, setRatings] = useState([])
   const [showModal, setShowModal] = useState(false)
   const [vitals, setVitals] = useState({
     height: null,
@@ -43,19 +43,29 @@ const AppSidebar = () => {
   });
   useEffect(() => {
     const fetchData = async () => {
-      const doctor = await getDoctorDetails()
-      const clinic = await getClinicDetails()
-      setDoctorDetails(doctor)
-      setClinicDetails(clinic)
+      // 1. Try local storage first for instant display
+      const storedDoctor = localStorage.getItem('doctorDetails')
+      const storedClinic = localStorage.getItem('clinicDetails')
+      if (storedDoctor) setDoctorDetails(JSON.parse(storedDoctor))
+      if (storedClinic) setClinicDetails(JSON.parse(storedClinic))
 
-      if (doctor?.doctorId) {
-        const ratingData = await averageRatings(doctor.doctorId) // <-- only doctorId
+      // 2. Refresh from API
+      try {
+        const doctor = await getDoctorDetails()
+        const clinic = await getClinicDetails()
 
-        if (ratingData?.ratingStats?.length > 0) {
-          setRatings(ratingData.ratingStats)
-        } else {
-          setRatings([{ category: ratingData.message || 'No reviews found', percentage: 0 }])
+        if (doctor) {
+          setDoctorDetails(doctor)
+          localStorage.setItem('doctorDetails', JSON.stringify(doctor))
         }
+        if (clinic) {
+          setClinicDetails(clinic)
+          localStorage.setItem('clinicDetails', JSON.stringify(clinic))
+        }
+      } catch (err) {
+        console.error('Error fetching doctor/clinic details:', err)
+      } finally {
+        setIsLoadingDoctor(false)
       }
     }
     fetchData()
@@ -64,19 +74,37 @@ const AppSidebar = () => {
 
   // Load patient vitals whenever patientData changes
   useEffect(() => {
-    let isMounted = true; // flag to prevent state update if unmounted
+    let isMounted = true;
 
     const fetchVitals = async () => {
       if (hasPatient && patientData?.bookingId && patientData?.patientId) {
-        const data = await getPatientVitals(patientData.bookingId, patientData.patientId);
-        if (data && isMounted) setVitals(data);
+        try {
+          const res = await getPatientVitals(
+            patientData.bookingId,
+            patientData.patientId
+          );
+
+          console.log("Vitals FINAL:", res);
+
+          if (isMounted) {
+            setVitals(res || {
+              height: null,
+              weight: null,
+              bloodPressure: null,
+              temperature: null,
+              bmi: null,
+            });
+          }
+        } catch (err) {
+          console.error("Vitals API Error:", err);
+        }
       }
     };
 
     fetchVitals();
 
     return () => {
-      isMounted = false; // cleanup to prevent memory leaks
+      isMounted = false;
     };
   }, [hasPatient, patientData]);
 
@@ -93,8 +121,8 @@ const AppSidebar = () => {
       ? 0
       : patientData?.visitType ?? '—',
     bookingFor: patientData?.bookingFor || '_',
-    visitCount: patientData?.visitCount === null ? 0 : patientData?.visitCount ?? '—',
-    followUp: patientData?.freeFollowUpsLeft || '—',
+    visitCount: patientData?.freeFollowUpsLeft === null ? 0 : patientData?.freeFollowUpsLeft ?? '—',
+    followUp: patientData?.freeFollowUps || '—',
     symptom: patientData?.problem || '—',
     patientId: patientData?.patientId || '—',
     clinicName: patientData?.clinicName || '—',
@@ -123,9 +151,29 @@ const AppSidebar = () => {
   //   setPatientData(null)
   // }, [setPatientData])
 
-  const imgSrc = doctorDetails?.doctorPicture.startsWith('data:image')
-    ? doctorDetails?.doctorPicture
-    : `data:image/png;base64,${doctorDetails?.doctorPicture}`
+  let rawImg = doctorDetails?.doctorPicture || doctorDetails?.profilePicture || clinicDetails?.hospitalLogo || clinicDetails?.clinicLogo;
+  if (typeof rawImg === 'string' && (rawImg === 'null' || rawImg === 'undefined' || rawImg.trim() === '')) {
+    rawImg = null;
+  }
+
+  if (rawImg && rawImg.includes('amazonaws.com/data%3Aimage')) {
+    try {
+      const decoded = decodeURIComponent(rawImg);
+      const dataIdx = decoded.indexOf('data:image');
+      if (dataIdx !== -1) {
+        rawImg = decoded.substring(dataIdx).split('?')[0];
+      }
+    } catch (e) {
+      console.error('Error decoding image URL', e);
+    }
+  }
+
+  const doctorImage = rawImg
+    ? (rawImg.startsWith('data:image') || rawImg.startsWith('http://') || rawImg.startsWith('https://')
+      ? rawImg
+      : `data:image/jpeg;base64,${rawImg}`)
+    : null;
+  const imgSrc = doctorImage || doctor;
 
   return (
     <>
@@ -178,16 +226,16 @@ const AppSidebar = () => {
                 <h4
                   className="mb-2 mt-2"
                   style={{
-                    color: COLORS.black,
+                    color: COLORS.white,
                     fontWeight: 'bold',
                     fontSize: SIZES.large,
-                    textAlign: 'center',        // horizontally center
+                    textAlign: 'center',
                     display: 'block',
-                    lineHeight: '1.2',          // adjust spacing between lines
-                    wordWrap: 'break-word',     // allow breaking long words
+                    lineHeight: '1.2',
+                    wordWrap: 'break-word',
                     overflowWrap: 'break-word',
-                    maxWidth: '100%',           // optional, restrict width
-                    whiteSpace: 'normal',       // allow wrapping
+                    maxWidth: '100%',
+                    whiteSpace: 'normal',
                   }}
                 >
                   {capitalizeEachWord(display.name)}
@@ -195,7 +243,7 @@ const AppSidebar = () => {
                 <div style={{ height: "12px" }}></div>
 
                 <div style={{ textAlign: "left", width: "100%", marginLeft: "15px" }}>
-                  <h6 style={{ color: COLORS.black, fontSize: SIZES.small, marginBottom: "6px" }}>
+                  <h6 style={{ color: COLORS.white, fontSize: SIZES.small, marginBottom: "6px" }}>
                     <strong>Age / Gender:</strong>{" "}
                     <span>
                       {display.age
@@ -208,41 +256,41 @@ const AppSidebar = () => {
                       / {display.gender || "-"}
                     </span>
                   </h6>
-                  <h6 style={{ color: COLORS.black, fontSize: SIZES.small, marginBottom: "6px" }}>
-                    <strong>Mobile:</strong> <span>{display.mobile}</span>
+                  <h6 style={{ color: COLORS.white, fontSize: SIZES.small, marginBottom: "6px" }}>
+                    <strong>Mobile:</strong> <span>{display.mobile || display.patientMobileNumber || "-"}</span>
                   </h6>
-                  <h6 style={{ color: COLORS.black, fontSize: SIZES.small, marginBottom: "6px" }}>
+                  <h6 style={{ color: COLORS.white, fontSize: SIZES.small, marginBottom: "6px" }}>
                     <strong>Visit Type:</strong> <span>{capitalizeFirst(display.visitType)}</span>
                   </h6>
-                  <h6 style={{ color: COLORS.black, fontSize: SIZES.small, marginBottom: "6px" }}>
-                    <strong>Visit Count:</strong> <span>{display.visitCount === '—' ? 0 : display.visitCount}</span>
+                  <h6 style={{ color: COLORS.white, fontSize: SIZES.small, marginBottom: "6px" }}>
+                    <strong>Free FollowUp Left:</strong> <span>{display.visitCount === '—' ? 0 : display.visitCount}</span>
                   </h6>
-                  <h6 style={{ color: COLORS.black, fontSize: SIZES.small, marginBottom: "6px" }}>
-                    <strong>FollowUp Count:</strong> <span>{display.followUp === '—' ? 0 : display.followUp}</span>
+                  <h6 style={{ color: COLORS.white, fontSize: SIZES.small, marginBottom: "6px" }}>
+                    <strong>FollowUp:</strong> <span>{display.followUp === '—' ? 0 : display.followUp}</span>
                   </h6>
                 </div>
-                <hr className="w-100 my-2" />
+                <hr className="w-100 my-2" style={{ borderColor: 'rgba(255,255,255,0.2)' }} />
                 <div className="w-100 px-2">
                   <h4
                     className="mb-2 mt-2"
-                    style={{ color: COLORS.black, fontWeight: 'bold', fontSize: SIZES.large }}
+                    style={{ color: COLORS.white, fontWeight: 'bold', fontSize: SIZES.large }}
                   >
                     Vitals
                   </h4>
-                  <h6 className="mb-1" style={{ color: COLORS.black, fontSize: SIZES.small }}>
-                    <strong>Height:</strong> <span>{display.vitals.height === '—' ? 0 : display.vitals.height} cm</span>
+                  <h6 className="mb-1" style={{ color: COLORS.white, fontSize: SIZES.small }}>
+                    <strong >Height:</strong> <span>{display.vitals?.height ? display.vitals.height : 0} cm</span>
                   </h6>
-                  <h6 className="mb-1" style={{ color: COLORS.black, fontSize: SIZES.small }}>
-                    <strong>Weight:</strong> <span>{display.vitals.weight === '—' ? 0 : display.vitals.weight} kg</span>
+                  <h6 className="mb-1" style={{ color: COLORS.white, fontSize: SIZES.small }}>
+                    <strong>Weight:</strong> <span>{display.vitals?.weight ? display.vitals.weight : 0} kg</span>
                   </h6>
-                  <h6 className="mb-1" style={{ color: COLORS.black, fontSize: SIZES.small }}>
-                    <strong>Blood Pressure:</strong> <span>{display.vitals.bloodPressure === '—' ? 0 : display.vitals.bloodPressure} mmHg</span>
+                  <h6 className="mb-1" style={{ color: COLORS.white, fontSize: SIZES.small }}>
+                    <strong>Blood Pressure:</strong> <span>{display.vitals?.bloodPressure ? display.vitals.bloodPressure : 0} mmHg</span>
                   </h6>
-                  <h6 className="mb-1" style={{ color: COLORS.black, fontSize: SIZES.small }}>
-                    <strong>Temperature:</strong> <span>{display.vitals.temperature === '—' ? 0 : display.vitals.temperature} °C</span>
+                  <h6 className="mb-1" style={{ color: COLORS.white, fontSize: SIZES.small }}>
+                    <strong>Temperature:</strong> <span>{display.vitals?.temperature ? display.vitals.temperature : 0} °C</span>
                   </h6>
-                  <h6 className="mb-1" style={{ color: COLORS.black, fontSize: SIZES.small }}>
-                    <strong>BMI:</strong> <span>{display.vitals.bmi === '—' ? 0 : display.vitals.bmi} kg/m²</span>
+                  <h6 className="mb-1" style={{ color: COLORS.white, fontSize: SIZES.small }}>
+                    <strong>BMI:</strong> <span>{display.vitals?.bmi ? display.vitals.bmi : 0} kg/m²</span>
                   </h6>
                 </div>
 
@@ -256,42 +304,72 @@ const AppSidebar = () => {
                     justifyContent: 'center',
                     alignContent: 'center',
                     alignItems: 'center',
+                    width: '100%',
                   }}
                 >
-                  {doctorDetails?.doctorPicture ? (
-                    <CImage
-                      src={imgSrc}
-                      alt="Doctor"
-                      width={100}
-                      height={100}
-                      className="rounded-circle border"
-                      style={{ borderWidth: 2, padding: 5, color: COLORS.gray, objectFit: 'cover' }}
-                    />
+                  {isLoadingDoctor && !doctorDetails ? (
+                    <div className="w-100 d-flex flex-column align-items-center">
+                      <div
+                        className="rounded-circle border mb-2"
+                        style={{ width: 100, height: 100, opacity: 0.3, backgroundColor: 'rgba(255,255,255,0.1)' }}
+                      />
+                      <div
+                        className="mb-1"
+                        style={{ width: '75%', height: 14, background: '#eee', borderRadius: 4, opacity: 0.5 }}
+                      />
+                      <div style={{ width: '50%', height: 12, background: '#eee', borderRadius: 4, opacity: 0.5 }} />
+                    </div>
                   ) : (
-                    <p>Loading image...</p>
-                  )}
+                    <>
+                      <CImage
+                        src={imgSrc}
+                        alt="Doctor"
+                        width={100}
+                        height={100}
+                        className="rounded-circle border"
+                        style={{
+                          borderWidth: 2,
+                          padding: 5,
+                          color: COLORS.gray,
+                          objectFit: 'cover',
+                          backgroundColor: 'rgba(255,255,255,0.1)'
+                        }}
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = doctor;
+                        }}
+                      />
 
-                  {/*                  
-<CImage
-  src={data:image/png;base64,${doctorDetails?.doctorPicture }}
-  alt="Doctor"
-  width={100}
-  className="rounded-circle border"
-  style={{ borderWidth: 2, padding: 5, color: COLORS.gray }}
-/> */}
-                  <h4
-                    className=" mb-0 mt-2 text-center"
-                    style={{ color: COLORS.black, fontWeight: 'bold', fontSize: SIZES.large }}
-                  >
-                    {capitalizeWords(doctorDetails?.doctorName) || 'Doctor Name'}
-                  </h4>
-                  <h6
-                    className="mb-0 mt-1 text-center"
-                    style={{ color: COLORS.black, fontSize: SIZES.small }}
-                  >
-                    {doctorDetails?.qualification || 'Qualification'} ({' '}
-                    {doctorDetails?.specialization || 'Specialization'})
-                  </h6>
+                      <h4
+                        className=" mb-0 mt-2 text-center"
+                        style={{ color: COLORS.white, fontWeight: 'bold', fontSize: SIZES.large }}
+                      >
+                        {capitalizeWords(
+                          doctorDetails?.doctorName ||
+                          doctorDetails?.staffName ||
+                          doctorDetails?.name ||
+                          doctorDetails?.userName ||
+                          localStorage.getItem('doctorName') ||
+                          'Doctor Name'
+                        )}
+                      </h4>
+                      <h6
+                        className="mb-0 mt-1 text-center"
+                        style={{ color: COLORS.white, fontSize: SIZES.small }}
+                      >
+                        {doctorDetails?.qualification || doctorDetails?.degree || 'Qualification'} (
+                        {doctorDetails?.specialization || doctorDetails?.speciality || 'Specialization'})
+                      </h6>
+                      {clinicDetails?.name && (
+                        <h6
+                          className="mb-0 mt-1 text-center"
+                          style={{ color: COLORS.white, fontSize: SIZES.small, opacity: 0.9 }}
+                        >
+                          {clinicDetails.name}
+                        </h6>
+                      )}
+                    </>
+                  )}
                 </div>
               </>
             )}
@@ -306,60 +384,6 @@ const AppSidebar = () => {
 
         {/* Show navigation only when NOT loading and no patient selected */}
         {!isPatientLoading && !hasPatient && <AppSidebarNav items={navigation} />}
-
-        {/* Show Patient Ratings only if ratings exist */}
-        {!isPatientLoading && !hasPatient && ratings.length > 0 && (
-          <CSidebarFooter className="border-top d-none d-lg-flex flex-column mt-2" style={{ paddingLeft: 10, paddingRight: 10 }}>
-            <h6 style={{ color: COLORS.black, fontWeight: 'bold', marginBottom: '0.5rem' }}>
-              Patient Ratings
-            </h6>
-
-            {ratings.map((item, index) => (
-              <div
-                key={index}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  marginBottom: 8,
-                  width: '100%',
-                }}
-              >
-                {/* Label */}
-                <div style={{ minWidth: 100 }}>
-                  <small style={{ color: COLORS.black, fontSize: SIZES.small, fontWeight: 'bold' }}>
-                    {item.category}
-                  </small>
-                </div>
-
-                {/* Progress bar */}
-                {item.percentage > 0 && (
-                  <div style={{ flex: 1 }}>
-                    <div
-                      className="progress"
-                      style={{ height: 8, borderRadius: 4, backgroundColor: '#e9ecef' }}
-                    >
-                      <div
-                        className={`progress-bar ${item.category.toLowerCase().includes('excellent')
-                          ? 'bg-success'
-                          : item.category.toLowerCase().includes('good')
-                            ? 'bg-primary'
-                            : item.category.toLowerCase().includes('average')
-                              ? 'bg-warning'
-                              : 'bg-secondary'
-                          }`}
-                        role="progressbar"
-                        style={{ width: `${item.percentage}%`, borderRadius: 4 }}
-                        aria-valuenow={item.percentage}
-                        aria-valuemin="0"
-                        aria-valuemax="100"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </CSidebarFooter>
-        )}
       </CSidebar>
       <CModal
         visible={showModal}
@@ -389,9 +413,9 @@ const AppSidebar = () => {
               </div>
             </div>
             <div className="info-grid">
-              <div><strong>Age/Gender:</strong> {display.age} / {display.gender}</div>
+              <div><strong>Age/Gender:</strong> {display.age} Yrs / {display.gender}</div>
               <div><strong>Mobile:</strong> {display.mobile}</div>
-              <div><strong>Booking For:</strong> {capitalizeFirst(display.bookingFor)}</div>
+              {/* <div><strong>Booking For:</strong> {capitalizeFirst(display.bookingFor)}</div> */}
               <div><strong>Visit Type:</strong> {capitalizeFirst(display.visitType)}</div>
               <div><strong>Visit Count:</strong> {display.visitCount === '—' ? 0 : display.visitCount}</div>
               <div><strong>FollowUps:</strong> {display.followUp === '—' ? 0 : display.followUp}</div>
@@ -399,7 +423,7 @@ const AppSidebar = () => {
           </div>
 
           {/* --- CLINIC / DOCTOR --- */}
-          <div className="info-card">
+          {/* <div className="info-card">
             <div className="info-block">
               <h5>Clinic Details</h5>
               <p><strong>{display.clinicName}</strong> ({display.clinicId})</p>
@@ -409,16 +433,16 @@ const AppSidebar = () => {
               <h5>Doctor</h5>
               <p><strong>{display.doctorName}</strong> ({display.doctorId})</p>
             </div>
-          </div>
+          </div> */}
 
           {/* --- DURATION & PROBLEM --- */}
           <div className="info-card">
             <div className="info-grid-2">
               <div>
-                <h5>Duration</h5>
+                <h5>Consultation Fee</h5>
                 <p>
-                  Consultation Expiration:{" "}
-                  {display?.consultationExpiration || "—"}
+
+                  {display?.consultationFee || "—"}
                 </p>
               </div>
               <div>
@@ -436,7 +460,7 @@ const AppSidebar = () => {
                 <p>Date: {display.serviceDate}</p>
                 <p>Time: {display.serviceTime}</p>
               </div>
-              <div>
+              {/* <div>
                 <h5>Sub-Service</h5>
                 {display?.subServiceId ? (
                   <>
@@ -446,16 +470,16 @@ const AppSidebar = () => {
                 ) : (
                   <p>—</p>
                 )}
-              </div>
+              </div> */}
             </div>
           </div>
 
           {/* --- FEES --- */}
-          <div className="info-card">
+          {/* <div className="info-card">
             <h5>Fees</h5>
             <p>Consultation Fee: {fmt(display.consultationFee)}</p>
             <p>Total Fee: {fmt(display.totalFee)}</p>
-          </div>
+          </div> */}
 
           {/* --- VITALS --- */}
           <div className="info-card">

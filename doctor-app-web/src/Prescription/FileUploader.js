@@ -127,7 +127,8 @@ function detectMimeFromBytes(bytes) {
 }
 
 function guessMimeFromExtension(path) {
-  const m = (path.match(/\.([a-z0-9]+)$/i) || [, ''])[1].toLowerCase()
+  const urlWithoutQuery = typeof path === 'string' ? path.split('?')[0] : '';
+  const m = (urlWithoutQuery.match(/\.([a-z0-9]+)$/i) || [, ''])[1].toLowerCase()
   switch (m) {
     case 'png':
       return 'image/png'
@@ -173,6 +174,7 @@ const FileUploader = ({ label, attachments = [] }) => {
         !(item instanceof ArrayBuffer)
       ) {
         const raw =
+         item.url ??   // ✅ ADD THIS LINE (IMPORTANT)
           item.data ??
           item.base64 ??
           item.attachments ?? // some backends use this
@@ -270,9 +272,15 @@ const FileUploader = ({ label, attachments = [] }) => {
           const blob = dataUrlToBlob(file.path)
           openBlobInNewTab(blob)
         } else if (isHttpUrl(file.path)) {
-          // protected URL -> fetch with auth -> blob
-          const blob = await fetchToBlobWithAuth(file.path)
-          openBlobInNewTab(blob)
+          if (file.path.includes('X-Amz-Signature=') || file.path.includes('amazonaws.com')) {
+            setOpening(false);
+            setPreviewFile(file);
+            return;
+          } else {
+            // protected URL -> fetch with auth -> blob
+            const blob = await fetchToBlobWithAuth(file.path)
+            openBlobInNewTab(blob)
+          }
         } else {
           // local/relative path – try just opening
           const win = window.open(file.path, '_blank')
@@ -330,11 +338,76 @@ const FileUploader = ({ label, attachments = [] }) => {
               ×
             </button>
             {previewFile.type.startsWith('image/') ? (
-              <img src={previewFile.path} alt="Preview" className="modal-image" />
+              <div style={{ textAlign: 'center' }}>
+                <img 
+                  src={previewFile.path} 
+                  alt="Preview" 
+                  className="modal-image" 
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    const fallback = document.getElementById('image-error-fallback');
+                    if (fallback) fallback.style.display = 'block';
+                  }}
+                />
+                <div id="image-error-fallback" style={{ display: 'none', padding: '3rem 1rem', background: '#f8f9fa', borderRadius: '8px', minWidth: '300px' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '1rem' }}>🖼️</div>
+                  <h5 style={{ color: '#1B4F8A', fontWeight: 'bold' }}>Image Preview Unavailable</h5>
+                  <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '1.5rem' }}>
+                    The server is enforcing a secure download for this image, or the image format is not supported inline.
+                  </p>
+                  <a 
+                    href={previewFile.path} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    style={{ 
+                      padding: '10px 24px', borderRadius: '20px', background: '#1B4F8A', 
+                      color: 'white', textDecoration: 'none', fontWeight: 'bold', display: 'inline-block' 
+                    }}
+                  >
+                    Download Image
+                  </a>
+                </div>
+                <div style={{ marginTop: '15px' }}>
+                  <a 
+                    href={previewFile.path} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    style={{ color: '#1B4F8A', fontWeight: '600', textDecoration: 'underline', fontSize: '14px' }}
+                  >
+                    Open / Download Image
+                  </a>
+                </div>
+              </div>
             ) : previewFile.type === 'application/pdf' ? (
-              <iframe src={previewFile.path} title="PDF Preview" className="modal-iframe" />
+              <div style={{ textAlign: 'center', background: '#f8f9fa', borderRadius: '8px', overflow: 'hidden' }}>
+                <iframe 
+                  src={`https://docs.google.com/viewer?url=${encodeURIComponent(previewFile.path)}&embedded=true`} 
+                  className="modal-iframe"
+                  style={{ width: '85vw', height: '75vh', border: 'none', display: 'block' }}
+                  title="PDF Preview"
+                />
+                <div style={{ padding: '12px', borderTop: '1px solid #e5e7eb' }}>
+                  <a 
+                    href={previewFile.path} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    style={{ 
+                      padding: '8px 24px', borderRadius: '20px', background: '#1B4F8A', 
+                      color: 'white', textDecoration: 'none', fontWeight: 'bold', display: 'inline-block',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Download Original PDF
+                  </a>
+                </div>
+              </div>
             ) : (
-              <p>{previewFile.name}</p>
+              <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+                <p style={{ fontSize: '16px', fontWeight: 'bold' }}>{previewFile.name}</p>
+                <a href={previewFile.path} target="_blank" rel="noopener noreferrer" style={{ color: '#1B4F8A', fontWeight: '600', textDecoration: 'underline' }}>
+                  Download File
+                </a>
+              </div>
             )}
           </div>
         </div>

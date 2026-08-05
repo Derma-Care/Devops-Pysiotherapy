@@ -80,7 +80,7 @@
 //     (error) => {
 //       if (error.response?.status === 401) {
 //         toast.error('Session expired. Please login again.')
-//         // localStorage.removeItem('token')
+//         // sessionStorage.removeItem('token')
 //         // window.location.href = '/login'
 //       } else {
 //         toast.error(error.response?.data?.message || 'Request failed.')
@@ -95,7 +95,7 @@
 //     (error) => {
 //       if (error.response?.status === 401) {
 //         toast.error('Session expired. Please login again.')
-//         // localStorage.removeItem('token')
+//         // sessionStorage.removeItem('token')
 //         // window.location.href = '/login'
 //       }
 //       return Promise.reject(error)
@@ -130,7 +130,7 @@
 //   // ✅ Request interceptor → attach token automatically
 //   const reqInterceptor = http.interceptors.request.use(
 //     (config) => {
-//       // const token = getAuthToken?.() || localStorage.getItem('token')
+//       // const token = getAuthToken?.() || sessionStorage.getItem('token')
 //       // if (token) {
 //       //   config.headers.Authorization = `Bearer ${token}`
 //       // }
@@ -149,7 +149,7 @@
 //       if (error.response?.status === 401) {
 //         toast.error('Session expired. Please login again.')
 //         // optional: log out user
-//         // localStorage.removeItem('token')
+//         // sessionStorage.removeItem('token')
 //         // window.location.href = '/login'
 //       } else if (error.response?.data?.message) {
 //         toast.error(error.response.data.message)
@@ -175,18 +175,18 @@ import { showCustomToast } from './Toaster'
 export const http = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
-  timeout: 10000,
+  timeout: 60000,
 })
 export const https = axios.create({
-  splrURL:wifiUrl,
+  splrURL: wifiUrl,
   withCredentials: true,
-  timeout: 20000,
+  timeout: 60000,
 })
 
 export const httpPublic = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
-  timeout: 20000,
+  timeout: 60000,
 })
 
 /* --------------------- Toast Control Flag --------------------- */
@@ -194,7 +194,7 @@ let isToastActive = false
 const showToastOnce = (message) => {
   if (!isToastActive) {
     isToastActive = true
-    showCustomToast(message,'error', {
+    showCustomToast(message, 'error', {
       onClose: () => {
         // reset when toast closes
         isToastActive = false
@@ -207,7 +207,7 @@ const showToastOnce = (message) => {
 export function attachInterceptors(getAuthToken) {
   const reqInterceptor = http.interceptors.request.use(
     (config) => {
-      // const token = getAuthToken?.() || localStorage.getItem('token')
+      // const token = getAuthToken?.() || sessionStorage.getItem('token')
       // if (token) config.headers.Authorization = `Bearer ${token}`
       return config
     },
@@ -220,29 +220,51 @@ export function attachInterceptors(getAuthToken) {
       const status = error.response?.status
       const message = error.response?.data?.message
 
-      // ✅ Check for network errors or server down
-      if (error.message === 'Network Error' || !error.response) {
-        showToastOnce('🚫 Server unreachable. Please try again later.')
+      // ✅ No Internet Connection
+      if (!navigator.onLine) {
+        showToastOnce(
+          "📡 No internet connection. Please check your network."
+        )
       }
-      // ✅ Check for timeout
-      else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        showToastOnce('⏱️ Request timed out. Please try again.')
+
+      // ✅ Timeout / Slow Internet
+      else if (
+        error.code === "ECONNABORTED" ||
+        error.message?.toLowerCase().includes("timeout")
+      ) {
+        showToastOnce(
+          "⏱️ Internet is slow or request timed out. Please try again."
+        )
       }
+
+      // ✅ Request sent but no response (server issue)
+      else if (!error.response) {
+        showToastOnce(
+          "🚫 Unable to reach server. Please try again later."
+        )
+      }
+
       // ✅ Unauthorized
       else if (status === 401) {
-        showToastOnce('🔒 Session expired. Please login again.')
+        showToastOnce(
+          "🔒 Session expired. Please login again."
+        )
       }
-      // ✅ API-specific error message
+
+      // ✅ API Message
       else if (message) {
         showCustomToast(message)
       }
-      // ✅ Fallback message
+
+      // ✅ Fallback
       else {
-        showToastOnce('❌ Something went wrong. Please try again.')
+        showToastOnce(
+          "❌ Something went wrong. Please try again."
+        )
       }
 
       return Promise.reject(error)
-    },
+    }
   )
 
   // optional cleanup function

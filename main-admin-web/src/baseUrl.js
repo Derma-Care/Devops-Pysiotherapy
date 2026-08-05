@@ -1,15 +1,20 @@
 // export const BASE_URL = 'http://alb-dev-sc-197990416.ap-south-1.elb.amazonaws.com/api'
 // const ipUrl = 'localhost'
-const ipUrl = '52.66.144.177:9090'
-export const BASE_URL = `http://${ipUrl}`
-export const CLINIC_ADMIN_URL = `http://${ipUrl}`
+// const ipUrl = '3.7.216.95:9090'
+
+import axios from 'axios';
+
+const ipUrl = 'api.ccmstestserver.online'
+
+export const BASE_URL = `https://${ipUrl}`
+export const CLINIC_ADMIN_URL = `https://${ipUrl}`
 export const MainAdmin_URL = `${BASE_URL}/admin`
-export const Procedure_URL=`http://${ipUrl}`
+export const Procedure_URL=`https://${ipUrl}`
 export const ClinicBase_url=`${BASE_URL}/admin`
 // export let wifiUrl = '192.168.1.7'
 
 // export const CUSTOMER_SERVICE_URL = `http://${ipUrl}:8083/api`
-export const Booking_service_Url = `http://${ipUrl}/api`
+export const Booking_service_Url = `https://${ipUrl}/api`
 
 // export const BOOKING_SERVICE_URL = `http://${ipUrl}:8087/api/v1`
 // export const BASE_URLS = `http://${ipUrl}:8080/api/v1`
@@ -17,7 +22,7 @@ export const Booking_service_Url = `http://${ipUrl}/api`
 export const SERVICE_URL = `admin/updateByServiceId`
 
 //sub-service
-export const subService_URL = `http://${ipUrl}/admin`
+export const subService_URL = `https://${ipUrl}/admin`
 export const ADD_SERVICE = 'addService'
 export const GET_ALL_SERVICES = 'getAllServices'
 export const DELETE_SERVICE_URL = `deleteService`
@@ -210,3 +215,32 @@ export const updateProcedureDetails='admin/updateSubService'
 
 
 export const getSubService='admin/getSubService'
+
+// ─── Status API ───────────────────────────────────────────────────────────────
+// These endpoints trigger backend email notifications on status change.
+// If emails are not being received, the issue is in the backend email service
+// (e.g. SMTP config, email template, or the endpoint not sending emails).
+export const statusapi = {
+  /**
+   * Moves clinic to VERIFICATION_IN_PROGRESS.
+   * Backend should send a "verification started" email to clinic's emailAddress.
+   */
+  startClinic: (id) =>
+    axios.put(`${MainAdmin_URL}/start-verification/${id}`),
+
+  /**
+   * Moves clinic to VERIFIED.
+   * Backend should send a "congratulations, you are verified" email.
+   */
+  verifyClinic: (id) =>
+    axios.put(`${MainAdmin_URL}/verify/${id}`),
+
+  /**
+   * Moves clinic to REJECTED with a reason.
+   * Backend should send a "your clinic was rejected" email with the reason.
+   */
+  rejectClinic: (id, reason) =>
+    axios.put(`${MainAdmin_URL}/reject/${id}`, null, {
+      params: { reason },
+    }),
+}

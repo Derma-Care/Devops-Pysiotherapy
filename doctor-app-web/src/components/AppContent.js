@@ -35,19 +35,18 @@ const AppContent = () => {
           <Route path="doctorprofile" element={<DoctorProfile />} />
           {/* <Route path="/reportDetails/:id" element={<ReportDetails />} /> */}
 
-          {/* Doctor-template opens with all tabs but History active */}
+          {/* Doctor-template opens with Diagnosis and subsequent tabs */}
           <Route
             path="/doctor-template"
             element={
               <PatientAppointmentDetails
-                defaultTab="Symptoms"
-                fromDoctorTemplate={true} // ✅ tells TabContent to load DoctorSymptoms
+                defaultTab="Diagnosis"
+                fromDoctorTemplate={true} // ✅ tells TabContent to load DoctorSymptoms/Summary template views
                 tabs={[
                   'Diagnosis',
-                  'Investigations',
-                  'Medication',
-                  'Procedures',
-                  'Follow-up',
+                  'Investigation',
+                  'Plan',
+                  'HomePlan',
                   'Prescription',
                 ]}
               />

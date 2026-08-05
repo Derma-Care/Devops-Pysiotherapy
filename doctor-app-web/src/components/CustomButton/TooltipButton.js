@@ -8,17 +8,53 @@ import { useNavigate } from 'react-router-dom'
 import { useDoctorContext } from '../../Context/DoctorContext'
 import { flushSync } from 'react-dom'
 import { CSpinner } from '@coreui/react'
-import { getInProgressDetails } from '../../Auth/Auth'
+import { getInProgressDetails, getFollowUpRecord } from '../../Auth/Auth'
 import { capitalizeFirst } from '../../utils/CaptalZeWord'
+import { normalizeSavedData } from '../../utils/normalizeData'
 
 const generateContent = (patient) => (
   <div className="tooltip-body">
-    <div><strong>Name:</strong> {capitalizeFirst(patient.name)}</div>
-    <div><strong>Age:</strong> {patient.age}</div>
-    <div><strong>Gender:</strong> {patient.gender}</div>
-    <div><strong>Problem:</strong> {patient.problem}</div>
-    {patient.subService && <div><strong>Subservice:</strong> {patient.subService}</div>}
-    {patient.duration && <div><strong>Duration:</strong> {patient.duration}</div>}
+    {[
+      { label: 'Name', value: capitalizeFirst(patient.name) },
+      { label: 'Age', value: patient.age },
+      { label: 'Gender', value: patient.gender },
+      { label: 'Problem', value: patient.problem },
+      ...(patient.subService ? [{ label: 'Subservice', value: patient.subService }] : []),
+      ...(patient.duration ? [{ label: 'Duration', value: patient.duration }] : []),
+    ].map(({ label, value }) => (
+      <div
+        key={label}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '5px 0',
+          borderBottom: '1px solid rgba(27,79,138,0.08)',
+        }}
+      >
+        <span
+          style={{
+            fontSize: '11px',
+            fontWeight: '600',
+            color: COLORS.bgcolor,
+            minWidth: '72px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.4px',
+          }}
+        >
+          {label}
+        </span>
+        <span
+          style={{
+            fontSize: '13px',
+            color: '#1a1a2e',
+            fontWeight: '500',
+          }}
+        >
+          {value || '—'}
+        </span>
+      </div>
+    ))}
   </div>
 )
 
@@ -26,67 +62,216 @@ const TooltipButton = ({ patient, onSelect, tab, disabled }) => {
   const navigate = useNavigate()
   const { setPatientData } = useDoctorContext()
   const [navLoading, setNavLoading] = useState(false)
+  const [isActive, setIsActive] = useState(false)   // tracks click/active state
 
   const popover = (
-    <Popover id={`popover-${patient.id}`} className="custom-popover">
-      {generateContent(patient)}
+    <Popover
+      id={`popover-${patient.id}`}
+      className="custom-popover"
+      style={{
+        border: `1.5px solid ${COLORS.bgcolor}`,
+        borderRadius: '10px',
+        boxShadow: '0 4px 16px rgba(27,79,138,0.12)',
+        minWidth: '220px',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Popover header strip */}
+      <div
+        style={{
+          backgroundColor: COLORS.bgcolor,
+          padding: '8px 14px',
+          fontSize: '12px',
+          fontWeight: '600',
+          color: COLORS.white,
+          letterSpacing: '0.5px',
+          textTransform: 'uppercase',
+        }}
+      >
+        Patient Info
+      </div>
+
+      {/* Popover body */}
+      <div
+        style={{
+          backgroundColor: COLORS.white,
+          padding: '10px 14px',
+        }}
+      >
+        {generateContent(patient)}
+      </div>
     </Popover>
   )
 
   const handleClick = async () => {
+    setIsActive(true)                          // turn orange on click
     flushSync(() => setNavLoading(true))
-
     try {
       let formData = {}
       let details = null
 
-      if (tab === 'In-Progress') {
-        // 🔥 fetch API
-        details = await getInProgressDetails(patient.patientId, patient.bookingId)
-        formData = details?.savedDetails?.[0] || {}
+      const vType = patient?.visitType?.toLowerCase()?.replace(/[\s_-]+/g, '') || ''
+      const isFollowUp = vType === 'followup' || vType === 'follow_up'
+      const tabLower = tab?.toLowerCase()?.replace(/[\s_-]+/g, '') || ''
+      const isTargetStatus = ['inprogress', 'inprograss', 'completed', 'investigationdone', 'dueforinvestigation'].includes(tabLower)
+
+      console.log('🧐 [TooltipButton] Clicked View. Raw Status:', tab, '| Raw VisitType:', patient?.visitType)
+      console.log('🧐 [TooltipButton] Evaluated isTargetStatus:', isTargetStatus, '| isFollowUp:', isFollowUp)
+
+      if (isFollowUp || isTargetStatus || tabLower === 'ongoing') {
+        const clinicId = localStorage.getItem('hospitalId')
+        const branchId = patient.branchId
+
+        const resp = await getFollowUpRecord(clinicId, branchId, patient.patientId, patient.bookingId)
+        console.log('✅ [TooltipButton] API Response:', resp)
+
+        // The API returns response.data.data or response.data.
+        // We need to find the record object, which might be the response itself or the first element of an array.
+        const record = Array.isArray(resp) ? resp[0] : (resp?.data && !Array.isArray(resp.data) ? resp.data : resp)
+        details = record || {}
+
+        // Handle nested savedDetails if present (common in some In-Progress responses)
+        const saved = details?.savedDetails?.[0] || details
+        formData = normalizeSavedData(saved)
       }
 
-      // save in context
       setPatientData({ ...patient, details })
       onSelect?.()
 
-      // navigation
-      if (tab === 'Confirmed') {
-        navigate(`/tab-content/${patient.patientId}`, { state: { patient, formData, fromTab: 'Confirmed' } })
-      } else if (tab === 'In-Progress') {
-        navigate(`/tab-inProgress/${patient.patientId}`, { state: { patient, formData, details, fromTab: 'In-Progress' } })
-      } else if (tab === 'Completed') {
-        navigate(`/tab-completed-content/${patient.patientId}`, { state: { patient, formData, fromTab: 'Completed' } })
+      if (tabLower === 'confirmed') {
+        navigate(`/tab-content/${patient.patientId}`, {
+          state: { patient, formData, details, fromTab: 'Confirmed' },
+        })
+      } else if (tabLower === 'inprogress' || tabLower === 'inprograss' || tabLower === 'ongoing') {
+        navigate(`/tab-inProgress/${patient.patientId}`, {
+          state: { patient, formData, details, fromTab: 'In-Progress' },
+        })
+      } else if (tabLower === 'completed') {
+        navigate(`/tab-completed-content/${patient.patientId}`, {
+          state: { patient, formData, details, fromTab: 'Completed' },
+        })
+      } else {
+        // Fallback for any other status (Pending, etc.)
+        navigate(`/tab-content/${patient.patientId}`, {
+          state: { patient, formData, details, fromTab: tab || 'Confirmed' },
+        })
       }
     } catch (error) {
-      console.error('❌ Failed to fetch details:', error)
+      console.error('Failed to fetch details:', error)
+      setIsActive(false)                       // reset to blue on error
       setNavLoading(false)
     }
+  }
+
+  // Derive button colors based on state priority:
+  // disabled/loading → gray | active/clicked → orange | default → navy blue
+  const getBgColor = () => {
+    if (navLoading || disabled) return '#e9ecef'
+    if (isActive) return COLORS.orange
+    return COLORS.bgcolor                      // navy blue #1B4F8A
+  }
+
+  const getBorderColor = () => {
+    if (navLoading || disabled) return '#dee2e6'
+    if (isActive) return COLORS.orange
+    return COLORS.bgcolor
+  }
+
+  const getTextColor = () => {
+    if (navLoading || disabled) return COLORS.gray
+    return COLORS.white
   }
 
   return (
     <>
       <OverlayTrigger trigger={['hover', 'focus']} placement="left" overlay={popover}>
         <span>
-          <Button
-            size="small"
-            customColor={COLORS.bgcolor}
+          <button
             onClick={handleClick}
-            disabled={disabled || navLoading} // <-- Use parent disabled + loading
+            disabled={disabled || navLoading}
+            style={{
+              backgroundColor: getBgColor(),
+              color: getTextColor(),
+              border: `1.5px solid ${getBorderColor()}`,
+              borderRadius: '8px',
+              padding: '4px 16px',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: navLoading || disabled ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s ease',
+              minWidth: '60px',
+            }}
+            onMouseEnter={(e) => {
+              if (!disabled && !navLoading && !isActive) {
+                // hover: show orange preview only when not already active
+                e.currentTarget.style.backgroundColor = COLORS.orange
+                e.currentTarget.style.borderColor = COLORS.orange
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!disabled && !navLoading && !isActive) {
+                // restore navy blue on mouse leave when not clicked
+                e.currentTarget.style.backgroundColor = COLORS.bgcolor
+                e.currentTarget.style.borderColor = COLORS.bgcolor
+              }
+            }}
           >
-            View
-          </Button>
+            {navLoading ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span
+                  style={{
+                    width: '10px',
+                    height: '10px',
+                    border: '2px solid #adb5bd',
+                    borderTopColor: COLORS.gray,
+                    borderRadius: '50%',
+                    display: 'inline-block',
+                    animation: 'spin 0.7s linear infinite',
+                  }}
+                />
+              </span>
+            ) : 'View'}
+          </button>
         </span>
       </OverlayTrigger>
 
+      {/* Spin keyframe */}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* Full screen loading overlay */}
       {navLoading && (
         <div
-          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-dark bg-opacity-25"
-          style={{ zIndex: 2000 }}
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{
+            zIndex: 2000,
+            backgroundColor: 'rgba(27, 79, 138, 0.15)',
+            backdropFilter: 'blur(2px)',
+          }}
         >
-          <div className="d-flex align-items-center">
-            <CSpinner className="me-2" />
-            <span>Opening patient…</span>
+          <div
+            style={{
+              backgroundColor: COLORS.white,
+              borderRadius: '12px',
+              padding: '20px 32px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              boxShadow: '0 4px 20px rgba(27,79,138,0.15)',
+              border: `1.5px solid ${COLORS.bgcolor}20`,
+            }}
+          >
+            <CSpinner
+              style={{ color: COLORS.bgcolor, width: '22px', height: '22px' }}
+            />
+            <span
+              style={{
+                color: COLORS.black,
+                fontWeight: '600',
+                fontSize: '14px',
+              }}
+            >
+              Opening patient…
+            </span>
           </div>
         </div>
       )}

@@ -10,7 +10,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 15000, // 15 sec timeout to detect slow internet
+  timeout: 60000, // 15 sec timeout to detect slow internet
 })
 
 // Request Interceptor
@@ -35,12 +35,11 @@ api.interceptors.response.use(
 
     if (err.response) {
       const { status } = err.response
-      console.log(object)
-      switch (err.response) {
+      switch (status) {
         case 401:
           localStorage.removeItem('token')
           showInfo('Session expired. Please log in again.', { title: 'Unauthorized' })
-          window.location.href = '/login'
+          window.location.href = '#/login'
           break
 
         case 403:
@@ -48,7 +47,7 @@ api.interceptors.response.use(
           break
 
         case 404:
-          showInfo('The requested resource was not found.', { title: 'Not Found' })
+          // Silent 404 - don't show toast as it's often used for optional checks
           break
 
         case 500:
@@ -61,7 +60,7 @@ api.interceptors.response.use(
     } else {
       // No response → Network/server issue
       if (err.code === 'ECONNABORTED') {
-       // showInfo('Request timed out. Please check your internet connection.', { title: 'Timeout' })
+        // showInfo('Request timed out. Please check your internet connection.', { title: 'Timeout' })
       } else {
         //   showInfo('Network error. Please check your connection.', { title: 'Network Error' })
       }

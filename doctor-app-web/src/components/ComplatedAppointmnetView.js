@@ -6,21 +6,40 @@ import { COLORS } from '../Themes'
 import { CCard, CCardBody, CNav, CNavItem, CNavLink, CContainer } from '@coreui/react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useDoctorContext } from '../Context/DoctorContext'
-import { SavePatientPrescription } from '../Auth/Auth'
+import { SavePatientPrescription, getInProgressDetails, getFollowUpRecord } from '../Auth/Auth'
 import { useToast } from '../utils/Toaster'
+import { normalizeSavedData } from '../utils/normalizeData'
+import Investigation from '../Prescription/Investigation'
 
 const CompletedAppointmentsView = ({ defaultTab, tabs, fromDoctorTemplate = false }) => {
   const { id } = useParams()
   const { state } = useLocation()
-  const { patientData } = useDoctorContext()
+  const { patientData, setPatientData } = useDoctorContext()
+
+  // Clear patient context on unmount so sidebar reverts to doctor profile
+  useEffect(() => {
+    return () => {
+      setPatientData(null)
+    }
+  }, [setPatientData])
+
   const [patient, setPatient] = useState(patientData || state?.patient || null)
   const navigate = useNavigate()
   const { success, info } = useToast()
 
   // Use tabs passed from props, or fallback to default
-  const TABS = tabs || ['History', 'Reports', 'Images']
+  const TABS = useMemo(() => {
+    if (tabs) return tabs
+    return ['History', 'Reports']
+  }, [tabs])
 
   const [activeTab, setActiveTab] = useState(defaultTab || TABS[0])
+
+  useEffect(() => {
+    if (!TABS.includes(activeTab) && TABS.length > 0) {
+      setActiveTab(TABS[0])
+    }
+  }, [TABS, activeTab])
   const [snackbar, setSnackbar] = useState({ show: false, message: '', type: '' })
 
   // Fetch patient if needed
@@ -39,16 +58,22 @@ const CompletedAppointmentsView = ({ defaultTab, tabs, fromDoctorTemplate = fals
     }
   }, [id, patient])
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(state?.formData || {
     symptoms: {},
-    tests: {},
+    assessment: {},
+    diagnosis: {},
+    investigation: {},
+    therapySessions: {},
+    exercisePlan: { exercises: [], homeAdvice: '' },
+    followUp: [],
     prescription: {},
-    treatments: {},
-    followUp: {},
-    summary: {},
     history: {},
     ClinicImages: {},
+    summary: {},
+    patientPain: '',
   })
+
+  // ── Pre-populated from TooltipButton, no need to fetch here again ──
 
   const goToNext = useCallback(
     (current) => {
@@ -59,88 +84,112 @@ const CompletedAppointmentsView = ({ defaultTab, tabs, fromDoctorTemplate = fals
   )
 
   const onNextMap = {
-    Diagnosis: (data) => {
+    Complaints: (data) => {
       setFormData((prev) => ({ ...prev, symptoms: { ...prev.symptoms, ...data } }))
+      goToNext('Complaints')
+    },
+    Assessment: (data) => {
+      setFormData((prev) => ({ ...prev, assessment: { ...prev.assessment, ...data } }))
+      goToNext('Assessment')
+    },
+    Diagnosis: (data) => {
+      setFormData((prev) => ({ ...prev, diagnosis: { ...prev.diagnosis, ...data } }))
       goToNext('Diagnosis')
     },
-    Investigations: (data) => {
-      setFormData((prev) => ({ ...prev, tests: { ...prev.tests, ...data } }))
-      goToNext('Investigations')
+    Investigation: (data) => {
+      setFormData((prev) => ({ ...prev, investigation: { ...prev.investigation, ...data } }))
+      goToNext('Investigation')
     },
-    Medication: (data) => {
+    Plan: (data) => {
+      setFormData((prev) => ({ ...prev, therapySessions: { ...prev.therapySessions, ...data } }))
+      goToNext('Plan')
+    },
+    HomePlan: (data) => {
+      setFormData((prev) => ({ ...prev, exercisePlan: { ...prev.exercisePlan, ...data } }))
+      goToNext('HomePlan')
+    },
+    FollowUp: (data) => {
+      setFormData((prev) => ({ ...prev, followUp: Array.isArray(data) ? data : prev.followUp }))
+      goToNext('FollowUp')
+    },
+    Prescription: (data) => {
       setFormData((prev) => ({ ...prev, prescription: { ...prev.prescription, ...data } }))
-      goToNext('Medication')
-    },
-    Procedures: (data) => {
-      setFormData((prev) => ({ ...prev, treatments: { ...prev.treatments, ...data } }))
-      goToNext('Procedures')
-    },
-    'Follow-up': (data) => {
-      setFormData((prev) => ({ ...prev, followUp: { ...prev.followUp, ...data } }))
-      goToNext('Follow-up')
-    },
-    Summary: async (data) => {
-      const payload = { ...formData, summary: { ...formData.summary, ...data } }
-      goToNext('Summary')
-      console.log('FINAL SUBMIT (Summary):', payload)
-    },
-    Images: (data) => {
-      setFormData((prev) => ({ ...prev, ClinicImages: { ...prev.ClinicImages, ...data } }))
-      goToNext('Images')
+      goToNext('Prescription')
     },
     History: (data) => {
-      const payload = { ...formData, history: { ...formData.history, ...data } }
-      setFormData((prev) => ({ ...prev, history: payload.history }))
-      console.log('FINAL SUBMIT (History):', payload)
+      setFormData((prev) => ({ ...prev, history: { ...prev.history, ...data } }))
+      goToNext('History')
+    },
+    Reports: (data) => {
+      setFormData((prev) => ({ ...prev, ClinicImages: { ...prev.ClinicImages, ...data } }))
+      goToNext('Reports')
     },
   }
 
   const counts = useMemo(
     () => ({
-      Investigations: formData?.tests?.selectedTests?.length || 0,
+      Assessment: formData?.tests?.selectedTests?.length || 0,
       Prescription: formData.prescription?.medicines?.length || 0,
-      Procedures: formData.treatments?.selectedTreatments?.length || 0,
+      TreatmentPlan: formData.treatments?.selectedTreatments?.length || 0,
       Images: formData.ClinicImages?.items?.length || 0,
     }),
     [formData],
   )
 
-const savePrescriptionTemplate = async () => {
-  try {
-    const diagnosis = formData.symptoms?.diagnosis?.trim() || ''
-    
-    // if (!diagnosis) {
-    //   alert('Diagnosis is missing. Cannot save template.')
-    //   return
-    // }
+  const savePrescriptionTemplate = async () => {
+    try {
+      const complaints = formData.symptoms?.complaints?.trim() || ''
 
-    const clinicId = localStorage.getItem('hospitalId')
-    const template = {
-      clinicId,
-      title: diagnosis,
-      symptoms: diagnosis,
-      tests: formData.tests || [],
-      prescription: formData.prescription || [],
-      treatments: formData.treatments || [],
-      followUp: formData.followUp || '',
+      // if (!complaints) {
+      //   alert('complaints is missing. Cannot save template.')
+      //   return
+      // }
+
+      const clinicId = localStorage.getItem('hospitalId')
+      const template = {
+        clinicId,
+        title: complaints,
+        symptoms: complaints,
+        assessment: formData.assessment || {},
+        investigation: formData.investigation || {},
+        diagnosis: formData.diagnosis || {},
+        therapySessions: formData.therapySessions || {},
+        followUp: formData.followUp || [],
+        exercisePlan: formData.exercisePlan || {},
+        recoverySupport: formData.recoverySupport || formData.exercisePlan?.recoverySupport || [],
+      }
+
+      const res = await SavePatientPrescription(template)
+      console.log('✅ Saved template response:', res)
+
+      if (res.status === 200) {
+        success(`${res.message || 'Prescription Template saved successfully to server!'}`, {
+          title: 'Success',
+        })
+      } else {
+        info(`${res.message || 'A prescription template updated successfully'}`, { title: 'Info' })
+      }
+    } catch (error) {
+      console.error('❌ Error saving template:', error)
+      alert('Failed to save prescription template. Please try again.')
     }
-
-    const res = await SavePatientPrescription(template)
-    console.log('✅ Saved template response:', res)
-
-    if (res.status === 200) {
-      success(`${res.message || 'Prescription Template saved successfully to server!'}`, {
-        title: 'Success',
-      })
-    } else {
-      info(`${res.message || 'A prescription template updated successfully'}`, { title: 'Info' })
-    }
-  } catch (error) {
-    console.error('❌ Error saving template:', error)
-    alert('Failed to save prescription template. Please try again.')
   }
-}
 
+
+  const complaintsSeed = useMemo(() => ({
+    ...formData.symptoms,
+    patientPain: formData.symptoms?.patientPain ?? formData.patientPain ?? '',
+    previousInjuries: formData.symptoms?.previousInjuries ?? formData.previousInjuries ?? '',
+    currentMedications: formData.symptoms?.currentMedications ?? formData.currentMedications ?? '',
+    allergies: formData.symptoms?.allergies ?? formData.allergies ?? '',
+    occupation: formData.symptoms?.occupation ?? formData.occupation ?? '',
+    insuranceProvider: formData.symptoms?.insuranceProvider ?? formData.insuranceProvider ?? '',
+    activityLevels: (formData.symptoms?.activityLevels?.length
+      ? formData.symptoms.activityLevels
+      : formData.activityLevels) ?? [],
+  }), [formData.symptoms, formData.patientPain, formData.previousInjuries,
+  formData.currentMedications, formData.allergies, formData.occupation,
+  formData.insuranceProvider, formData.activityLevels])
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -181,20 +230,6 @@ const savePrescriptionTemplate = async () => {
                         >
                           {t}
                         </span>
-                        {/* {count > 0 && (
-                          <span
-                            style={{
-                              background: COLORS.primary,
-                              color: '#fff',
-                              borderRadius: '50%',
-                              padding: '0 6px',
-                              fontSize: '12px',
-                              marginLeft: 6,
-                            }}
-                          >
-                            {count}
-                          </span>
-                        )} */}
                         {active && (
                           <span
                             style={{
@@ -223,6 +258,7 @@ const savePrescriptionTemplate = async () => {
         <TabContent
           activeTab={activeTab}
           formData={formData}
+          complaintsSeed={complaintsSeed}
           onNext={onNextMap[activeTab]}
           setActiveTab={setActiveTab}
           onSaveTemplate={savePrescriptionTemplate}

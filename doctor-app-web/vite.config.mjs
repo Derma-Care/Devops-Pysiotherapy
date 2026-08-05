@@ -12,7 +12,7 @@ export default defineConfig(() => {
     css: {
       postcss: {
         plugins: [
-          autoprefixer({}), // add options if needed
+          autoprefixer({}),
         ],
       },
     },
@@ -29,7 +29,9 @@ export default defineConfig(() => {
         },
       },
     },
-    plugins: [react()],
+    plugins: [
+      react(),
+    ],
     resolve: {
       alias: [
         {
@@ -41,9 +43,7 @@ export default defineConfig(() => {
     },
     server: {
       port: 3000,
-      proxy: {
-        // https://vitejs.dev/config/server-options.html
-      },
+      proxy: {},
     },
   }
 })

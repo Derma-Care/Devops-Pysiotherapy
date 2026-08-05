@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+
 import path from 'node:path'
 import autoprefixer from 'autoprefixer'
+import { COLORS } from './src/Constant/Themes'
 
 export default defineConfig(() => {
   return {
@@ -34,7 +36,9 @@ export default defineConfig(() => {
         },
       },
     },
-    plugins: [react()],
+    plugins: [
+      react()
+    ],
     resolve: {
       alias: [
         {
@@ -48,8 +52,8 @@ export default defineConfig(() => {
       host: '0.0.0.0',  // Ensure the server listens on all interfaces
       port: 3000,
       proxy: {
-        // https://vitejs.dev/config/server-options.html
+          // https://vitejs.dev/config/server-options.html
+        },
       },
-    },
-  }
-})
+    }
+  })

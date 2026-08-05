@@ -29,6 +29,7 @@ public class TherapistDTO {
     private List<String> treatmentTypes;
 
     private Availability availability;
+    private String emailId;
 
     private String bio;
 
@@ -38,8 +39,11 @@ public class TherapistDTO {
 
     private String role;
     private String physioType;
-
-   
+	private String dateofJoining;
+	private String emergencyContact;
+    private String aadharID;
+    private int totalSessionCount;
     private String userName;
     private String password;
+    private Boolean isPresent;
 }

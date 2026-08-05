@@ -16,9 +16,21 @@ import {
   cilLightbulb,
   cilBell,
   cilPeople,
+  cilGroup,
+  cilUserFollow,
+  cilUserPlus,
+  cilContact,
+  cilMedicalCross,
+  cilRunning,
+  cilLayers,
+  cilStar,
+  cilChatBubble,
+  cilBriefcase,
+  cilChart,
 } from '@coreui/icons'
 import { CNavItem } from '@coreui/react'
 import { NavLink } from 'react-router-dom'
+import { CircleHelp, CircleQuestionMark } from 'lucide-react'
 
 export const getNavigation = (permissions = {}) => {
   const allNav = [
@@ -32,7 +44,8 @@ export const getNavigation = (permissions = {}) => {
     {
       component: CNavItem,
       name: 'Appointments',
-      to: '/Appointment-Management',
+      // to: '/Appointment-Management',
+      to: '/followupDashboard',
       as: NavLink,
       icon: <CIcon icon={cilCalendar} customClassName="nav-icon" />,
     },
@@ -41,22 +54,22 @@ export const getNavigation = (permissions = {}) => {
       to: '/Employee-management',
       name: 'Employee management',
       as: NavLink,
-      icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
-    },
-    {
-      component: CNavItem,
-      name: 'Customer Management',
-      to: '/customer-management',
-      as: NavLink,
-      icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
+      icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
     },
     {
       component: CNavItem,
       name: 'Patient Management',
-      to: '/patient-management',
+      to: '/Patient-Management',
       as: NavLink,
-      icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
+      icon: <CIcon icon={cilUserFollow} customClassName="nav-icon" />,
     },
+    // {
+    //   component: CNavItem,
+    //   name: 'Patient Management',
+    //   to: '/patient-management',
+    //   as: NavLink,
+    //   icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
+    // },
     // {
     //   component: CNavItem,
     //   to: '/pharmacy-management',
@@ -64,19 +77,59 @@ export const getNavigation = (permissions = {}) => {
     //   as: NavLink,
     //   icon: <CIcon icon={cilTablet} customClassName="nav-icon" />,
     // },
-    {
-      component: CNavItem,
-      to: '/report-management',
-      name: 'Reports',
-      as: NavLink,
-      icon: <CIcon icon={cilDescription} customClassName="nav-icon" />,
-    },
+
     {
       component: CNavItem,
       to: '/package-management',
       name: 'Package Management',
       as: NavLink,
+      icon: <CIcon icon={cilBriefcase} customClassName="nav-icon" />,
+    },
+    {
+      component: CNavItem,
+      to: '/therapy-programs',
+      name: 'Program Management', //Program Management
+      as: NavLink,
+      icon: <CIcon icon={cilLayers} customClassName="nav-icon" />,
+    },
+    {
+      component: CNavItem,
+      to: '/therapy-Management',
+      name: 'Therapy Management',
+
+      as: NavLink,
+      icon: <CIcon icon={cilMedicalCross} customClassName="nav-icon" />,
+    },
+
+    {
+      component: CNavItem,
+      to: '/exercises',
+      name: 'Activity Library', //Exercises Management
+
+      as: NavLink,
+      icon: <CIcon icon={cilRunning} customClassName="nav-icon" />,
+    },
+
+    {
+      component: CNavItem,
+      to: '/report-management',
+      name: 'LabReport Management', //report management
+      as: NavLink,
       icon: <CIcon icon={cilDescription} customClassName="nav-icon" />,
+    },
+    {
+      component: CNavItem,
+      to: '/feedback',
+      name: 'Patient FeedBack',
+      as: NavLink,
+      icon: <CIcon icon={cilStar} customClassName="nav-icon" />,
+    },
+    {
+      component: CNavItem,
+      to: '/equipment-management',
+      name: 'Equipment Management',
+      as: NavLink,
+      icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
     },
 
     // {
@@ -93,39 +146,41 @@ export const getNavigation = (permissions = {}) => {
       as: NavLink,
       icon: <CIcon icon={cilClipboard} customClassName="nav-icon" />,
     },
-    {
-      component: CNavItem,
-      to: '/Treatments',
-      name: 'Treatments',
-      as: NavLink,
-      icon: <CIcon icon={cilHealing} customClassName="nav-icon" />,
-    },
-    {
-      component: CNavItem,
-      to: '/Procedure-Management',
-      name: 'Procedure Management',
-      as: NavLink,
-      icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
-    },
+    // {
+    //   component: CNavItem,
+    //   to: '/Treatments',
+    //   name: 'Treatments',
+    //   as: NavLink,
+    //   icon: <CIcon icon={cilHealing} customClassName="nav-icon" />,
+    // },
 
-    {
-      component: CNavItem,
-      to: '/consent-forms',
-      name: 'ConsentForms',
-      as: NavLink,
-      icon: <CIcon icon={cilNoteAdd} customClassName="nav-icon" />,
-    },
+
+
+    // {
+    //   component: CNavItem,
+    //   to: '/consent-forms',
+    //   name: 'ConsentForms',
+    //   as: NavLink,
+    //   icon: <CIcon icon={cilNoteAdd} customClassName="nav-icon" />,
+    // },
     {
       component: CNavItem,
       to: '/ref-doctor',
-      name: 'Refer Doctor',
+      name: 'Refered By Doctor',  //Referred BY Doctors
       as: NavLink,
       icon: <CIcon icon={cilNotes} customClassName="nav-icon" />,
     },
+    // {
+    //   component: CNavItem,
+    //   to: '/payouts',
+    //   name: 'Payouts',
+    //   as: NavLink,
+    //   icon: <CIcon icon={cilWallet} customClassName="nav-icon" />,
+    // },
     {
       component: CNavItem,
-      to: '/payouts',
-      name: 'Payouts',
+      to: '/billing',
+      name: 'Billing',
       as: NavLink,
       icon: <CIcon icon={cilWallet} customClassName="nav-icon" />,
     },
@@ -133,34 +188,59 @@ export const getNavigation = (permissions = {}) => {
       component: CNavItem,
       to: '/notification',
       name: 'Push Notification',
+
       as: NavLink,
       icon: <CIcon icon={cilBell} customClassName="nav-icon" />,
     },
     {
       component: CNavItem,
       to: '/attendance',
-      name: 'Attendance',
+      name: 'Attendance Reports',
       as: NavLink,
-      icon: <CIcon icon={cilBell} customClassName="nav-icon" />,
+      icon: <CIcon icon={cilClipboard} customClassName="nav-icon" />,
     },
+    {
+      component: CNavItem,
+      to: '/analytics',
+      name: 'Analytics',
+      as: NavLink,
+      icon: <CIcon icon={cilChart} customClassName="nav-icon" />,
+    },
+    {
+      component: CNavItem,
+      to: '/recoverySupport',
+      name: 'Recovery Support',
+      as: NavLink,
+      icon: <CIcon icon={cilLightbulb} customClassName="nav-icon" />,
+    },
+
+
+
     {
       component: CNavItem,
       to: '/help',
       name: 'Help',
       as: NavLink,
-      icon: <CIcon icon={cilLightbulb} customClassName="nav-icon" />,
+      icon: <CIcon icon={cilChatBubble} customClassName="nav-icon" />,
     },
+
+
+
   ]
 
-  // Only include items if permission exists
+
   if (!permissions || typeof permissions !== 'object') return []
 
   // return allNav.filter((item) => permissions[item.name])
   return allNav.filter(
     (item) =>
-      permissions[item.name] ||
-      item.name === 'Patient Management' ||
-      item.name === 'Package Management',
+      // permissions[item.name] || item.name === 'Attendance Reports' || item.name === 'Recovery Support'
+      permissions[item.name]
+
+
+
+
+    // item.name === 'Equipment Management',
   )
 }
 
