@@ -412,7 +412,7 @@ services:
       WHATSAPP_FOLLOWUP_REMINDER_TEMPLATE_ID: ${WHATSAPP_FOLLOWUP_REMINDER_TEMPLATE_ID}
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8888/api/actuator/health"]
       interval: 30s
       timeout: 15s
       retries: 5
@@ -607,7 +607,7 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9909/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9909/api/actuator/health"]
       interval: 30s
       timeout: 15s
       retries: 5
